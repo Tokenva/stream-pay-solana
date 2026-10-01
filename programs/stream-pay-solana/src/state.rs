@@ -9,3 +9,11 @@ pub struct ProtocolConfig {
     pub bump: u8,
     pub created_at: i64,
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct Organization {
+    pub authority: Pubkey,
+    pub bump: u8,
+    pub created_at: i64,
+}

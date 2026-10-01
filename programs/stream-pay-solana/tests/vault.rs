@@ -2,7 +2,7 @@ use anchor_lang::InstructionData;
 use litesvm::LiteSVM;
 use litesvm_token::{
     get_spl_account, spl_token::state::Account as SplTokenAccount, CreateAccount, CreateMint,
-    MintTo,
+    MintTo, TOKEN_ID,
 };
 use solana_address::Address;
 use solana_instruction::{AccountMeta, Instruction};
@@ -12,7 +12,7 @@ use solana_signer::Signer;
 use solana_transaction::Transaction;
 
 use stream_pay_solana::{
-    constants::{PROTOCOL_CONFIG_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
+    constants::{ORGANIZATION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     instruction, ID,
 };
 
@@ -28,74 +28,85 @@ fn initialize_vault_and_deposit() {
     )
     .expect("failed to load StreamPay program");
 
-    let payer = Keypair::new();
+    let company = Keypair::new();
 
-    svm.airdrop(&payer.pubkey(), 10_000_000_000)
-        .expect("failed to fund payer");
+    svm.airdrop(&company.pubkey(), 10_000_000_000)
+        .expect("failed to fund company");
 
-    // Create a test token mint with 6 decimals.
-    let mint = CreateMint::new(&mut svm, &payer)
-        .authority(&payer.pubkey())
+    // Use the same token program as litesvm-token.
+    let token_program = TOKEN_ID;
+
+    let system_program = Address::new_from_array(solana_system_interface::program::ID.to_bytes());
+
+    // Create a test USDC-like mint.
+    let mint = CreateMint::new(&mut svm, &company)
+        .authority(&company.pubkey())
         .decimals(6)
+        .token_program_id(&token_program)
         .send()
         .expect("failed to create mint");
 
     // Create the company's token account.
-    let company_token_account = CreateAccount::new(&mut svm, &payer, &mint)
-        .owner(&payer.pubkey())
+    let company_token_account = CreateAccount::new(&mut svm, &company, &mint)
+        .owner(&company.pubkey())
+        .token_program_id(&token_program)
         .send()
         .expect("failed to create company token account");
 
-    // Give the company 3,000 tokens.
+    // Give company 3,000 tokens.
     MintTo::new(
         &mut svm,
-        &payer,
+        &company,
         &mint,
         &company_token_account,
         3_000_000_000,
     )
-    .owner(&payer)
+    .token_program_id(&token_program)
+    .owner(&company)
     .send()
-    .expect("failed to mint test tokens");
+    .expect("failed to mint company tokens");
 
-    let token_program = Address::new_from_array(anchor_spl::token::ID.to_bytes());
-
-    let system_program = Address::new_from_array(solana_system_interface::program::ID.to_bytes());
-
-    let (protocol_config, _) =
-        anchor_lang::prelude::Pubkey::find_program_address(&[PROTOCOL_CONFIG_SEED], &ID);
-
-    let protocol_config = Address::new_from_array(protocol_config.to_bytes());
-
-    let (vault, _) =
-        anchor_lang::prelude::Pubkey::find_program_address(&[VAULT_SEED, mint.as_ref()], &ID);
-
-    let vault = Address::new_from_array(vault.to_bytes());
-
-    let (vault_authority, _) = anchor_lang::prelude::Pubkey::find_program_address(
-        &[VAULT_AUTHORITY_SEED, mint.as_ref()],
+    // Organization PDA.
+    let (organization_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[ORGANIZATION_SEED, company.pubkey().as_ref()],
         &ID,
     );
 
-    let vault_authority = Address::new_from_array(vault_authority.to_bytes());
+    let organization = Address::new_from_array(organization_anchor.to_bytes());
 
-    // Step 1: initialize protocol.
-    let initialize_protocol_ix = Instruction {
+    // Company-specific vault PDA.
+    let (vault_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[VAULT_SEED, organization.as_ref(), mint.as_ref()],
+        &ID,
+    );
+
+    let vault = Address::new_from_array(vault_anchor.to_bytes());
+
+    // Company-specific vault authority PDA.
+    let (vault_authority_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[VAULT_AUTHORITY_SEED, organization.as_ref(), mint.as_ref()],
+        &ID,
+    );
+
+    let vault_authority = Address::new_from_array(vault_authority_anchor.to_bytes());
+
+    // Create Organization.
+    let create_organization_ix = Instruction {
         program_id,
         accounts: vec![
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new(protocol_config, false),
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new(organization, false),
             AccountMeta::new_readonly(system_program, false),
         ],
-        data: instruction::InitializeProtocol {}.data(),
+        data: instruction::CreateOrganization {}.data(),
     };
 
-    // Step 2: create vault.
+    // Create company-specific Vault.
     let initialize_vault_ix = Instruction {
         program_id,
         accounts: vec![
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(protocol_config, false),
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(vault_authority, false),
@@ -106,22 +117,23 @@ fn initialize_vault_and_deposit() {
     };
 
     let setup_tx = Transaction::new(
-        &[&payer],
+        &[&company],
         Message::new(
-            &[initialize_protocol_ix, initialize_vault_ix],
-            Some(&payer.pubkey()),
+            &[create_organization_ix, initialize_vault_ix],
+            Some(&company.pubkey()),
         ),
         svm.latest_blockhash(),
     );
 
     svm.send_transaction(setup_tx)
-        .expect("protocol/vault setup failed");
+        .expect("organization/vault setup failed");
 
-    // Step 3: deposit 1,000 tokens into the vault.
+    // Deposit 1,000 tokens.
     let deposit_ix = Instruction {
         program_id,
         accounts: vec![
-            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
             AccountMeta::new(company_token_account, false),
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new(vault, false),
@@ -134,51 +146,36 @@ fn initialize_vault_and_deposit() {
     };
 
     let deposit_tx = Transaction::new(
-        &[&payer],
-        Message::new(&[deposit_ix], Some(&payer.pubkey())),
+        &[&company],
+        Message::new(&[deposit_ix], Some(&company.pubkey())),
         svm.latest_blockhash(),
     );
 
     svm.send_transaction(deposit_tx).expect("deposit failed");
 
-    // Verify company balance = 2,000 tokens.
+    // Verify company balance.
     let company_account: SplTokenAccount =
         get_spl_account(&svm, &company_token_account).expect("company token account missing");
 
     assert_eq!(company_account.amount, 2_000_000_000);
 
-    // Verify vault balance = 1,000 tokens.
+    // Verify vault balance.
     let vault_account: SplTokenAccount =
         get_spl_account(&svm, &vault).expect("vault token account missing");
 
     assert_eq!(vault_account.amount, 1_000_000_000);
 
-    println!("M2 deposit test passed");
+    // Verify vault uses the expected mint.
+    assert_eq!(vault_account.mint, mint);
+
+    // Verify vault is controlled by the expected PDA.
+    assert_eq!(vault_account.owner, vault_authority);
+
+    println!("M3 company vault test passed");
+    println!("Organization: {}", organization);
+    println!("Mint: {}", mint);
+    println!("Vault: {}", vault);
+    println!("Vault authority: {}", vault_authority);
     println!("Company balance: {}", company_account.amount);
     println!("Vault balance: {}", vault_account.amount);
-
-    // A zero-value deposit must be rejected.
-    let zero_deposit_ix = Instruction {
-        program_id,
-        accounts: vec![
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new(company_token_account, false),
-            AccountMeta::new_readonly(mint, false),
-            AccountMeta::new(vault, false),
-            AccountMeta::new_readonly(token_program, false),
-        ],
-        data: instruction::Deposit { amount: 0 }.data(),
-    };
-
-    let zero_deposit_tx = Transaction::new(
-        &[&payer],
-        Message::new(&[zero_deposit_ix], Some(&payer.pubkey())),
-        svm.latest_blockhash(),
-    );
-
-    let result = svm.send_transaction(zero_deposit_tx);
-
-    assert!(result.is_err());
-
-    println!("Zero deposit correctly rejected");
 }

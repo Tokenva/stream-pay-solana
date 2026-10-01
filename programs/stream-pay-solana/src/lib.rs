@@ -19,6 +19,10 @@ pub mod stream_pay_solana {
         crate::instructions::initialize_protocol::handle_initialize_protocol(ctx)
     }
 
+    pub fn create_organization(ctx: Context<CreateOrganization>) -> Result<()> {
+        crate::instructions::create_organization::handle_create_organization(ctx)
+    }
+
     pub fn initialize_vault(ctx: Context<InitializeVault>) -> Result<()> {
         crate::instructions::initialize_vault::handle_initialize_vault(ctx)
     }

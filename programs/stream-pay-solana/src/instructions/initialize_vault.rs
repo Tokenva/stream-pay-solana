@@ -1,10 +1,14 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
-    constants::{PROTOCOL_CONFIG_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
+    constants::{
+        ORGANIZATION_SEED,
+        VAULT_AUTHORITY_SEED,
+        VAULT_SEED,
+    },
     error::StreamPayError,
-    state::ProtocolConfig,
+    state::Organization,
 };
 
 #[derive(Accounts)]
@@ -13,39 +17,49 @@ pub struct InitializeVault<'info> {
     pub authority: Signer<'info>,
 
     #[account(
-        seeds = [PROTOCOL_CONFIG_SEED],
-        bump = protocol_config.bump,
-        constraint = protocol_config.authority == authority.key()
+        seeds = [ORGANIZATION_SEED, authority.key().as_ref()],
+        bump = organization.bump,
+        constraint = organization.authority == authority.key()
             @ StreamPayError::Unauthorized
     )]
-    pub protocol_config: Account<'info, ProtocolConfig>,
+    pub organization: Account<'info, Organization>,
 
-    pub mint: InterfaceAccount<'info, Mint>,
+    pub mint: Account<'info, Mint>,
 
     #[account(
         init,
         payer = authority,
         token::mint = mint,
         token::authority = vault_authority,
-        token::token_program = token_program,
-        seeds = [VAULT_SEED, mint.key().as_ref()],
+        seeds = [
+            VAULT_SEED,
+            organization.key().as_ref(),
+            mint.key().as_ref()
+        ],
         bump
     )]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
+    pub vault: Account<'info, TokenAccount>,
 
     /// CHECK: PDA used only as the vault token-account authority.
     #[account(
-        seeds = [VAULT_AUTHORITY_SEED, mint.key().as_ref()],
+        seeds = [
+            VAULT_AUTHORITY_SEED,
+            organization.key().as_ref(),
+            mint.key().as_ref()
+        ],
         bump
     )]
     pub vault_authority: UncheckedAccount<'info>,
 
-    pub token_program: Interface<'info, TokenInterface>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn handle_initialize_vault(ctx: Context<InitializeVault>) -> Result<()> {
-    msg!("StreamPay vault initialized");
+pub fn handle_initialize_vault(
+    ctx: Context<InitializeVault>,
+) -> Result<()> {
+    msg!("Organization vault initialized");
+    msg!("Organization: {}", ctx.accounts.organization.key());
     msg!("Mint: {}", ctx.accounts.mint.key());
     msg!("Vault: {}", ctx.accounts.vault.key());
     msg!("Vault authority: {}", ctx.accounts.vault_authority.key());
