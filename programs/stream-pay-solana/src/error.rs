@@ -7,4 +7,10 @@ pub enum StreamPayError {
 
     #[msg("The protocol is not paused")]
     NotPaused,
+
+    #[msg("The signer is not the protocol authority")]
+    Unauthorized,
+
+    #[msg("Amount must be greater than zero")]
+    InvalidAmount,
 }
