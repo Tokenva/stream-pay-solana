@@ -56,7 +56,12 @@ export function getStreamPda(
   streamId: number,
 ) {
   const idBuffer = Buffer.alloc(8);
-  idBuffer.writeBigUInt64LE(BigInt(streamId));
+  let value = BigInt(streamId);
+
+  for (let i = 0; i < 8; i += 1) {
+    idBuffer[i] = Number(value & BigInt(255));
+    value >>= BigInt(8);
+  }
 
   return PublicKey.findProgramAddressSync(
     [

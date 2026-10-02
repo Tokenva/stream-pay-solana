@@ -273,50 +273,41 @@ export default function Home() {
       );
     } catch (err) {
       setActionError(
-  err instanceof Error
-    ? err.message
-    : "Top-up failed",
-);
+        err instanceof Error
+          ? err.message
+          : "Top-up failed",
+      );
     }
   }
 
   async function handleCreateStream() {
+
     try {
       setMessage(null);
       setActionError(null);
 
       if (!startTime || !endTime) {
-        throw new Error(
-          "Choose stream start and end times",
-        );
+        throw new Error("Choose stream start and end times");
       }
 
-      const start =
-        Math.floor(
-          new Date(
-            startTime,
-          ).getTime() / 1000,
-        );
+      const start = Math.floor(
+        new Date(startTime).getTime() / 1000,
+      );
 
-      const end =
-        Math.floor(
-          new Date(
-            endTime,
-          ).getTime() / 1000,
-        );
+      const end = Math.floor(
+        new Date(endTime).getTime() / 1000,
+      );
 
-      const rawAmount =
-        toBaseUnits(
-          streamAmount,
-        );
+      const rawAmount = toBaseUnits(streamAmount);
 
-      const result =
-        await createStream(
-          employeeAddress,
-          rawAmount,
-          start,
-          end,
-        );
+      const result = await createStream(
+        employeeAddress,
+        rawAmount,
+        start,
+        end,
+      );
+
+      await refreshVault();
 
       setMessage(
         `Stream created: ${shortenAddress(
@@ -324,6 +315,8 @@ export default function Home() {
         )}`,
       );
     } catch (err) {
+      console.error("CREATE STREAM ERROR:", err);
+
       setActionError(
         err instanceof Error
           ? err.message
@@ -607,7 +600,7 @@ export default function Home() {
             onClick={
               handleCreateStream
             }
-            className="mt-5 rounded-xl bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
+            className="mt-5 cursor-pointer rounded-xl bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
           >
             {streamLoading
               ? "Creating..."
