@@ -2,11 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
-    constants::{
-        ORGANIZATION_SEED,
-        VAULT_AUTHORITY_SEED,
-        VAULT_SEED,
-    },
+    constants::{ORGANIZATION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::StreamPayError,
     state::Organization,
 };
@@ -55,9 +51,7 @@ pub struct InitializeVault<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handle_initialize_vault(
-    ctx: Context<InitializeVault>,
-) -> Result<()> {
+pub fn handle_initialize_vault(ctx: Context<InitializeVault>) -> Result<()> {
     msg!("Organization vault initialized");
     msg!("Organization: {}", ctx.accounts.organization.key());
     msg!("Mint: {}", ctx.accounts.mint.key());

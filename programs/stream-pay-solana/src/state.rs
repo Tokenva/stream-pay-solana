@@ -17,3 +17,37 @@ pub struct Organization {
     pub bump: u8,
     pub created_at: i64,
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct Stream {
+    pub organization: Pubkey,
+    pub employee: Pubkey,
+    pub vault: Pubkey,
+    pub mint: Pubkey,
+    pub stream_id: u64,
+    pub total_amount: u64,
+    pub escrow: Pubkey,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub claimed_amount: u64,
+    pub bump: u8,
+}
+
+impl Stream {
+    pub fn earned_amount(&self, current_time: i64) -> u64 {
+        if current_time <= self.start_time {
+            return 0;
+        }
+
+        if current_time >= self.end_time {
+            return self.total_amount;
+        }
+
+        let elapsed = (current_time - self.start_time) as u128;
+        let duration = (self.end_time - self.start_time) as u128;
+        let total_amount = self.total_amount as u128;
+
+        ((total_amount * elapsed) / duration) as u64
+    }
+}

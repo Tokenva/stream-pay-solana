@@ -1,11 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{
-    self,
-    Mint,
-    Token,
-    TokenAccount,
-    TransferChecked,
-};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
 use crate::{
     constants::{ORGANIZATION_SEED, VAULT_SEED},
@@ -49,10 +43,7 @@ pub struct Deposit<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn handle_deposit(
-    ctx: Context<Deposit>,
-    amount: u64,
-) -> Result<()> {
+pub fn handle_deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     require!(amount > 0, StreamPayError::InvalidAmount);
 
     let cpi_accounts = TransferChecked {
@@ -62,16 +53,9 @@ pub fn handle_deposit(
         authority: ctx.accounts.depositor.to_account_info(),
     };
 
-    let cpi_ctx = CpiContext::new(
-        ctx.accounts.token_program.key(),
-        cpi_accounts,
-    );
+    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.key(), cpi_accounts);
 
-    token::transfer_checked(
-        cpi_ctx,
-        amount,
-        ctx.accounts.mint.decimals,
-    )?;
+    token::transfer_checked(cpi_ctx, amount, ctx.accounts.mint.decimals)?;
 
     msg!("Vault deposit completed");
     msg!("Organization: {}", ctx.accounts.organization.key());

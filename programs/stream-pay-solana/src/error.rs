@@ -13,4 +13,10 @@ pub enum StreamPayError {
 
     #[msg("Amount must be greater than zero")]
     InvalidAmount,
+
+    #[msg("There is nothing available to claim")]
+    NothingToClaim,
+
+    #[msg("The stream mint does not match the provided mint")]
+    InvalidStreamMint,
 }

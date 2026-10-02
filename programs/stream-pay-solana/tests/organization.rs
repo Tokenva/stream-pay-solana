@@ -84,9 +84,7 @@ fn unauthorized_wallet_cannot_use_existing_organization() {
 
     svm.add_program(
         program_id,
-        include_bytes!(
-            "../../../target/deploy/stream_pay_solana.so"
-        ),
+        include_bytes!("../../../target/deploy/stream_pay_solana.so"),
     )
     .expect("failed to load StreamPay program");
 
@@ -99,37 +97,26 @@ fn unauthorized_wallet_cannot_use_existing_organization() {
     svm.airdrop(&company_b.pubkey(), 10_000_000_000)
         .expect("failed to fund company B");
 
-    let (organization_anchor, bump) =
-        anchor_lang::prelude::Pubkey::find_program_address(
-            &[
-                ORGANIZATION_SEED,
-                company_a.pubkey().as_ref(),
-            ],
-            &ID,
-        );
+    let (organization_anchor, bump) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[ORGANIZATION_SEED, company_a.pubkey().as_ref()],
+        &ID,
+    );
 
-    let organization =
-        Address::new_from_array(organization_anchor.to_bytes());
+    let organization = Address::new_from_array(organization_anchor.to_bytes());
 
     let create_organization_ix = Instruction {
         program_id,
         accounts: vec![
             AccountMeta::new(company_a.pubkey(), true),
             AccountMeta::new(organization, false),
-            AccountMeta::new_readonly(
-                solana_system_interface::program::ID,
-                false,
-            ),
+            AccountMeta::new_readonly(solana_system_interface::program::ID, false),
         ],
         data: instruction::CreateOrganization {}.data(),
     };
 
     let create_tx = Transaction::new(
         &[&company_a],
-        Message::new(
-            &[create_organization_ix],
-            Some(&company_a.pubkey()),
-        ),
+        Message::new(&[create_organization_ix], Some(&company_a.pubkey())),
         svm.latest_blockhash(),
     );
 
@@ -143,8 +130,7 @@ fn unauthorized_wallet_cannot_use_existing_organization() {
     let mut data: &[u8] = &account.data;
 
     let organization_data =
-        Organization::try_deserialize(&mut data)
-            .expect("failed to deserialize Organization");
+        Organization::try_deserialize(&mut data).expect("failed to deserialize Organization");
 
     assert_eq!(
         organization_data.authority.to_bytes(),
@@ -159,20 +145,14 @@ fn unauthorized_wallet_cannot_use_existing_organization() {
         accounts: vec![
             AccountMeta::new(company_b.pubkey(), true),
             AccountMeta::new_readonly(organization, false),
-            AccountMeta::new_readonly(
-                solana_system_interface::program::ID,
-                false,
-            ),
+            AccountMeta::new_readonly(solana_system_interface::program::ID, false),
         ],
         data: instruction::CreateOrganization {}.data(),
     };
 
     let unauthorized_tx = Transaction::new(
         &[&company_b],
-        Message::new(
-            &[unauthorized_ix],
-            Some(&company_b.pubkey()),
-        ),
+        Message::new(&[unauthorized_ix], Some(&company_b.pubkey())),
         svm.latest_blockhash(),
     );
 

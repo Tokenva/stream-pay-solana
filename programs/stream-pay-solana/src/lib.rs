@@ -30,4 +30,24 @@ pub mod stream_pay_solana {
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         crate::instructions::deposit::handle_deposit(ctx, amount)
     }
+
+    pub fn create_stream(
+        ctx: Context<CreateStream>,
+        stream_id: u64,
+        total_amount: u64,
+        start_time: i64,
+        end_time: i64,
+    ) -> Result<()> {
+        crate::instructions::create_stream::handle_create_stream(
+            ctx,
+            stream_id,
+            total_amount,
+            start_time,
+            end_time,
+        )
+    }
+
+    pub fn claim(ctx: Context<Claim>) -> Result<()> {
+        crate::instructions::claim::handle_claim(ctx)
+    }
 }
