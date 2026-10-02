@@ -10,8 +10,11 @@ skip-lint = false
 [programs.localnet]
 stream_pay_solana = "4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS"
 
+[programs.devnet]
+stream_pay_solana = "4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS"
+
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
