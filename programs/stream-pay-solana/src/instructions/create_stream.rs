@@ -105,6 +105,8 @@ pub fn handle_create_stream(
     stream.start_time = start_time;
     stream.end_time = end_time;
     stream.claimed_amount = 0;
+    stream.canceled = false;
+    stream.cancel_time = 0;
     stream.bump = ctx.bumps.stream;
 
     let organization_key = ctx.accounts.organization.key();

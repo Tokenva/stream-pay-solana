@@ -155,13 +155,17 @@ initialize_vault
 
 deposit
 [Move tokens into the company vault]
+
+create_stream
+[Create a payment stream and reserve its funds]
+
+claim
+[Allow the employee to claim earned Tokens]
 ```
 
 ## Future instructions
 
 ```text
-create_stream
-claim
 cancel_stream
 top_up_stream
 pause_protocol
@@ -1169,6 +1173,33 @@ deposit
 [Funds the company vault]
 ```
 
+## M4
+
+```text
+Company Vault
+      ↓
+create_stream
+[Creates payment agreement]
+      ↓
+Stream PDA
+[Stores stream rules]
+      ↓
+Stream Escrow
+[Stores reserved stream funds]
+      ↓
+Time passes
+      ↓
+Employee calls claim
+      ↓
+StreamPay calculates earned amount
+      ↓
+CPI
+      ↓
+Token Program
+      ↓
+Employee Token Account
+```
+
 ---
 
 # 33. PHASE-BY-PHASE TEST PATTERN
@@ -1270,7 +1301,15 @@ Security tests:
 Status:
 
 ```text
-M4 = PENDING ⏳
+Company
+   ↓
+Employee
+   ↓
+Token amount
+   ↓
+Start time
+   ↓
+End time
 ```
 
 ---
@@ -1611,7 +1650,7 @@ M0 — Environment + Solana fundamentals     ✅
 M1 — Protocol Configuration                 ✅
 M2 — Token Vault + Deposits                 ✅
 M3 — Company / Organization + Vault         ✅
-M4 — Payment Stream                         ⏳
+M4 — Payment Stream                         ✅
 M5 — Claim / Cancel / Top-up                ⏳
 M6 — Security + Comprehensive Tests         ⏳
 M7 — Frontend                               ⏳
@@ -1633,10 +1672,10 @@ M0 ✅
 M1 ✅
 M2 ✅
 M3 ✅
+M4 ✅
 
 Pending:
 
-M4 ⏳
 M5 ⏳
 M6 ⏳
 M7 ⏳
@@ -1785,8 +1824,8 @@ M3 — Company / Organization
 
 
 M4 — Payment Stream
-[Create the actual salary/payment agreement between a company and an employee]
-⏳ Pending
+[Create the payment agreement, reserve stream funds in escrow, calculate earned Tokens, and allow employees to claim earned Tokens]
+✅ Complete
 
 
 M5 — Claims / Cancel / Top-up

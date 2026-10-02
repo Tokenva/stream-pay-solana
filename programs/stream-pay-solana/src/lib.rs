@@ -50,4 +50,12 @@ pub mod stream_pay_solana {
     pub fn claim(ctx: Context<Claim>) -> Result<()> {
         crate::instructions::claim::handle_claim(ctx)
     }
+
+    pub fn top_up_stream(ctx: Context<TopUpStream>, stream_id: u64, amount: u64) -> Result<()> {
+        crate::instructions::top_up_stream::handle_top_up_stream(ctx, stream_id, amount)
+    }
+
+    pub fn cancel_stream(ctx: Context<CancelStream>, stream_id: u64) -> Result<()> {
+        crate::instructions::cancel_stream::handle_cancel_stream(ctx, stream_id)
+    }
 }

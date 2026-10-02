@@ -19,4 +19,16 @@ pub enum StreamPayError {
 
     #[msg("The stream mint does not match the provided mint")]
     InvalidStreamMint,
+
+    #[msg("The stream has already been canceled")]
+    AlreadyCanceled,
+
+    #[msg("The stream has been canceled")]
+    StreamCanceled,
+
+    #[msg("The stream has already started")]
+    StreamAlreadyStarted,
+
+    #[msg("Arithmetic overflow")]
+    ArithmeticOverflow,
 }

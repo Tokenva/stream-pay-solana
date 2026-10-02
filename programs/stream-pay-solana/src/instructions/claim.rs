@@ -52,8 +52,8 @@ pub struct Claim<'info> {
 
 pub fn handle_claim(ctx: Context<Claim>) -> Result<()> {
     require!(
-        ctx.accounts.stream.mint == ctx.accounts.mint.key(),
-        StreamPayError::InvalidStreamMint
+        !ctx.accounts.stream.canceled,
+        StreamPayError::StreamCanceled
     );
 
     let current_time = Clock::get()?.unix_timestamp;

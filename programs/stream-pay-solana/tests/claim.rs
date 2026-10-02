@@ -329,4 +329,81 @@ fn employee_can_claim_earned_tokens() {
     );
 
     println!("M4.5 claim safety tests passed");
+
+    // Cancel the stream at the current halfway timestamp.
+    let cancel_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
+            AccountMeta::new_readonly(employee.pubkey(), false),
+            AccountMeta::new(stream, false),
+            AccountMeta::new(stream_escrow, false),
+            AccountMeta::new(vault, false),
+            AccountMeta::new_readonly(vault_authority, false),
+            AccountMeta::new_readonly(mint, false),
+            AccountMeta::new(employee_token_account, false),
+            AccountMeta::new_readonly(token_program, false),
+        ],
+        data: instruction::CancelStream { stream_id }.data(),
+    };
+
+    let cancel_tx = Transaction::new(
+        &[&company],
+        Message::new(&[cancel_ix], Some(&company.pubkey())),
+        svm.latest_blockhash(),
+    );
+
+    svm.send_transaction(cancel_tx).expect("cancel failed");
+
+    let final_employee_account: SplTokenAccount =
+        get_spl_account(&svm, &employee_token_account).expect("employee token account missing");
+
+    let final_escrow_account: SplTokenAccount =
+        get_spl_account(&svm, &stream_escrow).expect("stream escrow missing");
+
+    let final_vault_account: SplTokenAccount =
+        get_spl_account(&svm, &vault).expect("vault missing");
+
+    let final_stream_account = svm.get_account(&stream).expect("stream account missing");
+
+    let final_stream_data =
+        stream_pay_solana::Stream::try_deserialize(&mut &final_stream_account.data[..])
+            .expect("failed to deserialize final Stream account");
+
+    assert_eq!(final_employee_account.amount, 500_000_000);
+    assert_eq!(final_escrow_account.amount, 0);
+    assert_eq!(final_vault_account.amount, 500_000_000);
+    assert_eq!(final_stream_data.claimed_amount, 500_000_000);
+    assert!(final_stream_data.canceled);
+    assert_eq!(final_stream_data.cancel_time, 1_500);
+
+    println!("M5.1 cancel test passed");
+
+    // Claim after cancellation must fail.
+    let canceled_claim_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(employee.pubkey(), true),
+            AccountMeta::new(stream, false),
+            AccountMeta::new(stream_escrow, false),
+            AccountMeta::new_readonly(mint, false),
+            AccountMeta::new(employee_token_account, false),
+            AccountMeta::new_readonly(token_program, false),
+        ],
+        data: instruction::Claim {}.data(),
+    };
+
+    let canceled_claim_tx = Transaction::new(
+        &[&employee],
+        Message::new(&[canceled_claim_ix], Some(&employee.pubkey())),
+        svm.latest_blockhash(),
+    );
+
+    assert!(
+        svm.send_transaction(canceled_claim_tx).is_err(),
+        "claim after cancellation should fail"
+    );
+
+    println!("Claim-after-cancel security test passed");
 }
