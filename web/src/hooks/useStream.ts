@@ -1,6 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import {
@@ -34,6 +38,73 @@ type StreamData = {
   bump: number;
 };
 
+const ZERO = BigInt(0);
+
+function calculateClaimable(
+  data: StreamData | null,
+): bigint {
+  if (!data) {
+    return ZERO;
+  }
+
+  const now = BigInt(
+    Math.floor(Date.now() / 1000),
+  );
+
+  const start = BigInt(
+    data.startTime.toString(),
+  );
+
+  const end = BigInt(
+    data.endTime.toString(),
+  );
+
+  const total = BigInt(
+    data.totalAmount.toString(),
+  );
+
+  const claimed = BigInt(
+    data.claimedAmount.toString(),
+  );
+
+  if (now <= start) {
+    return ZERO;
+  }
+
+  const cancelTime = BigInt(
+    data.cancelTime.toString(),
+  );
+
+  const effectiveEnd =
+    data.canceled &&
+    cancelTime < end
+      ? cancelTime
+      : end;
+
+  if (effectiveEnd <= start) {
+    return ZERO;
+  }
+
+  const elapsed =
+    now >= effectiveEnd
+      ? effectiveEnd - start
+      : now - start;
+
+  const duration = end - start;
+
+  if (duration <= ZERO) {
+    return ZERO;
+  }
+
+  const earned =
+    (total * elapsed) /
+    duration;
+
+  return earned > claimed
+    ? earned - claimed
+    : ZERO;
+}
+
 export function useStream(
   mintAddress: string,
   streamId: number,
@@ -46,151 +117,95 @@ export function useStream(
 
   const [streamEscrow, setStreamEscrow] =
     useState<PublicKey | null>(null);
-  const ZERO = BigInt(0);
+
   const [data, setData] =
     useState<StreamData | null>(null);
 
   const [claimable, setClaimable] =
     useState<bigint>(ZERO);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
   const [error, setError] =
     useState<string | null>(null);
 
-  const loadStream = useCallback(async () => {
-    if (
-      !wallet ||
-      !mintAddress.trim()
-    ) {
-      setStream(null);
-      setStreamEscrow(null);
-      setData(null);
-      setClaimable(ZERO);
-      return;
-    }
-
-    try {
-      setError(null);
-
-      const mint = new PublicKey(mintAddress);
-
-      const [organization] =
-        getOrganizationPda(
-          wallet.publicKey,
-        );
-
-      const [streamPda] =
-        getStreamPda(
-          organization,
-          wallet.publicKey,
-          streamId,
-        );
-
-      const [escrowPda] =
-        getStreamEscrowPda(streamPda);
-
-      setStream(streamPda);
-      setStreamEscrow(escrowPda);
-
-      const program = getProgram(
-        connection,
-        wallet,
-      );
-
-      const account =
-        await program.account.stream.fetch(
-          streamPda,
-        ) as StreamData;
-
-      setData(account);
-
-      const now =
-        BigInt(
-          Math.floor(
-            Date.now() / 1000,
-          ),
-        );
-
-      const start =
-        BigInt(account.startTime.toString());
-
-      const end =
-        BigInt(account.endTime.toString());
-
-      const total =
-        BigInt(account.totalAmount.toString());
-
-      const claimed =
-        BigInt(account.claimedAmount.toString());
-
-      let earned = ZERO;
-
-      if (now > start) {
-        const effectiveEnd =
-          account.canceled
-            ? BigInt(
-              account.cancelTime.toString(),
-            ) < end
-              ? BigInt(
-                account.cancelTime.toString(),
-              )
-              : end
-            : end;
-
-        if (now >= effectiveEnd) {
-          const elapsed =
-            effectiveEnd > start
-              ? effectiveEnd - start
-              : ZERO;
-
-          const duration =
-            end - start;
-
-          earned =
-            duration > ZERO
-              ? (total * elapsed) /
-              duration
-              : ZERO;
-        } else {
-          const elapsed =
-            now - start;
-
-          const duration =
-            end - start;
-
-          earned =
-            duration > ZERO
-              ? (total * elapsed) /
-              duration
-              : ZERO;
-        }
+  const loadStream = useCallback(
+    async () => {
+      if (
+        !wallet ||
+        !mintAddress.trim()
+      ) {
+        setStream(null);
+        setStreamEscrow(null);
+        setData(null);
+        setClaimable(ZERO);
+        setError(null);
+        return;
       }
 
-      const available =
-        earned > claimed
-          ? earned - claimed
-          : ZERO;
+      try {
+        setError(null);
 
-      setClaimable(available);
-    } catch (err) {
-      setData(null);
-      setClaimable(ZERO);
+        const mint =
+          new PublicKey(mintAddress);
 
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Stream not found";
+        const [organization] =
+          getOrganizationPda(
+            wallet.publicKey,
+          );
 
-      setError(message);
-    }
-  }, [
-    connection,
-    wallet,
-    mintAddress,
-    streamId,
-  ]);
+        const [streamPda] =
+          getStreamPda(
+            organization,
+            wallet.publicKey,
+            streamId,
+          );
 
+        const [escrowPda] =
+          getStreamEscrowPda(
+            streamPda,
+          );
+
+        setStream(streamPda);
+        setStreamEscrow(escrowPda);
+
+        const program =
+          getProgram(
+            connection,
+            wallet,
+          );
+
+        const account =
+          (await program.account.stream.fetch(
+            streamPda,
+          )) as StreamData;
+
+        setData(account);
+        setClaimable(
+          calculateClaimable(account),
+        );
+      } catch (err) {
+        setData(null);
+        setClaimable(ZERO);
+
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Stream not found";
+
+        setError(message);
+      }
+    },
+    [
+      connection,
+      wallet,
+      mintAddress,
+      streamId,
+    ],
+  );
+
+  // Network request only every 15 seconds.
   useEffect(() => {
     void loadStream();
 
@@ -199,7 +214,7 @@ export function useStream(
         () => {
           void loadStream();
         },
-        1000,
+        15_000,
       );
 
     return () => {
@@ -207,126 +222,158 @@ export function useStream(
     };
   }, [loadStream]);
 
-  const createStream = useCallback(
-    async (
-      employeeAddress: string,
-      amount: string,
-      startTime: number,
-      endTime: number,
-    ) => {
-      if (!wallet) {
-        throw new Error(
-          "Connect your wallet first",
+  // Update claimable amount locally every second.
+  // No Solana RPC request here.
+  useEffect(() => {
+    const update =
+      () => {
+        setClaimable(
+          calculateClaimable(data),
         );
-      }
+      };
 
-      const employee =
-        new PublicKey(employeeAddress);
+    update();
 
-      const mint =
-        new PublicKey(mintAddress);
+    const timer =
+      window.setInterval(
+        update,
+        1_000,
+      );
 
-      const [organization] =
-        getOrganizationPda(
-          wallet.publicKey,
-        );
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [data]);
 
-      const [vault] =
-        getVaultPda(
-          organization,
-          mint,
-        );
+  const createStream =
+    useCallback(
+      async (
+        employeeAddress: string,
+        amount: string,
+        startTime: number,
+        endTime: number,
+      ) => {
+        if (!wallet) {
+          throw new Error(
+            "Connect your wallet first",
+          );
+        }
 
-      const [vaultAuthority] =
-        getVaultAuthorityPda(
-          organization,
-          mint,
-        );
+        const employee =
+          new PublicKey(employeeAddress);
 
-      const [streamPda] =
-        getStreamPda(
-          organization,
-          employee,
-          streamId,
-        );
+        const mint =
+          new PublicKey(mintAddress);
 
-      const [escrowPda] =
-        getStreamEscrowPda(streamPda);
+        const [organization] =
+          getOrganizationPda(
+            wallet.publicKey,
+          );
 
-      const amountRaw =
-        new BN(amount);
+        const [vault] =
+          getVaultPda(
+            organization,
+            mint,
+          );
 
-      if (amountRaw.lte(new BN(0))) {
-        throw new Error(
-          "Amount must be greater than zero",
-        );
-      }
+        const [vaultAuthority] =
+          getVaultAuthorityPda(
+            organization,
+            mint,
+          );
 
-      if (endTime <= startTime) {
-        throw new Error(
-          "End time must be after start time",
-        );
-      }
+        const [streamPda] =
+          getStreamPda(
+            organization,
+            employee,
+            streamId,
+          );
 
-      const program =
-        getProgram(
-          connection,
-          wallet,
-        );
+        const [escrowPda] =
+          getStreamEscrowPda(
+            streamPda,
+          );
 
-      setLoading(true);
-      setError(null);
+        const amountRaw =
+          new BN(amount);
 
-      try {
-        const signature =
-          await program.methods
-            .createStream(
-              new BN(streamId),
-              amountRaw,
-              new BN(startTime),
-              new BN(endTime),
-            )
-            .accountsPartial({
-              authority: wallet.publicKey,
-              organization,
-              employee,
-              mint,
-              vault,
-              vaultAuthority,
-              stream: streamPda,
-              streamEscrow: escrowPda,
-              tokenProgram:
-                SPL_TOKEN_PROGRAM_ID,
-            })
-            .rpc();
+        if (
+          amountRaw.lte(
+            new BN(0),
+          )
+        ) {
+          throw new Error(
+            "Amount must be greater than zero",
+          );
+        }
 
-        await loadStream();
+        if (endTime <= startTime) {
+          throw new Error(
+            "End time must be after start time",
+          );
+        }
 
-        return {
-          signature,
-          stream: streamPda,
-          escrow: escrowPda,
-        };
-      } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Create Stream failed";
+        const program =
+          getProgram(
+            connection,
+            wallet,
+          );
 
-        setError(message);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [
-      connection,
-      wallet,
-      mintAddress,
-      streamId,
-      loadStream,
-    ],
-  );
+        setLoading(true);
+        setError(null);
+
+        try {
+          const signature =
+            await program.methods
+              .createStream(
+                new BN(streamId),
+                amountRaw,
+                new BN(startTime),
+                new BN(endTime),
+              )
+              .accountsPartial({
+                authority:
+                  wallet.publicKey,
+                organization,
+                employee,
+                mint,
+                vault,
+                vaultAuthority,
+                stream: streamPda,
+                streamEscrow:
+                  escrowPda,
+                tokenProgram:
+                  SPL_TOKEN_PROGRAM_ID,
+              })
+              .rpc();
+
+          await loadStream();
+
+          return {
+            signature,
+            stream: streamPda,
+            escrow: escrowPda,
+          };
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Create Stream failed";
+
+          setError(message);
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+      },
+      [
+        connection,
+        wallet,
+        mintAddress,
+        streamId,
+        loadStream,
+      ],
+    );
 
   const claim = useCallback(
     async () => {
@@ -336,7 +383,11 @@ export function useStream(
         );
       }
 
-      if (!stream || !streamEscrow || !data) {
+      if (
+        !stream ||
+        !streamEscrow ||
+        !data
+      ) {
         throw new Error(
           "Stream not loaded",
         );
@@ -352,7 +403,8 @@ export function useStream(
         );
 
       if (
-        tokenAccounts.value.length === 0
+        tokenAccounts.value.length ===
+        0
       ) {
         throw new Error(
           "Employee token account not found",

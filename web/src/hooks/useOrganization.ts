@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { PublicKey } from "@solana/web3.js";
 import {
   useAnchorWallet,
   useConnection,
@@ -13,55 +19,96 @@ export function useOrganization() {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
 
+  const walletKey =
+    wallet?.publicKey.toBase58() ?? null;
+
   const [organization, setOrganization] =
-    useState<ReturnType<typeof getOrganizationPda>[0] | null>(null);
+    useState<PublicKey | null>(null);
 
-  const [exists, setExists] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [exists, setExists] =
+    useState(false);
 
-  const loadOrganization = useCallback(async () => {
-    if (!wallet) {
-      setOrganization(null);
-      setExists(false);
-      return;
-    }
+  const [loading, setLoading] =
+    useState(false);
 
-    setLoading(true);
-    setError(null);
+  const [error, setError] =
+    useState<string | null>(null);
 
-    try {
-      const [organizationPda] =
-        getOrganizationPda(wallet.publicKey);
+  const loadedWalletRef =
+    useRef<string | null>(null);
 
-      const account =
-        await connection.getAccountInfo(
-          organizationPda,
+  const loadingRef =
+    useRef(false);
+
+  const loadOrganization = useCallback(
+    async (force = false) => {
+      if (!walletKey) {
+        loadedWalletRef.current = null;
+        setOrganization(null);
+        setExists(false);
+        setError(null);
+        return;
+      }
+
+      if (
+        !force &&
+        loadedWalletRef.current === walletKey
+      ) {
+        return;
+      }
+
+      if (loadingRef.current) {
+        return;
+      }
+
+      loadingRef.current = true;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const walletPublicKey =
+          new PublicKey(walletKey);
+
+        const [organizationPda] =
+          getOrganizationPda(
+            walletPublicKey,
+          );
+
+        const account =
+          await connection.getAccountInfo(
+            organizationPda,
+          );
+
+        setOrganization(organizationPda);
+        setExists(account !== null);
+
+        loadedWalletRef.current = walletKey;
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to read Organization",
         );
-
-      setOrganization(organizationPda);
-      setExists(account !== null);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to read Organization",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [connection, wallet]);
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [connection, walletKey],
+  );
 
   useEffect(() => {
-    void loadOrganization();
-  }, [loadOrganization]);
+    void loadOrganization(true);
+  }, [loadOrganization, walletKey]);
 
   const createOrganization = useCallback(
     async () => {
       if (!wallet) {
-        throw new Error("Connect your wallet first");
+        throw new Error(
+          "Connect your wallet first",
+        );
       }
 
       const program = getProgram(
@@ -70,7 +117,9 @@ export function useOrganization() {
       );
 
       const [organizationPda] =
-        getOrganizationPda(wallet.publicKey);
+        getOrganizationPda(
+          wallet.publicKey,
+        );
 
       const signature =
         await program.methods
@@ -80,14 +129,18 @@ export function useOrganization() {
           })
           .rpc();
 
-      await loadOrganization();
+      await loadOrganization(true);
 
       return {
         signature,
         organizationPda,
       };
     },
-    [connection, wallet, loadOrganization],
+    [
+      connection,
+      wallet,
+      loadOrganization,
+    ],
   );
 
   return {
@@ -95,7 +148,8 @@ export function useOrganization() {
     exists,
     loading,
     error,
-    refresh: loadOrganization,
+    refresh: () =>
+      loadOrganization(true),
     createOrganization,
   };
 }

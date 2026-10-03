@@ -1,0 +1,69 @@
+export type IndexedStream = {
+  address: string;
+  organization: string;
+  employee: string;
+  vault: string;
+  escrow: string;
+  mint: string;
+  stream_id: string;
+  total_amount: string;
+  start_time: string;
+  end_time: string;
+  claimed_amount: string;
+  canceled: boolean;
+  cancel_time: string;
+  updated_at: string;
+};
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+export async function fetchIndexedStreams(
+  params?: {
+    organization?: string;
+    employee?: string;
+    canceled?: boolean;
+  },
+): Promise<IndexedStream[]> {
+  const searchParams = new URLSearchParams();
+
+  if (params?.organization) {
+    searchParams.set("organization", params.organization);
+  }
+
+  if (params?.employee) {
+    searchParams.set("employee", params.employee);
+  }
+
+  if (params?.canceled !== undefined) {
+    searchParams.set(
+      "canceled",
+      String(params.canceled),
+    );
+  }
+
+  const query = searchParams.toString();
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/indexed/streams${
+      query ? `?${query}` : ""
+    }`,
+    {
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Failed to fetch indexed streams",
+    );
+  }
+
+  const data = (await response.json()) as {
+    count: number;
+    streams: IndexedStream[];
+  };
+
+  return data.streams;
+}
+

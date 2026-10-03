@@ -9,6 +9,7 @@ import { useVault } from "@/hooks/useVault";
 import { useDeposit } from "@/hooks/useDeposit";
 import { useStream } from "@/hooks/useStream";
 import { useStreamActions } from "@/hooks/useStreamActions";
+import { useIndexedStreams } from "@/hooks/useIndexedStreams";
 const MINT =
   process.env.NEXT_PUBLIC_TOKEN_MINT ?? "";
 
@@ -189,6 +190,15 @@ export default function Home() {
       await refreshVault();
     },
   );
+
+  const {
+  streams: indexedStreams,
+  loading: indexedStreamsLoading,
+  error: indexedStreamsError,
+  refresh: refreshIndexedStreams,
+} = useIndexedStreams(
+  publicKey?.toBase58(),
+);
 
   useEffect(() => {
     if (
@@ -505,7 +515,7 @@ export default function Home() {
                 !depositAmount
               }
               onClick={handleDeposit}
-              className="rounded-xl bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
+              className="rounded-xl cursor-pointer bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
             >
               {depositLoading
                 ? "Depositing..."
@@ -661,7 +671,7 @@ export default function Home() {
                       streamData.canceled
                     }
                     onClick={handleTopUp}
-                    className="rounded-xl border border-zinc-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-900 disabled:opacity-40"
+                    className="rounded-xl cursor-pointer border border-zinc-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-900 disabled:opacity-40"
                   >
                     {actionLoading
                       ? "Processing..."
@@ -675,7 +685,7 @@ export default function Home() {
                       streamData.canceled
                     }
                     onClick={handleCancel}
-                    className="rounded-xl border border-red-900 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-950/40 disabled:opacity-40"
+                    className="rounded-xl cursor-pointer border border-red-900 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-950/40 disabled:opacity-40"
                   >
                     {actionLoading
                       ? "Processing..."
@@ -727,7 +737,7 @@ export default function Home() {
                 onClick={
                   handleClaim
                 }
-                className="mt-6 rounded-xl bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
+                className="mt-6 cursor-pointer rounded-xl bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
               >
                 {streamLoading
                   ? "Processing..."
@@ -742,6 +752,78 @@ export default function Home() {
               wallet and Stream ID.
             </p>
           )}
+        </section>
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">
+                Indexed Streams
+              </h2>
+
+              <p className="text-sm text-white/50">
+                Data served by StreamPay backend
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void refreshIndexedStreams()}
+              className="rounded cursor-pointer lg border border-white/10 px-3 py-2 text-sm"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {indexedStreamsLoading && (
+            <p className="text-sm text-white/50">
+              Loading indexed streams...
+            </p>
+          )}
+
+          {indexedStreamsError && (
+            <p className="text-sm text-red-400">
+              {indexedStreamsError}
+            </p>
+          )}
+
+          {!indexedStreamsLoading &&
+            !indexedStreamsError &&
+            indexedStreams.length === 0 && (
+              <p className="text-sm text-white/50">
+                No indexed streams found.
+              </p>
+            )}
+
+          <div className="space-y-3">
+            {indexedStreams.map((stream) => (
+              <div
+                key={stream.address}
+                className="rounded-xl border border-white/10 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span>
+                    Stream #{stream.stream_id}
+                  </span>
+
+                  <span
+                    className={
+                      stream.canceled
+                        ? "text-red-400"
+                        : "text-green-400"
+                    }
+                  >
+                    {stream.canceled
+                      ? "Canceled"
+                      : "Active"}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-xs text-white/50">
+                  {stream.address}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       </div>
     </main>
