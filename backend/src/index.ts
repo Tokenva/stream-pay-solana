@@ -316,12 +316,29 @@ app.get("/api/activities", async (req, res) => {
       organization,
     } = req.query;
 
+    const limitRaw =
+      typeof req.query.limit === "string"
+        ? Number(req.query.limit)
+        : 20;
+
+    const offsetRaw =
+      typeof req.query.offset === "string"
+        ? Number(req.query.offset)
+        : 0;
+
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(Math.max(Math.floor(limitRaw), 1), 100)
+      : 20;
+
+    const offset = Number.isFinite(offsetRaw)
+      ? Math.max(Math.floor(offsetRaw), 0)
+      : 0;
+
     const conditions: string[] = [];
-    const values: string[] = [];
+    const values: Array<string | number> = [];
 
     if (typeof stream === "string") {
       values.push(stream);
-
       conditions.push(
         `stream_address = $${values.length}`,
       );
@@ -329,7 +346,6 @@ app.get("/api/activities", async (req, res) => {
 
     if (typeof employee === "string") {
       values.push(employee);
-
       conditions.push(
         `employee = $${values.length}`,
       );
@@ -337,7 +353,6 @@ app.get("/api/activities", async (req, res) => {
 
     if (typeof organization === "string") {
       values.push(organization);
-
       conditions.push(
         `organization = $${values.length}`,
       );
@@ -347,6 +362,12 @@ app.get("/api/activities", async (req, res) => {
       conditions.length > 0
         ? `WHERE ${conditions.join(" AND ")}`
         : "";
+
+    const limitIndex = values.length + 1;
+    const offsetIndex = values.length + 2;
+
+    values.push(limit);
+    values.push(offset);
 
     const result = await pool.query(
       `
@@ -360,23 +381,69 @@ app.get("/api/activities", async (req, res) => {
         stream_address,
         organization,
         employee,
-        created_at
+        created_at,
+        COUNT(*) OVER() AS total_count
       FROM activities
       ${whereClause}
-      ORDER BY slot DESC
+      ORDER BY slot DESC, id DESC
+      LIMIT $${limitIndex}
+      OFFSET $${offsetIndex}
       `,
       values,
     );
 
+    const total =
+      result.rows.length > 0
+        ? Number(result.rows[0].total_count)
+        : 0;
+
+    const activities = result.rows.map(
+      ({ total_count, ...activity }) =>
+        activity,
+    );
+
     res.json({
-      count: result.rows.length,
-      activities: result.rows,
+      count: activities.length,
+      total,
+      limit,
+      offset,
+      hasMore: offset + activities.length < total,
+      activities,
     });
   } catch (error) {
     console.error(error);
 
     res.status(500).json({
       error: "Failed to fetch activities",
+    });
+  }
+});
+
+app.get("/api/activities/stats", async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        instruction,
+        COUNT(*)::integer AS count
+      FROM activities
+      GROUP BY instruction
+      ORDER BY count DESC
+    `);
+
+    const totalResult = await pool.query(`
+      SELECT COUNT(*)::integer AS count
+      FROM activities
+    `);
+
+    res.json({
+      total: totalResult.rows[0]?.count ?? 0,
+      byInstruction: result.rows,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      error: "Failed to fetch activity stats",
     });
   }
 });

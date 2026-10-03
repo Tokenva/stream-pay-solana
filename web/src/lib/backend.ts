@@ -67,3 +67,97 @@ export async function fetchIndexedStreams(
   return data.streams;
 }
 
+export type Activity = {
+  id: string;
+  signature: string;
+  instruction_index: number;
+  instruction: string;
+  slot: string;
+  block_time: string | null;
+  stream_address: string | null;
+  organization: string | null;
+  employee: string | null;
+  created_at: string;
+};
+
+export async function fetchActivities(
+  params?: {
+    stream?: string;
+    employee?: string;
+    organization?: string;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<{
+  count: number;
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  activities: Activity[];
+}> {
+  const searchParams =
+    new URLSearchParams();
+
+  if (params?.stream) {
+    searchParams.set(
+      "stream",
+      params.stream,
+    );
+  }
+
+  if (params?.employee) {
+    searchParams.set(
+      "employee",
+      params.employee,
+    );
+  }
+
+  if (params?.organization) {
+    searchParams.set(
+      "organization",
+      params.organization,
+    );
+  }
+
+  if (params?.limit !== undefined) {
+    searchParams.set(
+      "limit",
+      String(params.limit),
+    );
+  }
+
+  if (params?.offset !== undefined) {
+    searchParams.set(
+      "offset",
+      String(params.offset),
+    );
+  }
+
+  const query =
+    searchParams.toString();
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/activities${
+      query ? `?${query}` : ""
+    }`,
+    {
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Failed to fetch activities",
+    );
+  }
+
+  return (await response.json()) as {
+    count: number;
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+    activities: Activity[];
+  };
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-
+import ActivityHistory from "@/components/ActivityHistory";
 import WalletButton from "@/components/WalletButton";
 import { useOrganization } from "@/hooks/useOrganization";
 import { useVault } from "@/hooks/useVault";
@@ -10,6 +10,7 @@ import { useDeposit } from "@/hooks/useDeposit";
 import { useStream } from "@/hooks/useStream";
 import { useStreamActions } from "@/hooks/useStreamActions";
 import { useIndexedStreams } from "@/hooks/useIndexedStreams";
+import ActivityStats from "@/components/ActivityStats";
 const MINT =
   process.env.NEXT_PUBLIC_TOKEN_MINT ?? "";
 
@@ -192,13 +193,13 @@ export default function Home() {
   );
 
   const {
-  streams: indexedStreams,
-  loading: indexedStreamsLoading,
-  error: indexedStreamsError,
-  refresh: refreshIndexedStreams,
-} = useIndexedStreams(
-  publicKey?.toBase58(),
-);
+    streams: indexedStreams,
+    loading: indexedStreamsLoading,
+    error: indexedStreamsError,
+    refresh: refreshIndexedStreams,
+  } = useIndexedStreams(
+    publicKey?.toBase58(),
+  );
 
   useEffect(() => {
     if (
@@ -825,6 +826,8 @@ export default function Home() {
             ))}
           </div>
         </section>
+        <ActivityStats />
+        <ActivityHistory />
       </div>
     </main>
   );
