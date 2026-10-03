@@ -31,4 +31,31 @@ pub enum StreamPayError {
 
     #[msg("Arithmetic overflow")]
     ArithmeticOverflow,
+
+    #[msg("The cross-chain configuration is invalid")]
+    InvalidCrossChainConfig,
+
+    #[msg("The VAA body is invalid")]
+    InvalidVaaBody,
+
+    #[msg("The VAA source chain is not trusted")]
+    InvalidVaaSourceChain,
+
+    #[msg("The VAA emitter is not trusted")]
+    InvalidVaaEmitter,
+
+    #[msg("The VAA destination chain is invalid")]
+    InvalidVaaDestination,
+
+    #[msg("The VAA payload is invalid")]
+    InvalidVaaPayload,
+
+    #[msg("The VAA payload version is invalid")]
+    InvalidVaaVersion,
+
+    #[msg("The VAA action is invalid")]
+    InvalidVaaAction,
+
+    #[msg("The VAA sequence does not match")]
+    InvalidVaaSequence,
 }

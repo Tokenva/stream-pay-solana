@@ -13,11 +13,12 @@ export declare namespace StreamPayEvmGateway {
     }
 
   export interface StreamPayEvmGatewayInterface extends Interface {
-    getFunction(nameOrSignature: "MESSAGE_VERSION" | "cancelStreamIntent" | "createStreamIntent" | "destinationWormholeChainId" | "getStream" | "nonce" | "owner" | "pause" | "paused" | "renounceOwnership" | "setDestinationWormholeChain" | "setSolanaProgram" | "solanaProgram" | "sourceWormholeChainId" | "streams" | "topUpStreamIntent" | "transferOwnership" | "unpause" | "usedOperationIds"): FunctionFragment;
+    getFunction(nameOrSignature: "MESSAGE_VERSION" | "WORMHOLE_FINALITY" | "cancelStreamIntent" | "createStreamIntent" | "destinationWormholeChainId" | "getStream" | "nonce" | "owner" | "pause" | "paused" | "renounceOwnership" | "solanaProgram" | "sourceWormholeChainId" | "streams" | "topUpStreamIntent" | "transferOwnership" | "unpause" | "usedOperationIds" | "wormhole" | "wormholeMessageFee"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "DestinationChainUpdated" | "GatewayMessagePrepared" | "OwnershipTransferred" | "Paused" | "SolanaProgramUpdated" | "StreamIntentCanceled" | "StreamIntentCreated" | "StreamIntentToppedUp" | "Unpaused"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "GatewayMessagePublished" | "OwnershipTransferred" | "Paused" | "StreamIntentCanceled" | "StreamIntentCreated" | "StreamIntentToppedUp" | "Unpaused"): EventFragment;
 
     encodeFunctionData(functionFragment: 'MESSAGE_VERSION', values?: undefined): string;
+encodeFunctionData(functionFragment: 'WORMHOLE_FINALITY', values?: undefined): string;
 encodeFunctionData(functionFragment: 'cancelStreamIntent', values: [BytesLike, BytesLike]): string;
 encodeFunctionData(functionFragment: 'createStreamIntent', values: [BytesLike, BytesLike, BytesLike, BytesLike, BigNumberish, BigNumberish, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'destinationWormholeChainId', values?: undefined): string;
@@ -27,8 +28,6 @@ encodeFunctionData(functionFragment: 'owner', values?: undefined): string;
 encodeFunctionData(functionFragment: 'pause', values?: undefined): string;
 encodeFunctionData(functionFragment: 'paused', values?: undefined): string;
 encodeFunctionData(functionFragment: 'renounceOwnership', values?: undefined): string;
-encodeFunctionData(functionFragment: 'setDestinationWormholeChain', values: [BigNumberish]): string;
-encodeFunctionData(functionFragment: 'setSolanaProgram', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'solanaProgram', values?: undefined): string;
 encodeFunctionData(functionFragment: 'sourceWormholeChainId', values?: undefined): string;
 encodeFunctionData(functionFragment: 'streams', values: [BytesLike]): string;
@@ -36,8 +35,11 @@ encodeFunctionData(functionFragment: 'topUpStreamIntent', values: [BytesLike, By
 encodeFunctionData(functionFragment: 'transferOwnership', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'unpause', values?: undefined): string;
 encodeFunctionData(functionFragment: 'usedOperationIds', values: [BytesLike]): string;
+encodeFunctionData(functionFragment: 'wormhole', values?: undefined): string;
+encodeFunctionData(functionFragment: 'wormholeMessageFee', values?: undefined): string;
 
     decodeFunctionResult(functionFragment: 'MESSAGE_VERSION', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'WORMHOLE_FINALITY', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'cancelStreamIntent', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'createStreamIntent', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'destinationWormholeChainId', data: BytesLike): Result;
@@ -47,8 +49,6 @@ decodeFunctionResult(functionFragment: 'owner', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'pause', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'paused', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'renounceOwnership', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'setDestinationWormholeChain', data: BytesLike): Result;
-decodeFunctionResult(functionFragment: 'setSolanaProgram', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'solanaProgram', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'sourceWormholeChainId', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'streams', data: BytesLike): Result;
@@ -56,25 +56,15 @@ decodeFunctionResult(functionFragment: 'topUpStreamIntent', data: BytesLike): Re
 decodeFunctionResult(functionFragment: 'transferOwnership', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'usedOperationIds', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'wormhole', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'wormholeMessageFee', data: BytesLike): Result;
   }
 
   
-    export namespace DestinationChainUpdatedEvent {
-      export type InputTuple = [oldChain: BigNumberish, newChain: BigNumberish];
-      export type OutputTuple = [oldChain: bigint, newChain: bigint];
-      export interface OutputObject {oldChain: bigint, newChain: bigint };
-      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
-      export type Filter = TypedDeferredTopicFilter<Event>
-      export type Log = TypedEventLog<Event>
-      export type LogDescription = TypedLogDescription<Event>
-    }
-
-  
-
-    export namespace GatewayMessagePreparedEvent {
-      export type InputTuple = [operationId: BytesLike, streamId: BytesLike, action: BigNumberish, nonce: BigNumberish, payload: BytesLike];
-      export type OutputTuple = [operationId: string, streamId: string, action: bigint, nonce: bigint, payload: string];
-      export interface OutputObject {operationId: string, streamId: string, action: bigint, nonce: bigint, payload: string };
+    export namespace GatewayMessagePublishedEvent {
+      export type InputTuple = [operationId: BytesLike, streamId: BytesLike, action: BigNumberish, gatewayNonce: BigNumberish, sequence: BigNumberish, payloadHash: BytesLike];
+      export type OutputTuple = [operationId: string, streamId: string, action: bigint, gatewayNonce: bigint, sequence: bigint, payloadHash: string];
+      export interface OutputObject {operationId: string, streamId: string, action: bigint, gatewayNonce: bigint, sequence: bigint, payloadHash: string };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -99,18 +89,6 @@ decodeFunctionResult(functionFragment: 'usedOperationIds', data: BytesLike): Res
       export type InputTuple = [account: AddressLike];
       export type OutputTuple = [account: string];
       export interface OutputObject {account: string };
-      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
-      export type Filter = TypedDeferredTopicFilter<Event>
-      export type Log = TypedEventLog<Event>
-      export type LogDescription = TypedLogDescription<Event>
-    }
-
-  
-
-    export namespace SolanaProgramUpdatedEvent {
-      export type InputTuple = [oldProgram: BytesLike, newProgram: BytesLike];
-      export type OutputTuple = [oldProgram: string, newProgram: string];
-      export interface OutputObject {oldProgram: string, newProgram: string };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -209,10 +187,18 @@ decodeFunctionResult(functionFragment: 'usedOperationIds', data: BytesLike): Res
     
 
     
+    WORMHOLE_FINALITY: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
     cancelStreamIntent: TypedContractMethod<
       [operationId: BytesLike, streamId: BytesLike, ],
       [bigint],
-      'nonpayable'
+      'payable'
     >
     
 
@@ -220,7 +206,7 @@ decodeFunctionResult(functionFragment: 'usedOperationIds', data: BytesLike): Res
     createStreamIntent: TypedContractMethod<
       [operationId: BytesLike, streamId: BytesLike, organization: BytesLike, employee: BytesLike, amount: BigNumberish, startTime: BigNumberish, endTime: BigNumberish, ],
       [bigint],
-      'nonpayable'
+      'payable'
     >
     
 
@@ -281,22 +267,6 @@ decodeFunctionResult(functionFragment: 'usedOperationIds', data: BytesLike): Res
     
 
     
-    setDestinationWormholeChain: TypedContractMethod<
-      [newChain: BigNumberish, ],
-      [void],
-      'nonpayable'
-    >
-    
-
-    
-    setSolanaProgram: TypedContractMethod<
-      [newProgram: BytesLike, ],
-      [void],
-      'nonpayable'
-    >
-    
-
-    
     solanaProgram: TypedContractMethod<
       [],
       [string],
@@ -324,7 +294,7 @@ decodeFunctionResult(functionFragment: 'usedOperationIds', data: BytesLike): Res
     topUpStreamIntent: TypedContractMethod<
       [operationId: BytesLike, streamId: BytesLike, amount: BigNumberish, ],
       [bigint],
-      'nonpayable'
+      'payable'
     >
     
 
@@ -352,6 +322,22 @@ decodeFunctionResult(functionFragment: 'usedOperationIds', data: BytesLike): Res
     >
     
 
+    
+    wormhole: TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >
+    
+
+    
+    wormholeMessageFee: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
 
     getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
 
@@ -360,15 +346,20 @@ decodeFunctionResult(functionFragment: 'usedOperationIds', data: BytesLike): Res
       [bigint],
       'view'
     >;
+getFunction(nameOrSignature: 'WORMHOLE_FINALITY'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
 getFunction(nameOrSignature: 'cancelStreamIntent'): TypedContractMethod<
       [operationId: BytesLike, streamId: BytesLike, ],
       [bigint],
-      'nonpayable'
+      'payable'
     >;
 getFunction(nameOrSignature: 'createStreamIntent'): TypedContractMethod<
       [operationId: BytesLike, streamId: BytesLike, organization: BytesLike, employee: BytesLike, amount: BigNumberish, startTime: BigNumberish, endTime: BigNumberish, ],
       [bigint],
-      'nonpayable'
+      'payable'
     >;
 getFunction(nameOrSignature: 'destinationWormholeChainId'): TypedContractMethod<
       [],
@@ -405,16 +396,6 @@ getFunction(nameOrSignature: 'renounceOwnership'): TypedContractMethod<
       [void],
       'nonpayable'
     >;
-getFunction(nameOrSignature: 'setDestinationWormholeChain'): TypedContractMethod<
-      [newChain: BigNumberish, ],
-      [void],
-      'nonpayable'
-    >;
-getFunction(nameOrSignature: 'setSolanaProgram'): TypedContractMethod<
-      [newProgram: BytesLike, ],
-      [void],
-      'nonpayable'
-    >;
 getFunction(nameOrSignature: 'solanaProgram'): TypedContractMethod<
       [],
       [string],
@@ -433,7 +414,7 @@ getFunction(nameOrSignature: 'streams'): TypedContractMethod<
 getFunction(nameOrSignature: 'topUpStreamIntent'): TypedContractMethod<
       [operationId: BytesLike, streamId: BytesLike, amount: BigNumberish, ],
       [bigint],
-      'nonpayable'
+      'payable'
     >;
 getFunction(nameOrSignature: 'transferOwnership'): TypedContractMethod<
       [newOwner: AddressLike, ],
@@ -450,12 +431,20 @@ getFunction(nameOrSignature: 'usedOperationIds'): TypedContractMethod<
       [boolean],
       'view'
     >;
+getFunction(nameOrSignature: 'wormhole'): TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'wormholeMessageFee'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
 
-    getEvent(key: 'DestinationChainUpdated'): TypedContractEvent<DestinationChainUpdatedEvent.InputTuple, DestinationChainUpdatedEvent.OutputTuple, DestinationChainUpdatedEvent.OutputObject>;
-getEvent(key: 'GatewayMessagePrepared'): TypedContractEvent<GatewayMessagePreparedEvent.InputTuple, GatewayMessagePreparedEvent.OutputTuple, GatewayMessagePreparedEvent.OutputObject>;
+    getEvent(key: 'GatewayMessagePublished'): TypedContractEvent<GatewayMessagePublishedEvent.InputTuple, GatewayMessagePublishedEvent.OutputTuple, GatewayMessagePublishedEvent.OutputObject>;
 getEvent(key: 'OwnershipTransferred'): TypedContractEvent<OwnershipTransferredEvent.InputTuple, OwnershipTransferredEvent.OutputTuple, OwnershipTransferredEvent.OutputObject>;
 getEvent(key: 'Paused'): TypedContractEvent<PausedEvent.InputTuple, PausedEvent.OutputTuple, PausedEvent.OutputObject>;
-getEvent(key: 'SolanaProgramUpdated'): TypedContractEvent<SolanaProgramUpdatedEvent.InputTuple, SolanaProgramUpdatedEvent.OutputTuple, SolanaProgramUpdatedEvent.OutputObject>;
 getEvent(key: 'StreamIntentCanceled'): TypedContractEvent<StreamIntentCanceledEvent.InputTuple, StreamIntentCanceledEvent.OutputTuple, StreamIntentCanceledEvent.OutputObject>;
 getEvent(key: 'StreamIntentCreated'): TypedContractEvent<StreamIntentCreatedEvent.InputTuple, StreamIntentCreatedEvent.OutputTuple, StreamIntentCreatedEvent.OutputObject>;
 getEvent(key: 'StreamIntentToppedUp'): TypedContractEvent<StreamIntentToppedUpEvent.InputTuple, StreamIntentToppedUpEvent.OutputTuple, StreamIntentToppedUpEvent.OutputObject>;
@@ -463,12 +452,8 @@ getEvent(key: 'Unpaused'): TypedContractEvent<UnpausedEvent.InputTuple, Unpaused
 
     filters: {
       
-      'DestinationChainUpdated(uint16,uint16)': TypedContractEvent<DestinationChainUpdatedEvent.InputTuple, DestinationChainUpdatedEvent.OutputTuple, DestinationChainUpdatedEvent.OutputObject>;
-      DestinationChainUpdated: TypedContractEvent<DestinationChainUpdatedEvent.InputTuple, DestinationChainUpdatedEvent.OutputTuple, DestinationChainUpdatedEvent.OutputObject>;
-    
-
-      'GatewayMessagePrepared(bytes32,bytes32,uint8,uint64,bytes)': TypedContractEvent<GatewayMessagePreparedEvent.InputTuple, GatewayMessagePreparedEvent.OutputTuple, GatewayMessagePreparedEvent.OutputObject>;
-      GatewayMessagePrepared: TypedContractEvent<GatewayMessagePreparedEvent.InputTuple, GatewayMessagePreparedEvent.OutputTuple, GatewayMessagePreparedEvent.OutputObject>;
+      'GatewayMessagePublished(bytes32,bytes32,uint8,uint64,uint64,bytes32)': TypedContractEvent<GatewayMessagePublishedEvent.InputTuple, GatewayMessagePublishedEvent.OutputTuple, GatewayMessagePublishedEvent.OutputObject>;
+      GatewayMessagePublished: TypedContractEvent<GatewayMessagePublishedEvent.InputTuple, GatewayMessagePublishedEvent.OutputTuple, GatewayMessagePublishedEvent.OutputObject>;
     
 
       'OwnershipTransferred(address,address)': TypedContractEvent<OwnershipTransferredEvent.InputTuple, OwnershipTransferredEvent.OutputTuple, OwnershipTransferredEvent.OutputObject>;
@@ -477,10 +462,6 @@ getEvent(key: 'Unpaused'): TypedContractEvent<UnpausedEvent.InputTuple, Unpaused
 
       'Paused(address)': TypedContractEvent<PausedEvent.InputTuple, PausedEvent.OutputTuple, PausedEvent.OutputObject>;
       Paused: TypedContractEvent<PausedEvent.InputTuple, PausedEvent.OutputTuple, PausedEvent.OutputObject>;
-    
-
-      'SolanaProgramUpdated(bytes32,bytes32)': TypedContractEvent<SolanaProgramUpdatedEvent.InputTuple, SolanaProgramUpdatedEvent.OutputTuple, SolanaProgramUpdatedEvent.OutputObject>;
-      SolanaProgramUpdated: TypedContractEvent<SolanaProgramUpdatedEvent.InputTuple, SolanaProgramUpdatedEvent.OutputTuple, SolanaProgramUpdatedEvent.OutputObject>;
     
 
       'StreamIntentCanceled(bytes32)': TypedContractEvent<StreamIntentCanceledEvent.InputTuple, StreamIntentCanceledEvent.OutputTuple, StreamIntentCanceledEvent.OutputObject>;

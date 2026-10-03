@@ -6,6 +6,9 @@ pub mod deposit;
 pub mod initialize_protocol;
 pub mod initialize_vault;
 pub mod top_up_stream;
+pub mod cross_chain;
+pub mod cross_chain_action;
+pub mod cross_chain_asset;
 
 pub use cancel_stream::*;
 pub use claim::*;
@@ -15,3 +18,6 @@ pub use deposit::*;
 pub use initialize_protocol::*;
 pub use initialize_vault::*;
 pub use top_up_stream::*;
+pub use cross_chain::*;
+pub use cross_chain_action::*;
+pub use cross_chain_asset::*;

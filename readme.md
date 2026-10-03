@@ -1,6 +1,6 @@
-# StreamPay Solana
+# StreamPay
 
-StreamPay Solana is an Anchor-based Solana smart contract for programmable payroll and token streaming. The protocol supports organization-managed funding, vault custody, per-stream payout schedules, employee claims, and cancellation logic for payroll-style recurring compensation.
+StreamPay is a programmable payroll and token-streaming project. Its Solana program supports organization-managed funding, vault custody, per-stream payout schedules, employee claims, and cancellation. The repository also includes an EVM gateway built with Hardhat and Wormhole-related interfaces.
 
 ## Overview
 
@@ -48,6 +48,13 @@ The protocol uses the following on-chain account types:
 
 The `Stream::earned_amount()` logic calculates proportional payout based on elapsed time and the stream window.
 
+## Repository components
+
+- `programs/stream-pay-solana/`: Anchor program and Rust tests for Solana payroll streams.
+- `evm-gateway/`: Solidity gateway contract, Hardhat configuration, scripts, and tests.
+- `backend/`: TypeScript backend services.
+- `web/`: Next.js web application.
+
 ## Project structure
 
 ```text
@@ -57,6 +64,14 @@ The `Stream::earned_amount()` logic calculates proportional payout based on elap
 ├── rust-toolchain.toml
 ├── readme.md
 ├── app/
+├── backend/
+│   └── src/
+├── evm-gateway/
+│   ├── contracts/
+│   ├── scripts/
+│   ├── test/
+│   └── hardhat.config.ts
+├── idls/
 ├── programs/
 │   └── stream-pay-solana/
 │       ├── Cargo.toml
@@ -82,7 +97,9 @@ The `Stream::earned_amount()` logic calculates proportional payout based on elap
 │           ├── security.rs
 │           ├── stream.rs
 │           └── vault.rs
-└── target/
+├── target/
+└── web/
+	└── src/
 ```
 
 ## Program details
@@ -92,7 +109,7 @@ The `Stream::earned_amount()` logic calculates proportional payout based on elap
 - Solana toolchain version: `4.1.2`
 - Default network: `localnet`
 
-## Local development
+## Solana development
 
 ### Prerequisites
 
@@ -131,9 +148,46 @@ anchor localnet
 anchor deploy
 ```
 
+## EVM gateway development
+
+The gateway uses Hardhat and Solidity `0.8.28`. Install its dependencies and run the contract checks from the gateway directory:
+
+```bash
+cd evm-gateway
+npm install
+npx hardhat compile
+npx hardhat test
+```
+
+For Sepolia operations, create a local `.env` file with `SEPOLIA_RPC_URL` and `SEPOLIA_PRIVATE_KEY`. The configuration falls back to a public Sepolia RPC endpoint and uses no signing account when these variables are unset.
+
+## Backend development
+
+The backend requires Node.js and a PostgreSQL database. Set `DATABASE_URL` in `backend/.env`; optionally set `SOLANA_RPC_URL` to use a different Solana cluster (the default is Devnet) and `PORT` to change the server port (the default is `4000`). Start the service from the backend directory:
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+The API health endpoint is available at `http://localhost:4000/health` by default. The database tables are initialized when the service starts.
+
+## Web development
+
+The Next.js app uses `http://localhost:4000` for its backend API by default. Set `NEXT_PUBLIC_API_URL` and, if needed, `NEXT_PUBLIC_BACKEND_URL` in `web/.env.local` to point to another backend. Start the app from the web directory:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+The app is served at `http://localhost:3000` by default. Use `npm run lint` to run ESLint or `npm run build` to create a production build.
+
 ## Notes
 
-This repository is not just a protocol bootstrap; it contains a working payroll-streaming flow with an organization model, token vaults, stream lifecycle management, and claim/cancel settlement logic. It is designed as a foundation for a real-world payroll or vesting system on Solana and can be extended with additional governance, compliance, or multi-asset support.
+The Solana program provides the payroll-streaming flow, including organization management, token vaults, stream lifecycle management, and claim/cancel settlement logic. The EVM gateway is maintained as a separate Hardhat project under `evm-gateway/`.
 
 ## License
 

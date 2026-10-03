@@ -63,3 +63,52 @@ impl Stream {
         ((total_amount * elapsed) / duration) as u64
     }
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct CrossChainConfig {
+    pub authority: Pubkey,
+    pub source_chain: u16,
+    pub source_emitter: [u8; 32],
+    pub bump: u8,
+    pub created_at: i64,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct ConsumedVaa {
+    pub emitter_chain: u16,
+    pub emitter_address: [u8; 32],
+    pub sequence: u64,
+    pub action: u8,
+    pub operation_id: [u8; 32],
+    pub stream_id: [u8; 32],
+    pub amount: u64,
+    pub start_time: u64,
+    pub end_time: u64,
+    pub payload_hash: [u8; 32],
+    pub consumed_at: i64,
+    pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct CrossChainStream {
+    pub external_stream_id: [u8; 32],
+    pub native_stream_id: u64,
+    pub organization: Pubkey,
+    pub employee: Pubkey,
+    pub mint: Pubkey,
+    pub operation_id: [u8; 32],
+    pub created_at: i64,
+    pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct CrossChainAssetConfig {
+    pub authority: Pubkey,
+    pub mint: Pubkey,
+    pub bump: u8,
+    pub created_at: i64,
+}

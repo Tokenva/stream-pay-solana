@@ -4337,6 +4337,7 @@ dependencies = [
  "solana-address 2.7.0",
  "solana-clock 3.2.1",
  "solana-instruction 4.0.0",
+ "solana-keccak-hasher",
  "solana-keypair",
  "solana-message",
  "solana-signer",

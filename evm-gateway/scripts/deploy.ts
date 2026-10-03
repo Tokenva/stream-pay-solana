@@ -9,9 +9,18 @@ const { ethers, networkName } =
 const solanaProgramId =
   process.env.SOLANA_PROGRAM_ID;
 
+const wormholeCore =
+  process.env.WORMHOLE_CORE;
+
 if (!solanaProgramId) {
   throw new Error(
     "SOLANA_PROGRAM_ID is not set",
+  );
+}
+
+if (!wormholeCore) {
+  throw new Error(
+    "WORMHOLE_CORE is not set",
   );
 }
 
@@ -25,7 +34,9 @@ if (solanaProgramBytes.length !== 32) {
 }
 
 const solanaProgram =
-  ethers.hexlify(solanaProgramBytes);
+  ethers.hexlify(
+    solanaProgramBytes,
+  );
 
 const [deployer] =
   await ethers.getSigners();
@@ -48,6 +59,10 @@ console.log(
   `Solana Program: ${solanaProgramId}`,
 );
 
+console.log(
+  `Wormhole Core: ${wormholeCore}`,
+);
+
 const gateway =
   await ethers.deployContract(
     "StreamPayEvmGateway",
@@ -55,6 +70,7 @@ const gateway =
       10002,
       1,
       solanaProgram,
+      wormholeCore,
       deployer.address,
     ],
   );
@@ -68,28 +84,49 @@ await gateway.waitForDeployment();
 const gatewayAddress =
   await gateway.getAddress();
 
+const wormholeFee =
+  await gateway.wormholeMessageFee();
+
 console.log("");
+
 console.log(
   "======================================",
 );
+
 console.log(
   "StreamPay EVM Gateway deployed",
 );
+
 console.log(
   "======================================",
 );
+
 console.log(
   `Contract: ${gatewayAddress}`,
 );
+
 console.log(
   `Network: ${networkName}`,
 );
+
 console.log(
   `Deployer: ${deployer.address}`,
 );
+
 console.log(
   `Solana Program: ${solanaProgramId}`,
 );
+
+console.log(
+  `Wormhole Core: ${wormholeCore}`,
+);
+
+console.log(
+  `Wormhole Message Fee: ${ethers.formatEther(
+    wormholeFee,
+  )} ETH`,
+);
+
 console.log(
   "======================================",
 );

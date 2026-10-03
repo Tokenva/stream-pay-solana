@@ -58,4 +58,45 @@ pub mod stream_pay_solana {
     pub fn cancel_stream(ctx: Context<CancelStream>, stream_id: u64) -> Result<()> {
         crate::instructions::cancel_stream::handle_cancel_stream(ctx, stream_id)
     }
+
+    pub fn initialize_cross_chain_config(
+        ctx: Context<InitializeCrossChainConfig>,
+        source_emitter: [u8; 32],
+    ) -> Result<()> {
+        crate::instructions::cross_chain::handle_initialize_cross_chain_config(ctx, source_emitter)
+    }
+
+    pub fn consume_vaa(
+        ctx: Context<ConsumeVaa>,
+        guardian_set_bump: u8,
+        sequence: u64,
+        vaa_body: Vec<u8>,
+    ) -> Result<()> {
+        crate::instructions::cross_chain::handle_consume_vaa(
+            ctx,
+            guardian_set_bump,
+            sequence,
+            vaa_body,
+        )
+    }
+
+    pub fn execute_cross_chain_action(
+        ctx: Context<ExecuteCrossChainAction>,
+        sequence: u64,
+        native_stream_id: u64,
+        vaa_body: Vec<u8>,
+    ) -> Result<()> {
+        instructions::cross_chain_action::handle_execute_cross_chain_action(
+            ctx,
+            sequence,
+            native_stream_id,
+            vaa_body,
+        )
+    }
+
+    pub fn initialize_cross_chain_asset_config(
+        ctx: Context<InitializeCrossChainAssetConfig>,
+    ) -> Result<()> {
+        crate::instructions::cross_chain_asset::handle_initialize_cross_chain_asset_config(ctx)
+    }
 }

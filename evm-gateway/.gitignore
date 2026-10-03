@@ -8,3 +8,4 @@ ignition/deployments/
 .env
 .env.*
 !.env.example
+artifacts/cross-chain/guardian-signatures-keypair.json
