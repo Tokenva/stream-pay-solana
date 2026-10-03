@@ -302,6 +302,7 @@ pub fn handle_execute_cross_chain_action(
     let message_nonce =
         decode_u64_word(&payload[PAYLOAD_MESSAGE_NONCE_OFFSET..PAYLOAD_MESSAGE_NONCE_OFFSET + 32])?;
 
+    require!(message_nonce > 0, StreamPayError::InvalidVaaPayload);
     require!(
         amount == ctx.accounts.consumed_vaa.amount,
         StreamPayError::InvalidVaaPayload
