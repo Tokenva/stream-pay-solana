@@ -38,16 +38,9 @@ async function main() {
 
   const payer = Keypair.fromSecretKey(secretKey);
 
-  const guardianSignatures = Keypair.fromSecretKey(
-    Uint8Array.from(
-      JSON.parse(
-        fs.readFileSync(
-          SIGNATURE_KEYPAIR_PATH,
-          "utf8",
-        ),
-      ),
-    ),
-  );
+const guardianSignatures = new PublicKey(
+  "9kA8pCRrFiEJuX1Nqf7zSAuQrDhhhLTRvM3i2dV9R27w",
+);
 
   const connection = new Connection(
     RPC_URL,
@@ -56,11 +49,11 @@ async function main() {
 
   console.log(
     "Guardian signatures account:",
-    guardianSignatures.publicKey.toBase58(),
+    guardianSignatures.toBase58(),
   );
 
   const account = await connection.getAccountInfo(
-    guardianSignatures.publicKey,
+    guardianSignatures,
   );
 
   if (!account) {
@@ -72,7 +65,7 @@ async function main() {
     programId: SHIM_PROGRAM_ID,
     keys: [
       {
-        pubkey: guardianSignatures.publicKey,
+        pubkey: guardianSignatures,
         isSigner: false,
         isWritable: true,
       },

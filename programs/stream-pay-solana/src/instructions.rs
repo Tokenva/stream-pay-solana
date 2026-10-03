@@ -9,6 +9,7 @@ pub mod top_up_stream;
 pub mod cross_chain;
 pub mod cross_chain_action;
 pub mod cross_chain_asset;
+pub mod cross_chain_top_up;
 
 pub use cancel_stream::*;
 pub use claim::*;
@@ -21,3 +22,4 @@ pub use top_up_stream::*;
 pub use cross_chain::*;
 pub use cross_chain_action::*;
 pub use cross_chain_asset::*;
+pub use cross_chain_top_up::*;

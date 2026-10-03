@@ -42,8 +42,8 @@ const VAA_PATH =
 const VAA_BODY_PATH =
   "artifacts/cross-chain/vaa-body.bin";
 
-const SEQUENCE = 5n;
-const NATIVE_STREAM_ID = 6n;
+const SEQUENCE = 7n;
+const NATIVE_STREAM_ID = 8n;
 
 const VAA_HEADER_LEN = 51;
 const PAYLOAD_LEN = 416;

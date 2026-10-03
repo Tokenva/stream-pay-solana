@@ -180,22 +180,15 @@ async function main() {
   // Guardian signatures account
   // --------------------------------------------------
 
-  const signatureSecret = Uint8Array.from(
-    JSON.parse(
-      fs.readFileSync(
-        SIGNATURE_KEYPAIR_PATH,
-        "utf8",
-      ),
-    ),
-  );
+const guardianSignatures = new PublicKey(
+  process.env.GUARDIAN_SIGNATURES_ACCOUNT ??
+    "CXxqjpz8fPnBpgF5hU3gBTnJMd3Ut2uQvHegZXqcXuTb",
+);
 
-  const guardianSignatures =
-    Keypair.fromSecretKey(signatureSecret);
-
-  console.log(
-    "Guardian signatures account:",
-    guardianSignatures.publicKey.toBase58(),
-  );
+console.log(
+  "Guardian signatures account:",
+  guardianSignatures.toBase58(),
+);
 
   // --------------------------------------------------
   // ConsumedVaa PDA
@@ -344,7 +337,7 @@ async function main() {
           isWritable: false,
         },
         {
-          pubkey: guardianSignatures.publicKey,
+          pubkey: guardianSignatures,
           isSigner: false,
           isWritable: false,
         },

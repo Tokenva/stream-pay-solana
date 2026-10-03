@@ -120,12 +120,12 @@ const amount =
 
 const startTime =
   BigInt(
-    timestamp + 60,
+    timestamp + 3600,
   );
 
 const endTime =
   BigInt(
-    timestamp + 3660,
+    timestamp + 7200,
   );
 
 const fee =

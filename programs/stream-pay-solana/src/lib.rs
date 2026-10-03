@@ -99,4 +99,18 @@ pub mod stream_pay_solana {
     ) -> Result<()> {
         crate::instructions::cross_chain_asset::handle_initialize_cross_chain_asset_config(ctx)
     }
+
+    pub fn execute_cross_chain_top_up(
+        ctx: Context<ExecuteCrossChainTopUp>,
+        sequence: u64,
+        native_stream_id: u64,
+        vaa_body: Vec<u8>,
+    ) -> Result<()> {
+        instructions::cross_chain_top_up::handle_execute_cross_chain_top_up(
+            ctx,
+            sequence,
+            native_stream_id,
+            vaa_body,
+        )
+    }
 }
