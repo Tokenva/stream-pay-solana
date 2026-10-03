@@ -1,1372 +1,673 @@
-# StreamPay Solana — Learning Notes
+# StreamPay Solana
 
-# 1. WHAT ARE WE BUILDING?
+> **Trustless Cross-Chain Asset Streaming & Payroll Protocol**
 
-StreamPay is a payroll/payment streaming protocol.
+StreamPay is a **Solana-first payroll protocol** that combines time-based payment streams with an EVM/Wormhole cross-chain execution layer.
 
-The basic idea:
+---
 
-```text
-Company
-   ↓
-deposits tokens
-   ↓
-StreamPay Vault
-   ↓
-creates a payment Stream
-   ↓
-employee earns money over time
-   ↓
-employee claims earned money
-```
+## Navigation
+
+- [Current Status](#current-status)
+- [What StreamPay Does](#what-streampay-does)
+- [Architecture](#architecture)
+- [Core Solana Concepts](#core-solana-concepts)
+- [Milestones](#milestones)
+- [M0 — Environment](#m0--environment--fundamentals)
+- [M1 — Protocol Configuration](#m1--protocol-configuration)
+- [M2 — Token Vault](#m2--token-vault--deposits)
+- [M3 — Organization](#m3--organization--company-vault)
+- [M4 — Payment Stream](#m4--payment-stream)
+- [M5 — Stream Lifecycle](#m5--cancel--top-up--stream-lifecycle)
+- [M6 — Security](#m6--security--comprehensive-tests)
+- [M7 — Frontend](#m7--frontend)
+- [M8 — Backend / Indexer](#m8--backend--indexer)
+- [M9 — EVM Gateway](#m9--evm-gateway)
+- [M10 — Wormhole Messaging](#m10--cross-chain-messaging)
+- [M11 — Cross-Chain Assets](#m11--cross-chain-assets)
+- [M12 — Devnet + Documentation](#m12--devnet--documentation--portfolio)
+- [Verified Test Evidence](#verified-test-evidence)
+- [Public Deployment Identifiers](#public-deployment-identifiers)
+- [Security Notes](#security-notes)
+- [Final Project Picture](#final-project-picture)
+
+---
+
+# Current Status
+
+## Milestone dashboard
+
+| Milestone | Area | Current status |
+|---|---|---|
+| **M0** | Environment + Solana fundamentals | ✅ Complete |
+| **M1** | Protocol configuration | ✅ Complete |
+| **M2** | Token vault + deposits | ✅ Complete |
+| **M3** | Organization + company vault | ✅ Complete |
+| **M4** | Payment stream + employee claim | ✅ Complete |
+| **M5** | Cancel / Top-up / stream lifecycle | 🟡 Partial |
+| **M6** | Security + comprehensive tests | ⏳ Pending |
+| **M7** | Frontend | ⏳ Pending |
+| **M8** | Backend / indexer | ⏳ Pending |
+| **M9** | EVM gateway | ✅ Complete |
+| **M10** | Cross-chain messaging | ✅ Complete |
+| **M11** | Cross-chain assets | ⏳ Pending |
+| **M12** | Devnet + documentation + portfolio | 🟡 In progress |
+
+### Important status clarification
+
+**M5 is not simply "pending".**
+
+The **cross-chain TopUp path is working**, but the native M5 milestone also includes the native `cancel_stream` lifecycle and native stream-management behavior. Those parts have not been completed as a full M5 phase.
+
+**M11 is still pending.**
+
+We successfully moved **Solana-side test tokens into the stream escrow** during the cross-chain execution demo. That is destination-side funding, not an actual EVM-to-Solana token bridge/NTT transfer.
+
+**M12 is in progress.**
+
+The Devnet/Sepolia technical demonstration is working. The remaining work is to finish the documentation, reproducible setup, architecture presentation, demo material, and portfolio packaging.
+
+---
+
+# What StreamPay Does
+
+StreamPay turns a fixed payroll amount into a **time-based payment stream**.
 
 Example:
 
 ```text
-Company wants to pay 3,000 USDC over 30 days
+Company
+   ↓
+funds payroll
+   ↓
+Company Vault
+   ↓
+creates Stream
+   ↓
+Stream Escrow
+   ↓
+time passes
+   ↓
+earned amount increases
+   ↓
+Employee claims earned amount
+   ↓
+Employee Token Account
 ```
 
-Instead of:
+For a `3,000 USDC` stream over `30 days`:
 
 ```text
-Day 1 → employee gets all 3,000 USDC
+Day 1   → a small amount is earned
+Day 15  → roughly half is earned
+Day 30  → the full amount is earned
 ```
 
-we want:
+The **Solana program is the source of truth** for protocol state, authorization, stream state, accounting, and claim calculations.
+
+---
+
+# Architecture
+
+## 1. Native Solana architecture
+
+```mermaid
+flowchart TD
+    Company["Company Wallet"]
+    Org["Organization PDA"]
+    Vault["Company Vault"]
+    Stream["Stream PDA"]
+    Escrow["Stream Escrow"]
+    Employee["Employee Wallet"]
+    EmployeeToken["Employee Token Account"]
+    Program["StreamPay Solana Program"]
+    Token["SPL Token Program"]
+
+    Company --> Org
+    Org --> Vault
+    Company --> Program
+    Program --> Vault
+    Vault --> Stream
+    Stream --> Escrow
+    Employee --> Program
+    Program --> Token
+    Token --> EmployeeToken
+```
+
+The main relationship is:
 
 ```text
-Day 1  → small amount becomes earned
-Day 2  → more becomes earned
-...
-Day 30 → full amount is earned
+Company
+   ↓
+Organization
+   ↓
+Company Vault
+   ↓
+Create Stream
+   ↓
+Stream Escrow
+   ↓
+Time-based earning
+   ↓
+Employee Claim
+```
+
+## 2. Cross-chain architecture
+
+```mermaid
+flowchart TD
+    EVM["Ethereum Sepolia"]
+    Gateway["StreamPay EVM Gateway"]
+    WH["Wormhole"]
+    VAA["Verified Action Approval (VAA)"]
+    Solana["Solana Devnet"]
+    Consume["consume_vaa"]
+    StreamPay["StreamPay Program"]
+    Action["CreateStream / TopUp"]
+
+    EVM --> Gateway
+    Gateway --> WH
+    WH --> VAA
+    VAA --> Consume
+    Consume --> Solana
+    Solana --> StreamPay
+    StreamPay --> Action
+```
+
+The verified direction is:
+
+```text
+Ethereum Sepolia
+      ↓
+EVM Gateway
+      ↓
+Wormhole
+      ↓
+VAA
+      ↓
+Guardian signature verification
+      ↓
+consume_vaa
+      ↓
+StreamPay Solana Program
+      ↓
+Cross-chain action
 ```
 
 ---
 
-# 2. CORE SOLANA WORDS
+# Core Solana Concepts
 
-```text
-Program
-[Rules that our Solana application follows]
-
-Account
-[Data stored on Solana]
-
-Instruction
-[An action that our Program can perform]
-
-Transaction
-[A request sent to Solana to perform one or more Instructions]
-
-Wallet
-[User/company identity used to control funds and sign Transactions]
-
-Signer
-[The Wallet that approves/signs a Transaction]
-
-PDA
-[A special program-derived address used by the Program]
-
-CPI
-[Our Program calling another Solana Program]
-
-Token
-[Digital value such as USDC]
-
-Mint
-[Defines a particular Token]
-
-Token Account
-[Account that holds the balance of a particular Token]
-
-Token Program
-[Solana Program that manages Token operations]
-
-Transfer
-[Move Tokens from one Token Account to another]
-
-Vault
-[The Token Account where our protocol keeps funds]
-
-Stream
-[The agreement describing how money is paid over time]
-```
+| Concept | Meaning in StreamPay |
+|---|---|
+| **Program** | On-chain Rust code containing StreamPay rules |
+| **Account** | On-chain data/state |
+| **Instruction** | One action exposed by the program |
+| **Transaction** | Request containing one or more instructions |
+| **Wallet** | Identity used to sign transactions |
+| **Signer** | Account that must approve an action |
+| **PDA** | Deterministic program-derived address |
+| **CPI** | Program-to-program call on Solana |
+| **Mint** | Defines a token |
+| **Token Account** | Stores a token balance |
+| **Vault** | Company funding token account |
+| **Stream** | Time-based payment agreement |
+| **Escrow** | Token account holding stream-reserved funds |
+| **VAA** | Wormhole-attested cross-chain message |
 
 ---
 
-# 3. THE GENERAL SOLANA FLOW
+# Program Instruction Inventory
 
-```text
-Wallet
-[User/company identity that approves the action]
-        ↓
-Transaction
-[Request sent to Solana]
-        ↓
-Instruction
-[Specific action we want to perform]
-        ↓
-Program
-[Our StreamPay rules execute]
-        ↓
-Accounts
-[Program reads or changes on-chain data]
-```
-
-## In our project
-
-```text
-Company Wallet
-[Company controls this Wallet]
-        ↓
-signs Transaction
-[Company approves the action]
-        ↓
-Deposit Instruction
-[Company asks StreamPay to deposit tokens]
-        ↓
-StreamPay Program
-[Our Rust program checks the rules]
-        ↓
-CPI
-[StreamPay asks the Token Program to move tokens]
-        ↓
-Vault Token Account
-[Vault balance changes]
-```
-
----
-
-# 4. WHAT OUR PROGRAM DOES
-
-Our StreamPay Program contains the rules.
-
-## Instructions built so far
+## Native protocol
 
 ```text
 initialize_protocol
-[Create the protocol configuration]
-
 create_organization
-[Create a company/organization record]
-
 initialize_vault
-[Create a company-specific token vault]
-
 deposit
-[Move tokens into the company vault]
-
 create_stream
-[Create a payment stream and reserve its funds]
-
 claim
-[Allow the employee to claim earned Tokens]
 ```
 
-## Future instructions
+## Cross-chain execution
+
+```text
+execute_cross_chain_create_stream
+execute_cross_chain_top_up
+```
+
+## VAA processing
+
+```text
+consume_vaa
+```
+
+## Native lifecycle operations still to finish
 
 ```text
 cancel_stream
 top_up_stream
-pause_protocol
 ```
 
 ---
 
-# 5. M1 — PROTOCOL CONFIGURATION
+# Milestones
 
-## STATUS: COMPLETE ✅
+## M0 — Environment & Fundamentals
+
+**Status: ✅ Complete**
+
+### Goal
+
+Prepare the development environment and understand the Solana concepts needed to build StreamPay.
+
+### Toolchain
+
+```text
+Rust        1.98.1
+Cargo       1.98.1
+Solana CLI  4.1.2
+Anchor CLI  1.2.0
+AVM         1.2.0
+Surfpool    1.6.0
+```
+
+### Result
+
+```text
+Rust + Anchor + Solana tooling
+          ↓
+Anchor project
+          ↓
+Build + test workflow
+```
+
+---
+
+# M1 — Protocol Configuration
+
+**Status: ✅ Complete**
 
 ## Goal
 
-Create the basic configuration of StreamPay.
+Create the basic StreamPay protocol configuration.
 
-## What did we create?
+## ProtocolConfig PDA
 
-```text
-ProtocolConfig PDA
-[On-chain account that stores StreamPay protocol metadata]
-```
-
-It stores:
+The configuration stores:
 
 ```text
 authority
-[Who controls the protocol]
-
 version
-[Protocol version]
-
 paused
-[Whether protocol activity is paused]
-
 bump
-[PDA bump used during address derivation]
-
 created_at
-[Protocol creation timestamp]
 ```
 
----
-
-# 6. M1 — INITIALIZE PROTOCOL FLOW
+## PDA derivation
 
 ```text
-Authority Wallet
-[Wallet allowed to initialize the protocol]
-        ↓
-signs Transaction
-[Approves creation of protocol configuration]
-        ↓
-initialize_protocol Instruction
-[Action that creates ProtocolConfig]
-        ↓
-StreamPay Program
-[Creates and initializes the PDA]
-        ↓
-ProtocolConfig PDA
-[Stores protocol metadata]
-```
-
-In simple words:
-
-```text
-Authority says:
-"Create StreamPay's configuration."
-
-Program:
-"Okay. I will create the ProtocolConfig account
-and store the protocol settings."
-```
-
----
-
-# 7. M1 — WHY DO WE USE A PDA?
-
-We need a predictable address for the protocol configuration.
-
-We use:
-
-```text
+Program ID
+   +
 "protocol"
-```
-
-as the seed.
-
-Conceptually:
-
-```text
-StreamPay Program ID
-        +
-"protocol"
-        ↓
+   ↓
 ProtocolConfig PDA
-```
-
-So:
-
-```text
-PDA
-[Predictable program-derived address]
-
-ProtocolConfig PDA
-[The specific address where protocol settings live]
-```
-
----
-
-# 8. M1 — CODE STRUCTURE
-
-```text
-state.rs
-[Defines the ProtocolConfig data]
-
-constants.rs
-[Defines the protocol PDA seed and version]
-
-initialize_protocol.rs
-[Contains protocol initialization logic]
-
-lib.rs
-[Exposes initialize_protocol]
-
-tests/protocol_config.rs
-[Tests the real instruction]
-```
-
----
-
-# 9. M1 — TEST
-
-## Why do we test?
-
-We don't only want:
-
-```text
-"Rust compiled"
-```
-
-We want:
-
-```text
-"The actual Solana instruction executed correctly."
-```
-
-## Test flow
-
-```text
-Create test environment
-        ↓
-Load StreamPay Program
-        ↓
-Create test Wallet
-        ↓
-Call initialize_protocol
-        ↓
-Program creates ProtocolConfig PDA
-        ↓
-Read ProtocolConfig
-        ↓
-Check stored values
 ```
 
 ## Verified
 
 ```text
-✅ ProtocolConfig PDA created
-✅ Authority correct
+✅ ProtocolConfig created
+✅ Correct authority
 ✅ Version = 1
-✅ Paused = false
-✅ PDA bump correct
-✅ Created timestamp stored
-```
-
-## Result
-
-```text
-1 test passed
-0 failed
-
-M1 = COMPLETE ✅
+✅ paused = false
+✅ Correct PDA bump
+✅ Creation timestamp stored
 ```
 
 ---
 
-# 10. M2 — TOKEN VAULT
+# M2 — Token Vault + Deposits
 
-## STATUS: COMPLETE ✅
+**Status: ✅ Complete**
 
 ## Goal
 
-Create a place where StreamPay can hold Tokens.
+Create company-specific token storage and allow the company to deposit tokens into it.
 
-The idea:
-
-```text
-Company
-   ↓
-Company Token Account
-   ↓
-deposit
-   ↓
-StreamPay Company Vault
-   ↓
-holds USDC
-```
-
----
-
-# 11. IMPORTANT M2 PARTS
-
-## Mint
+## Vault relationship
 
 ```text
-Mint
-[Defines the Token]
+Organization
+    │
+    ├── Vault Authority PDA
+    │
+    └── Vault Token Account
+             │
+             └── Token balance
 ```
 
-Example:
-
-```text
-USDC Mint
-[Defines what the USDC token is]
-```
-
-## Token Account
-
-```text
-Token Account
-[Holds the actual Token balance]
-```
-
-Examples:
-
-```text
-Company Token Account
-[Holds company's USDC]
-
-Vault Token Account
-[Holds StreamPay's USDC]
-```
-
-## Vault Authority PDA
-
-```text
-Vault Authority PDA
-[PDA used as the authority for the Vault]
-```
-
-So:
-
-```text
-Mint
-  ↓
-defines the Token
-
-Token Account
-  ↓
-holds Token balance
-
-Vault Token Account
-  ↓
-holds StreamPay funds
-
-Vault Authority PDA
-  ↓
-controls the Vault
-```
-
----
-
-# 12. M2.1 — CREATE THE COMPANY VAULT
-
-## Goal
-
-Create a Vault Token Account for a specific company and Token.
-
-## Why?
-
-A global vault would make different companies share the same Token Account.
-
-We instead want:
-
-```text
-Company A + USDC
-        ↓
-Company A Vault
-
-Company B + USDC
-        ↓
-Company B Vault
-```
-
-## Vault PDA
-
-The Vault PDA is derived from:
+## Vault PDA derivation
 
 ```text
 "vault"
-+
-Organization PDA
-+
-Mint
-```
-
-Conceptually:
-
-```text
-VAULT_SEED
    +
-Organization
+Organization PDA
    +
 Mint
    ↓
-Company-specific Vault PDA
+Company Vault PDA
 ```
 
-## Vault Authority PDA
-
-Derived from:
-
-```text
-"vault-authority"
-+
-Organization PDA
-+
-Mint
-```
-
-Conceptually:
-
-```text
-VAULT_AUTHORITY_SEED
-   +
-Organization
-   +
-Mint
-   ↓
-Vault Authority PDA
-```
-
----
-
-# 13. M2.1 — CREATE VAULT FLOW
+## Deposit flow
 
 ```text
 Company Wallet
-[Company's signing wallet]
-        ↓
-signs Transaction
-[Approves vault creation]
-        ↓
-initialize_vault Instruction
-[Requests creation of the vault]
-        ↓
+      ↓
+deposit
+      ↓
 StreamPay Program
-[Checks Organization, Mint and PDA accounts]
-        ↓
+      ↓
+CPI
+      ↓
 Token Program
-[Creates the Token Account]
-        ↓
-Vault Token Account
-[Stores the company's future Token balance]
+      ↓
+Company Vault
 ```
 
-Initially:
+## Validation
+
+The deposit path validates the depositor, organization authority, token mint, destination vault, and amount.
 
 ```text
-Vault balance = 0
-```
-
----
-
-# 14. M2.1 — TEST
-
-## Test flow
-
-```text
-Create test company Wallet
-        ↓
-Create test Mint
-        ↓
-Create Organization
-        ↓
-Call initialize_vault
-        ↓
-Vault Token Account created
-        ↓
-Check Mint
-        ↓
-Check Vault Authority
-        ↓
-Check Balance
+deposit(positive amount) → allowed
+deposit(0)               → rejected
 ```
 
 ## Verified
 
 ```text
-✅ Mint exists
-✅ Vault created
-✅ Vault is a Token Account
-✅ Vault uses correct Mint
-✅ Vault authority is correct PDA
+✅ Vault creation
+✅ Correct Mint
+✅ Correct Vault Authority PDA
 ✅ Initial balance = 0
-```
-
-Result:
-
-```text
-M2.1 = COMPLETE ✅
-```
-
----
-
-# 15. M2.2 — DEPOSIT TOKENS
-
-Now the Vault exists.
-
-Next we move Tokens into it.
-
-Example:
-
-```text
-Company has:
-
-3,000 USDC
-```
-
-Company deposits:
-
-```text
-1,000 USDC
-```
-
-Before:
-
-```text
-Company Token Account = 3,000 USDC
-Vault                 = 0 USDC
-```
-
-After:
-
-```text
-Company Token Account = 2,000 USDC
-Vault                 = 1,000 USDC
+✅ Token transfer works
+✅ Company balance decreases correctly
+✅ Vault balance increases correctly
+✅ CPI transfer works
+✅ Zero-value deposit rejected
 ```
 
 ---
 
-# 16. M2.2 — DEPOSIT FLOW
+# M3 — Organization + Company Vault
 
-```text
-Company Wallet
-[Company identity and signing Wallet]
-        ↓
-signs Transaction
-[Company approves the deposit]
-        ↓
-deposit Instruction
-[Asks StreamPay to deposit Tokens]
-        ↓
-StreamPay Program
-[Checks Organization, source account, Mint and Vault]
-        ↓
-CPI
-[StreamPay asks the Token Program to transfer Tokens]
-        ↓
-Token Program
-[Actually moves the Tokens]
-        ↓
-Vault Token Account
-[Receives and stores the USDC]
-```
-
----
-
-# 17. M2.2 — WHY DO WE USE CPI?
-
-StreamPay does not directly implement the Token transfer.
-
-The Token Program manages Token operations.
-
-So:
-
-```text
-StreamPay
-   ↓
-"I want to transfer these Tokens"
-   ↓
-CPI
-   ↓
-Token Program
-   ↓
-"Okay, I will perform the transfer"
-```
-
-Therefore:
-
-```text
-CPI
-[Our Program calls another Program]
-```
-
-In our case:
-
-```text
-StreamPay
-   ↓ CPI
-Token Program
-```
-
----
-
-# 18. M2.2 — WHAT DOES DEPOSIT CHECK?
-
-The Program checks:
-
-```text
-depositor
-[The person depositing signed the transaction]
-
-depositor Token Account
-[The source account belongs to the depositor]
-
-Organization
-[The depositor is the authority of that Organization]
-
-Mint
-[The source Token Account uses the expected Token]
-
-Vault
-[The destination is the correct company-specific vault]
-
-amount
-[Must be greater than zero]
-```
-
----
-
-# 19. M2.2 — ACTUAL TOKEN MOVEMENT
-
-```text
-Company Token Account
-[Contains 3,000 USDC]
-        ↓
-Transfer
-[Move 1,000 USDC]
-        ↓
-Token Program
-[Performs the transfer]
-        ↓
-Vault Token Account
-[Now contains 1,000 USDC]
-```
-
-After:
-
-```text
-Company Token Account = 2,000 USDC
-Vault Token Account   = 1,000 USDC
-```
-
----
-
-# 20. M2.2 — SECURITY TEST
-
-We added:
-
-```text
-amount must be greater than zero
-```
-
-Therefore:
-
-```text
-deposit(1,000)
-        ↓
-✅ allowed
-
-deposit(0)
-        ↓
-❌ rejected
-```
-
-Why?
-
-```text
-Invalid or meaningless state changes should be rejected.
-```
-
----
-
-# 21. M2.2 — TEST
-
-## Test flow
-
-```text
-Create test company
-        ↓
-Create Mint
-        ↓
-Create Company Token Account
-        ↓
-Mint 3,000 test Tokens
-        ↓
-Create Organization
-        ↓
-Create Company Vault
-        ↓
-deposit(1,000)
-        ↓
-Read both Token Accounts
-        ↓
-Check balances
-```
-
-## Verified
-
-```text
-✅ Token transfer worked
-✅ Company balance decreased correctly
-✅ Vault balance increased correctly
-✅ CPI to Token Program worked
-✅ Zero deposit rejected
-```
-
-Result:
-
-```text
-M2.2 = COMPLETE ✅
-```
-
----
-
-# 22. M3 — COMPANY / ORGANIZATION
-
-## STATUS: COMPLETE ✅
+**Status: ✅ Complete**
 
 ## Goal
 
-Create a record representing a company.
+Represent the company using StreamPay and connect that company to its own vault.
 
-We need StreamPay to know:
+## Organization PDA
 
-```text
-"Which company owns this payment activity?"
-```
-
----
-
-# 23. M3.1 — ORGANIZATION ACCOUNT
-
-## What is it?
-
-```text
-Organization PDA
-[On-chain record representing the company]
-```
-
-It stores:
+Stores:
 
 ```text
 authority
-[Company Wallet that controls it]
-
 bump
-[PDA bump]
-
 created_at
-[Creation timestamp]
 ```
 
----
-
-# 24. M3.1 — ORGANIZATION FLOW
+## PDA derivation
 
 ```text
+"organization"
+       +
 Company Wallet
-[Company's signing Wallet]
-        ↓
-signs Transaction
-[Approves company registration]
-        ↓
-create_organization Instruction
-[Creates the company record]
-        ↓
-StreamPay Program
-[Creates the Organization PDA]
-        ↓
+       ↓
 Organization PDA
-[Stores company authority and metadata]
 ```
 
-Organization PDA is derived from:
-
-```text
-"organization"
-+
-Company Wallet
-```
-
-Conceptually:
+## Company relationship
 
 ```text
 Company Wallet
-      +
-"organization"
       ↓
 Organization PDA
+      ↓
+Company Vault
+      ↓
+Company Token Balance
 ```
 
----
+## Authorization rule
 
-# 25. M3.1 — TEST
+A company wallet must be the authority of the organization it is using.
 
-## Test flow
-
-```text
-Create test Company Wallet
-        ↓
-Call create_organization
-        ↓
-Program creates Organization PDA
-        ↓
-Read Organization
-        ↓
-Check authority
-        ↓
-Check bump
-        ↓
-Check created_at
-```
+An unauthorized wallet must not be able to operate on another company's organization.
 
 ## Verified
 
 ```text
 ✅ Organization PDA created
-✅ Authority correct
-✅ Bump correct
+✅ Correct authority
+✅ Correct bump
 ✅ Created timestamp stored
+✅ Company-specific vault created
+✅ Correct mint
+✅ Correct vault authority
+✅ Unauthorized organization access rejected
 ```
 
-Result:
+## M3 test result
 
 ```text
-1 test passed
+Organization tests     = 2 passed
+Company Vault test     = 1 passed
 
-M3.1 = COMPLETE ✅
+M3 = COMPLETE
 ```
 
 ---
 
-# 26. M3.2 — COMPANY-SPECIFIC VAULT
+# M4 — Payment Stream
 
-We changed the vault design so it belongs to an Organization.
+**Status: ✅ Complete**
 
-The relationship is now:
+## Goal
 
-```text
-Organization PDA
-        ↓
-Company-specific Vault Authority PDA
-        ↓
-Company-specific Vault Token Account
-        ↓
-USDC
-```
+Create the payment agreement, reserve the funds in escrow, calculate earnings over time, and allow an employee to claim earned tokens.
 
-This prevents all companies from sharing one global vault for the same Token.
+## Stream data
 
----
-
-# 27. M3.2 — COMPANY VAULT FLOW
+A stream records:
 
 ```text
-Company Wallet
-[Company controls the Organization]
-        ↓
-signs Transaction
-[Approves vault creation]
-        ↓
-initialize_vault Instruction
-[Requests the company vault]
-        ↓
-StreamPay Program
-[Checks Organization authority]
-        ↓
-Vault PDA
-[Derived from Organization + Mint]
-        ↓
-Vault Token Account
-[Holds that company's Tokens]
+organization
+employee
+mint
+total_amount
+start_time
+end_time
+claimed_amount
 ```
 
----
-
-# 28. M3.3 — COMPANY DEPOSIT
-
-The deposit is now tied to the Organization.
-
-```text
-Company Wallet
-        ↓
-signs Transaction
-        ↓
-deposit Instruction
-        ↓
-StreamPay Program
-        ↓
-checks Organization authority
-        ↓
-checks company Token Account
-        ↓
-checks company-specific Vault
-        ↓
-CPI
-        ↓
-Token Program
-        ↓
-Vault receives Tokens
-```
-
----
-
-# 29. M3 — SECURITY TEST
-
-We also tested an unauthorized wallet against an existing Organization.
-
-Test idea:
-
-```text
-Company A
-   ↓
-Organization A
-```
-
-Then:
-
-```text
-Company B
-   ↓
-tries to use Organization A
-   ↓
-❌ rejected
-```
-
-Verified:
-
-```text
-✅ Unauthorized Organization access rejected
-```
-
-Important:
-
-This test proves the Organization ownership rule.
-
-A deeper direct test of unauthorized vault access belongs in the later security-testing phase (M6).
-
----
-
-# 30. M3 — FULL TEST
-
-## Test flow
-
-```text
-Create Company Wallet
-        ↓
-Create Mint
-        ↓
-Create Company Token Account
-        ↓
-Give Company 3,000 Tokens
-        ↓
-Create Organization
-        ↓
-Create Company-specific Vault
-        ↓
-Deposit 1,000 Tokens
-        ↓
-Read balances
-        ↓
-Check Vault Mint
-        ↓
-Check Vault Authority
-```
-
-## Verified
-
-```text
-✅ Organization created
-✅ Company-specific Vault created
-✅ Correct Mint
-✅ Correct Vault Authority PDA
-✅ Company balance = 2,000 USDC
-✅ Vault balance = 1,000 USDC
-✅ Deposit CPI works
-```
-
-Current test result:
-
-```text
-M3 Organization tests = 2 passed
-M3 Company Vault test = 1 passed
-
-M3 = COMPLETE ✅
-```
-
----
-
-# 31. WHAT WE HAVE BUILT SO FAR
-
-```text
-                    StreamPay Program
-                           │
-             ┌─────────────┴─────────────┐
-             │                           │
-             ▼                           ▼
-      ProtocolConfig              Organization
-           PDA                         PDA
-             │                           │
-             │                           ▼
-             │                    Company Vault System
-             │                           │
-             │                    ┌──────┴──────┐
-             │                    │             │
-             │                    ▼             ▼
-             │              Vault Token    Vault Authority
-             │                 Account          PDA
-             │                    │
-             │                    ▼
-             │                  USDC
-             │
-             └──── protocol metadata
-```
-
----
-
-# 32. COMPLETE FLOW WE HAVE BUILT
-
-## M1
-
-```text
-Authority Wallet
-[Approves initialization]
-        ↓
-Transaction
-[Request]
-        ↓
-initialize_protocol
-[Create protocol configuration]
-        ↓
-StreamPay Program
-[Runs rules]
-        ↓
-ProtocolConfig PDA
-[Stores protocol metadata]
-```
-
-## M2
-
-```text
-Company Wallet
-[Approves deposit]
-        ↓
-Transaction
-[Request]
-        ↓
-deposit
-[Deposit action]
-        ↓
-StreamPay Program
-[Checks rules]
-        ↓
-CPI
-[Calls Token Program]
-        ↓
-Token Program
-[Moves Tokens]
-        ↓
-Company Vault Token Account
-[Stores deposited USDC]
-```
-
-## M3
-
-```text
-Company Wallet
-[Company identity]
-        ↓
-create_organization
-[Creates company record]
-        ↓
-Organization PDA
-[Stores company authority]
-        ↓
-initialize_vault
-[Creates company-specific vault]
-        ↓
-Company Vault
-[Stores company Tokens]
-        ↓
-deposit
-[Funds the company vault]
-```
-
-## M4
+## Create-stream flow
 
 ```text
 Company Vault
       ↓
 create_stream
-[Creates payment agreement]
       ↓
 Stream PDA
-[Stores stream rules]
       ↓
 Stream Escrow
-[Stores reserved stream funds]
       ↓
-Time passes
-      ↓
-Employee calls claim
-      ↓
-StreamPay calculates earned amount
-      ↓
-CPI
-      ↓
-Token Program
-      ↓
-Employee Token Account
+Reserved stream funds
 ```
 
----
-
-# 33. PHASE-BY-PHASE TEST PATTERN
-
-Every phase will follow the same pattern:
+## Earned amount model
 
 ```text
-1. Build
-   [Does the Program compile?]
-
-2. Unit / integration test
-   [Does the real Instruction work?]
-
-3. State verification
-   [Did the expected Accounts change?]
-
-4. Security / negative test
-   [Does invalid or unauthorized behavior fail?]
-
-5. Regression test
-   [Did earlier phases continue to work?]
+Before start  → 0
+At start      → 0
+During stream → proportional amount
+At end        → full amount
+After end     → full amount
 ```
 
-For completed phases:
-
-```text
-M1
-Build ✅
-Functional test ✅
-State verification ✅
-Security/validation ✅ where applicable
-Regression ✅
-
-M2
-Build ✅
-Vault test ✅
-Deposit test ✅
-Balance verification ✅
-Zero-deposit rejection ✅
-Regression ✅
-
-M3
-Build ✅
-Organization test ✅
-Company vault test ✅
-Balance verification ✅
-Unauthorized Organization test ✅
-M1/M2 regression ✅
-```
-
----
-
-# 34. FUTURE TEST PLAN
-
-## M4 — PAYMENT STREAM
-
-### Goal
-
-Create the actual payment agreement.
-
-```text
-Company
-   ↓
-Employee
-   ↓
-3,000 USDC
-   ↓
-30 days
-```
-
-### Planned test
-
-```text
-Create Company
-        ↓
-Create Employee
-        ↓
-Create Stream
-        ↓
-Read Stream Account
-        ↓
-Check company
-Check employee
-Check amount
-Check start/end
-Check claimed amount
-```
-
-Security tests:
-
-```text
-❌ wrong company
-❌ invalid employee
-❌ zero amount
-❌ end before start
-❌ invalid duration
-```
-
-Status:
-
-```text
-Company
-   ↓
-Employee
-   ↓
-Token amount
-   ↓
-Start time
-   ↓
-End time
-```
-
----
-
-# 35. M5 — CLAIM / CANCEL / TOP-UP
-
-### Goal
-
-Allow an employee to claim earned Tokens.
-
-### Planned flow
+## Claim flow
 
 ```text
 Employee Wallet
-        ↓
-signs Transaction
-        ↓
-Claim Instruction
-        ↓
-StreamPay Program
-        ↓
-calculates earned amount
-        ↓
+      ↓
+claim
+      ↓
+StreamPay calculates claimable amount
+      ↓
 CPI
-        ↓
+      ↓
 Token Program
-        ↓
+      ↓
 Employee Token Account
 ```
 
-### Planned tests
+## Claim safety tests
 
 ```text
-✅ claim before start = 0/rejected as designed
-✅ partial claim works
-✅ repeated claim cannot double-count
-✅ final claim works
-✅ claimed amount updates
-✅ cancel works
-✅ top-up works
+Claim at stream start
+   ↓
+❌ nothing is earned
+
+Claim the same amount again
+   ↓
+❌ nothing new is claimable
 ```
 
-Status:
+## Verified claim example
 
 ```text
-M5 = PENDING ⏳
+Employee received:
+500,000,000 base units
+
+Escrow retained:
+500,000,000 base units
+
+claimed_amount:
+500,000,000 base units
+```
+
+## Completed regression suite
+
+```text
+claim.rs             1 passed
+organization.rs      2 passed
+protocol_config.rs   1 passed
+stream.rs            2 passed
+vault.rs             1 passed
+
+TOTAL                7 passed
+FAILURES             0
+```
+
+## M4 result
+
+```text
+M4.1 Stream Account            ✅
+M4.2 Create Stream             ✅
+M4.2 Escrow funding            ✅
+M4.3 Earned amount calculation ✅
+M4.4 Employee Claim            ✅
+M4.5 Claim safety tests        ✅
+
+M4 = COMPLETE
 ```
 
 ---
 
-# 36. M6 — SECURITY + COMPREHENSIVE TESTS
+# M5 — Cancel / Top-Up / Stream Lifecycle
 
-### Goal
+**Status: 🟡 Partial**
 
-Attack our own protocol through invalid inputs.
+## Goal
 
-### Planned tests
+Manage an existing stream after creation.
+
+The native M5 phase covers:
+
+```text
+cancel_stream
+top_up_stream
+remaining-balance handling
+stream lifecycle edge cases
+```
+
+## Native cancel flow
+
+```text
+Company Wallet
+      ↓
+cancel_stream
+      ↓
+StreamPay validates ownership + lifecycle
+      ↓
+Remaining escrow handling
+```
+
+## Native TopUp flow
+
+```text
+Company Vault
+      ↓
+top_up_stream
+      ↓
+StreamPay validates target stream
+      ↓
+CPI
+      ↓
+Stream Escrow
+```
+
+## What is already proven
+
+A **cross-chain TopUp** was successfully executed through:
+
+```text
+EVM Gateway
+   ↓
+Wormhole
+   ↓
+VAA
+   ↓
+consume_vaa
+   ↓
+execute_cross_chain_top_up
+   ↓
+Stream total increases
+```
+
+## What remains
+
+```text
+✅ Cross-chain TopUp integration
+⏳ Native cancel_stream lifecycle
+⏳ Full native M5 lifecycle test coverage
+```
+
+> Do not mark M5 as fully complete until the native lifecycle work is completed and tested.
+
+---
+
+# M6 — Security + Comprehensive Tests
+
+**Status: ⏳ Pending**
+
+## Goal
+
+Systematically test invalid inputs, bad account combinations, unauthorized actions, and edge cases.
+
+## Planned coverage
 
 ```text
 ❌ wrong signer
@@ -1378,492 +679,806 @@ Attack our own protocol through invalid inputs.
 ❌ double claim
 ❌ invalid timestamps
 ❌ arithmetic overflow/underflow
-❌ replayed action
+❌ replayed cross-chain action
 ```
 
-Regression:
+## Regression rule
+
+Every new milestone must preserve the working behavior of previous milestones.
 
 ```text
-All previous M1-M5 tests must still pass.
-```
-
-Status:
-
-```text
-M6 = PENDING ⏳
+M1 tests
+  ↓
+M2 tests
+  ↓
+M3 tests
+  ↓
+M4 tests
+  ↓
+M5 tests
+  ↓
+Security regression
 ```
 
 ---
 
-# 37. M7 — FRONTEND
+# M7 — Frontend
 
-### Goal
+**Status: ⏳ Pending**
 
-Users interact with StreamPay from a web app.
+## Goal
 
-### Planned test
+Build the web interface companies and employees will use.
+
+## Planned stack
+
+```text
+Next.js
+TypeScript
+Tailwind CSS
+```
+
+## Planned user journey
 
 ```text
 Connect Wallet
-        ↓
-Read Organization
-        ↓
-Show Vault
-        ↓
+      ↓
+View Organization
+      ↓
+View Vault
+      ↓
 Create Stream
-        ↓
-Show Stream
-        ↓
-Claim
-        ↓
-Refresh on-chain state
+      ↓
+View Streams
+      ↓
+Claim Payments
+      ↓
+View History
 ```
 
-Also test:
+## Principle
 
-```text
-✅ wrong network handled
-✅ transaction errors displayed
-✅ wallet rejection handled
-✅ balances refresh correctly
-```
+The frontend is a client of the protocol.
 
-Status:
-
-```text
-M7 = PENDING ⏳
-```
+It should read and submit transactions, but the blockchain remains the source of truth.
 
 ---
 
-# 38. M8 — INDEXER / BACKEND
+# M8 — Backend / Indexer
 
-### Goal
+**Status: ⏳ Pending**
 
-Read blockchain activity and provide useful application data.
+## Goal
 
-Important:
-
-```text
-Backend
-[Reads and indexes blockchain state]
-
-Backend does NOT
-[decide how much an employee is allowed to claim]
-```
-
-### Planned test
+Make on-chain data faster and easier to query.
 
 ```text
-Solana Program event/activity
-        ↓
+Solana Program
+      ↓
 Indexer
-        ↓
+      ↓
 Database
-        ↓
+      ↓
 API
-        ↓
+      ↓
 Frontend
 ```
 
-Tests:
+## Responsibilities
 
 ```text
-✅ new Organization indexed
-✅ new Stream indexed
-✅ deposit indexed
-✅ claim indexed
-✅ duplicate events handled
-✅ database state matches chain state
+Transaction history
+Stream history
+Notifications
+Analytics
+Search
+API endpoints
 ```
 
-Status:
+## Important rule
 
 ```text
-M8 = PENDING ⏳
+Solana Program
+= source of truth
+
+Backend
+= index + query layer
+```
+
+The backend must not decide how much an employee has earned or whether an employee is authorized to claim.
+
+---
+
+# M9 — EVM Gateway
+
+**Status: ✅ Complete**
+
+## Goal
+
+Provide the EVM-side entry point for cross-chain StreamPay actions.
+
+## Network
+
+```text
+Ethereum Sepolia
+```
+
+## Deployed gateway
+
+```text
+0x13a5b0be7F5841Ac2Cb0D07e71bB4209f469F104
+```
+
+## Gateway capabilities
+
+The deployed contract contains:
+
+```text
+CreateStream
+TopUpStream
+CancelStream
+```
+
+The CreateStream and TopUpStream intents were successfully exercised in the M12 cross-chain demonstration.
+
+## Gateway responsibility
+
+```text
+EVM transaction
+      ↓
+validate operation
+      ↓
+encode StreamPay payload
+      ↓
+Wormhole publishMessage
+      ↓
+produce cross-chain message
 ```
 
 ---
 
-# 39. M9 — EVM GATEWAY
+# M10 — Cross-Chain Messaging
 
-### Goal
+**Status: ✅ Complete**
 
-Add the EVM-side gateway.
+## Goal
 
-### Planned test
+Connect EVM Sepolia and Solana Devnet through Wormhole.
 
-```text
-EVM wallet
-   ↓
-Gateway
-   ↓
-validate message
-   ↓
-produce cross-chain instruction/message
-```
-
-Tests:
+## Verified flow
 
 ```text
-✅ valid caller
-✅ correct token
-✅ correct destination
-✅ invalid message rejected
-✅ unauthorized caller rejected
-```
-
-Status:
-
-```text
-M9 = PENDING ⏳
-```
-
----
-
-# 40. M10 — CROSS-CHAIN MESSAGING
-
-### Goal
-
-Connect the EVM side and Solana side through Wormhole messaging.
-
-### Planned test
-
-```text
-Chain A
-   ↓
-message
-   ↓
+EVM Sepolia
+      ↓
+StreamPay EVM Gateway
+      ↓
 Wormhole
-   ↓
-Solana
-   ↓
-StreamPay
+      ↓
+VAA
+      ↓
+Guardian signature verification
+      ↓
+consume_vaa
+      ↓
+StreamPay Solana Program
 ```
 
-Tests:
+## Verified Wormhole sequences
 
 ```text
-✅ trusted source accepted
-✅ unknown source rejected
-✅ duplicate message rejected
-✅ invalid payload rejected
-✅ message state recorded
+Sequence 7 → CreateStream
+Sequence 8 → TopUpStream
 ```
 
-Status:
+## TopUp VAA processing
+
+The TopUp path completed all of these steps:
 
 ```text
-M10 = PENDING ⏳
+1. Fetch VAA
+        ↓
+2. Post guardian signatures
+        ↓
+3. Consume VAA on Solana
+        ↓
+4. Execute cross-chain TopUp
 ```
+
+## Replay protection
+
+The cross-chain state records consumed VAA information so a previously consumed message is not intended to be executed again.
 
 ---
 
-# 41. M11 — CROSS-CHAIN ASSETS
+# M11 — Cross-Chain Assets
 
-### Goal
+**Status: ⏳ Pending**
 
-Move/fund assets across chains.
+## Goal
 
-### Planned test
+Implement the actual asset-transfer layer that moves/funds assets across chains.
+
+Target architecture:
 
 ```text
 Source Chain
-   ↓
-cross-chain asset transfer
-   ↓
+      ↓
+Cross-chain asset transfer
+      ↓
 Destination Chain
-   ↓
+      ↓
+StreamPay
+```
+
+## What we have verified
+
+During the cross-chain CreateStream/TopUp demonstration:
+
+```text
+Solana Devnet test-token funding
+      ↓
 StreamPay Vault
+      ↓
+Cross-chain execution
+      ↓
+Stream Escrow
 ```
 
-Tests:
+The destination-side token movement works.
+
+## What is not implemented
 
 ```text
-✅ correct amount
-✅ correct destination
-✅ correct token
-✅ replay protection
-✅ unauthorized source rejected
-✅ final balance matches expected amount
+EVM-to-Solana token bridge
+NTT/token-transfer infrastructure
 ```
 
-Status:
+Therefore:
 
-```text
-M11 = PENDING ⏳
+| Capability | Status |
+|---|---|
+| Cross-chain message execution | ✅ Verified |
+| Destination escrow funding | ✅ Verified |
+| Actual EVM ↔ Solana asset bridge | ⏳ Not implemented |
+| NTT/token-transfer layer | ⏳ Not implemented |
+
+M11 remains pending until the asset-transfer mechanism itself is implemented and tested.
+
+---
+
+# M12 — Devnet + Documentation + Portfolio
+
+**Status: 🟡 In Progress**
+
+## Goal
+
+Turn the working protocol into a reproducible, explainable, portfolio-ready project.
+
+## Completed technical demonstration
+
+```mermaid
+sequenceDiagram
+    participant EVM as Ethereum Sepolia
+    participant G as EVM Gateway
+    participant W as Wormhole
+    participant S as Solana Devnet
+
+    EVM->>G: CreateStream intent
+    G->>W: publishMessage
+    W-->>S: VAA
+    S->>S: consume_vaa
+    S->>S: Create native Stream
+
+    EVM->>G: TopUp intent
+    G->>W: publishMessage
+    W-->>S: VAA
+    S->>S: consume_vaa
+    S->>S: execute_cross_chain_top_up
+    S->>S: Stream total 2,000 → 3,000
+    S->>S: Transfer additional funds to Escrow
 ```
 
 ---
 
-# 42. M12 — DEVNET + DOCUMENTATION + PORTFOLIO
+## M12.1 — CreateStream test
 
-### Goal
-
-Prepare the project for real demonstration and portfolio use.
-
-### Planned test
+### EVM transaction
 
 ```text
-Build
-  ↓
-Deploy to Devnet
-  ↓
-Initialize protocol
-  ↓
-Create Organization
-  ↓
-Create Vault
-  ↓
-Deposit
-  ↓
-Create Stream
-  ↓
-Claim
-  ↓
-Verify final balances
+0x5cf66d9a9ee8938ba7a2ca65d51447c00a9553746a972d9cc47696a3f2a23c5f
 ```
 
-Also verify:
+### Gateway nonce
 
 ```text
-✅ README complete
-✅ architecture diagram complete
-✅ setup instructions work
-✅ tests pass
-✅ deployment instructions work
-✅ demo flow works from start to finish
+8
 ```
 
-Status:
+### Wormhole sequence
 
 ```text
-M12 = PENDING ⏳
+7
+```
+
+### Operation ID
+
+```text
+0x16298b8b95c0dcb914166e967db56595336a0e4a8b86e8074e3f17c5d71bc06c
+```
+
+### Stream ID
+
+```text
+0x6f2e2d30c89ea945bd168bf291ff0a35936f9cdb2295200752b52a72b12db7b5
+```
+
+### Stream parameters
+
+```text
+Amount = 2,000 base units
+Start  = 1 hour after message publication time
+End    = 2 hours after message publication time
+```
+
+The test stream used a **6-decimal Solana Devnet test mint**, so:
+
+```text
+2,000 base units = 0.002 test tokens
+```
+
+### Result
+
+```text
+✅ Wormhole VAA existed
+✅ VAA fetched
+✅ Guardian verification path completed
+✅ consume_vaa succeeded
+✅ Native Stream created
+✅ Stream Escrow created
+```
+
+### Solana execution transaction
+
+```text
+3pdurLsSKBcRahbje1KXEp2vfkuKLZzZV7PcLxyArTDmvoTcEZFkotGY7b6zJHdfKafSzUgT5EDjGFi3aLNBvrDc
+```
+
+### Created native Stream
+
+```text
+Native Stream:
+F3HtRP...  [public on-chain account]
+
+Stream Escrow:
+2RwY9...   [public on-chain token account]
 ```
 
 ---
 
-# 43. CURRENT ROADMAP
+## M12.2 — TopUp test
+
+### EVM transaction
 
 ```text
-M0 — Environment + Solana fundamentals     ✅
-M1 — Protocol Configuration                 ✅
-M2 — Token Vault + Deposits                 ✅
-M3 — Company / Organization + Vault         ✅
-M4 — Payment Stream                         ✅
-M5 — Claim / Cancel / Top-up                ⏳
-M6 — Security + Comprehensive Tests         ⏳
-M7 — Frontend                               ⏳
-M8 — Indexer / Backend                      ⏳
-M9 — EVM Gateway                            ⏳
-M10 — Cross-chain Messaging                 ⏳
-M11 — Cross-chain Assets                    ⏳
-M12 — Devnet + Docs + Portfolio             ⏳
+0x6366f91c1f9b1ec24796847246ee1bc80f2d91943fb9b263a68799d1f0ecaabd
+```
+
+### Gateway nonce
+
+```text
+9
+```
+
+### Wormhole sequence
+
+```text
+8
+```
+
+### Operation ID
+
+```text
+0x0307cba870b0db93c47b6e8d7d65bedc165b2c38a3ee851fbe383e21f25d19d0
+```
+
+### TopUp parameters
+
+```text
+Existing total = 2,000 base units
+TopUp          = 1,000 base units
+New total      = 3,000 base units
+```
+
+With the 6-decimal test mint:
+
+```text
+2,000 base units = 0.002 test tokens
+1,000 base units = 0.001 test tokens
+3,000 base units = 0.003 test tokens
+```
+
+### Result
+
+```text
+✅ VAA fetched
+✅ Guardian signatures posted
+✅ VAA consumed
+✅ Cross-chain TopUp executed
+✅ Stream total changed 2,000 → 3,000
+✅ Additional tokens moved into escrow
+```
+
+### Solana execution transaction
+
+```text
+5bhdcPzZPFZ9cN4FdE6qn8PHZTe5Axi9uDxHMSh7Hz1HDhfRHU4mLPUA7v4qCDuN17DsAUe1MXqDi8xX8jTTrx4T
 ```
 
 ---
 
-# 44. CURRENT PROGRESS
+## M12.3 — Guardian signature processing
+
+### Guardian signature account used for TopUp
 
 ```text
-Completed:
+9kA8pCRrFiEJuX1Nqf7zSAuQrDhhhLTRvM3i2dV9R27w
+```
 
+### Signature-posting transaction
+
+```text
+2zNZWpTnAYsG2Zuvu8mQ68UHwSJvu271tmjNavAv4QyuTzG9eV1sHUM2bBHCNHiqDubHWu7xjYhStesVqgs684Ah
+```
+
+### Consumed VAA
+
+```text
+4Mo8tFU6VKffkbex38vPVThiFnfBkZJMxvat3kxW4JE9
+```
+
+### VAA consume transaction
+
+```text
+5nDJpgoHf4QB5AixqLMTmVoSScfFPZ6eJNPAB5HFBJwocenaYdzyCpHPBu5CmpChaQBXtKkAHcnVcsDcUmNzEqEW
+```
+
+### Temporary guardian state cleanup
+
+```text
+Guardian signatures account closed successfully.
+
+Transaction:
+4YTzbtq11np7amXt4TrFNkQgtry4VDeX86BPbzPFpERxa3949fRqLe1iGXyB5MixionagWc1k8XsSfPkxWwbsdGT
+```
+
+---
+
+# Verified Test Evidence
+
+## Final TopUp custody state
+
+After the successful TopUp:
+
+```text
+Vault balance         = 0
+Stream Escrow balance = 0.003 test tokens
+```
+
+The Stream Escrow token account is owned by the native Stream account.
+
+This verifies:
+
+```text
+Cross-chain message
+      ↓
+Solana execution
+      ↓
+additional stream funding
+      ↓
+stream escrow custody
+```
+
+---
+
+# Cross-Chain State Model
+
+The cross-chain flow uses dedicated state for:
+
+```text
+CrossChainConfig
+Consumed VAA
+Cross-chain stream state
+Native Stream
+Stream Escrow
+Vault
+Vault Authority
+```
+
+## CrossChainConfig PDA
+
+```text
+FWyWiCt35UVv6Dgik1PT7ZVXekEHfMPU9sBB8uvkPmp2
+
+Bump:
+255
+```
+
+## Guardian set PDA
+
+```text
+Guardian Set Index:
+0
+
+PDA:
+dxZtypiKT5D9LYzdPxjvSZER9MgYfeRVU5qpMTMTRs4
+```
+
+## Trusted EVM emitter
+
+The deployed Sepolia gateway is represented on Solana as:
+
+```text
+00000000000000000000000013a5b0be7f5841ac2cb0d07e71bb4209f469f104
+```
+
+The emitter is checked as the trusted source of the cross-chain message.
+
+---
+
+# Key On-Chain Accounts
+
+## Protocol
+
+```text
+Program ID:
+4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS
+
+ProtocolConfig PDA:
+62hSrssQue2ed1n9dxviZtNcNcSpB8QdQBX6zP66GTwA
+```
+
+## Organization
+
+```text
+Organization PDA:
+AhxBRoQmi1mAZNfBmkEB9WjSEBr48SaTyQWaLKM13YVG
+```
+
+## Vault
+
+```text
+Vault Token Account / PDA:
+DsPZZ83mzSHvSkhRhJTcUieJ212Dq1kiPtBnaSH2kdos
+
+Vault Authority:
+EonGZb6XxkCqfaZSGVxhzqj6yqko7LDHUbYVuojdwQN8
+```
+
+## Test mint
+
+```text
+6jDvPYSs5qerGyXe3G2FLpFJhFQHHvjbkj9Xi9jYDxhB
+
+Decimals:
+6
+```
+
+---
+
+# Public Deployment Identifiers
+
+## Solana Devnet
+
+```text
+Cluster:
+Solana Devnet
+
+RPC:
+https://api.devnet.solana.com
+
+Program ID:
+4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS
+```
+
+## Ethereum Sepolia
+
+```text
+Network:
+Ethereum Sepolia
+
+StreamPay EVM Gateway:
+0x13a5b0be7F5841Ac2Cb0D07e71bB4209f469F104
+
+Wormhole Sepolia Core:
+0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78
+```
+
+## Wormhole on Solana
+
+```text
+Wormhole Solana Devnet Core:
+3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5
+
+Wormhole Verify VAA Shim:
+EFaNWErqAtVWufdNb7yofSHHfWFos843DFpu4JBw24at
+```
+
+---
+
+# Development Workflow
+
+Every protocol change follows this pattern:
+
+```text
+1. Build
+   ↓
+2. Unit / integration test
+   ↓
+3. State verification
+   ↓
+4. Negative / security test
+   ↓
+5. Regression test
+```
+
+For cross-chain actions:
+
+```text
+1. Publish EVM intent
+        ↓
+2. Wait for Wormhole VAA
+        ↓
+3. Fetch VAA
+        ↓
+4. Post guardian signatures
+        ↓
+5. Consume VAA on Solana
+        ↓
+6. Execute StreamPay action
+        ↓
+7. Verify account state + token balances
+        ↓
+8. Close temporary guardian state
+```
+
+---
+
+# Security Notes
+
+## Never commit
+
+```text
+.env
+private keys
+seed phrases
+guardian keypair secret material
+temporary credentials
+```
+
+## Safe to document
+
+```text
+Program IDs
+Contract addresses
+Public PDAs
+Public token mint addresses
+Transaction signatures
+Public account addresses
+```
+
+## Development key hygiene
+
+Any wallet/seed material exposed during development must be treated as **compromised** and must not be reused for real funds.
+
+The guardian-signature keypair is temporary development infrastructure and its secret material must never be committed.
+
+---
+
+# What Is Actually Complete
+
+## Core Solana protocol
+
+```text
 M0 ✅
 M1 ✅
 M2 ✅
 M3 ✅
 M4 ✅
+```
 
-Pending:
+## Cross-chain execution layer
 
-M5 ⏳
-M6 ⏳
-M7 ⏳
-M8 ⏳
-M9 ⏳
-M10 ⏳
-M11 ⏳
-M12 ⏳
+```text
+M9  ✅ EVM Gateway
+M10 ✅ Wormhole Messaging
+```
+
+## Partial
+
+```text
+M5  🟡 Cross-chain TopUp proven; native cancel/lifecycle not finished
+M12 🟡 Technical Devnet/Sepolia demo proven; documentation/portfolio work remains
+```
+
+## Still pending
+
+```text
+M6  ⏳ Comprehensive security testing
+M7  ⏳ Frontend
+M8  ⏳ Backend / indexer
+M11 ⏳ Actual cross-chain asset bridge / NTT layer
 ```
 
 ---
 
-# 45. THE BIG PICTURE
+# Final Project Picture
 
-```text
-Company Wallet
-        ↓
-Organization PDA
-        ↓
-Company Vault
-        ↓
-Deposit USDC
-        ↓
-Create Stream
-        ↓
-Employee earns over time
-        ↓
-Employee claims
-        ↓
-Employee receives Tokens
+## Native payroll path
+
+```mermaid
+flowchart TD
+    Company["Company Wallet"]
+    Org["Organization PDA"]
+    Vault["Company Vault"]
+    Stream["Payment Stream"]
+    Escrow["Stream Escrow"]
+    Time["Time-based earning"]
+    Claim["Employee Claim"]
+    Employee["Employee Token Account"]
+
+    Company --> Org
+    Org --> Vault
+    Vault --> Stream
+    Stream --> Escrow
+    Escrow --> Time
+    Time --> Claim
+    Claim --> Employee
 ```
 
-Later:
+## Cross-chain extension
 
-```text
-EVM Chain
-   ↓
-Wormhole
-   ↓
-Solana
-   ↓
-StreamPay
-```
+```mermaid
+flowchart TD
+    EVM["Ethereum Sepolia"]
+    Gateway["StreamPay EVM Gateway"]
+    Wormhole["Wormhole"]
+    VAA["VAA"]
+    Consume["consume_vaa"]
+    Program["StreamPay Solana Program"]
+    Create["Cross-chain CreateStream"]
+    TopUp["Cross-chain TopUp"]
+    Escrow["Stream Escrow"]
 
----
-
-# 46. THE MOST IMPORTANT MENTAL MODEL
-
-```text
-Program
-[Rules]
-
-Account
-[Data]
-
-Instruction
-[Action]
-
-Transaction
-[Request]
-
-Wallet
-[Identity used to control funds and sign]
-
-Signer
-[Wallet approving the action]
-
-PDA
-[Program-derived special address]
-
-CPI
-[Program calls another Program]
-
-Mint
-[Defines a Token]
-
-Token Account
-[Holds a Token balance]
-
-Token Program
-[Manages Token operations]
-
-Vault
-[Token Account holding protocol funds]
-
-Organization
-[Company record]
-
-Stream
-[Payment agreement over time]
+    EVM --> Gateway
+    Gateway --> Wormhole
+    Wormhole --> VAA
+    VAA --> Consume
+    Consume --> Program
+    Program --> Create
+    Program --> TopUp
+    Create --> Escrow
+    TopUp --> Escrow
 ```
 
 ---
 
-# 47. ONE FINAL PICTURE
+# M12 Remaining Checklist
 
 ```text
-                 COMPANY
-                    │
-                    │
-                    ▼
-            ORGANIZATION PDA
-                    │
-                    │ owns/identifies
-                    ▼
-             COMPANY VAULT
-                    │
-                    │ contains
-                    ▼
-                  USDC
-                    │
-                    │ funds
-                    ▼
-                 STREAM
-                    │
-                    │ time passes
-                    ▼
-                EMPLOYEE
-                    │
-                    │ claims
-                    ▼
-                 TOKENS
+☐ Final README
+☐ Final architecture diagram
+☐ Reproducible setup instructions
+☐ Deployment instructions
+☐ Security documentation
+☐ End-to-end demo guide
+☐ Portfolio presentation
+☐ Final documentation review
 ```
 
-Current foundation:
+## Current stopping point
 
-```text
-M0 — Environment + Solana Fundamentals
-[Set up Rust, Anchor, Solana CLI, testing tools, and learn the basic Solana concepts]
-✅ Complete
-
-
-M1 — Protocol Configuration
-[Create the basic StreamPay protocol settings and store them in a ProtocolConfig PDA]
-✅ Complete
-
-
-M2 — Token Vault + Deposits
-[Create a company-specific token vault and allow the company to deposit tokens into it]
-✅ Complete
-
-
-M3 — Company / Organization
-[Create an Organization for a company and connect that company to its own vault]
-✅ Complete
-
-
-M4 — Payment Stream
-[Create the payment agreement, reserve stream funds in escrow, calculate earned Tokens, and allow employees to claim earned Tokens]
-✅ Complete
-
-
-M5 — Claims / Cancel / Top-up
-[Allow employees to claim earned money and manage existing streams]
-⏳ Pending
-
-
-M6 — Security + Comprehensive Tests
-[Test unauthorized actions, invalid inputs, edge cases, replay protection, and other security risks]
-⏳ Pending
-
-
-M7 — Frontend
-[Build the web interface for companies and employees to use StreamPay]
-⏳ Pending
-
-
-M8 — Backend / Indexer
-[Read blockchain activity, store useful data, and provide it to the frontend]
-⏳ Pending
-
-
-M9 — EVM Gateway
-[Create the Ethereum/EVM-side gateway for cross-chain interaction]
-⏳ Pending
-
-
-M10 — Cross-chain Messaging
-[Connect chains using Wormhole messaging]
-⏳ Pending
-
-
-M11 — Cross-chain Assets
-[Enable assets to move/fund the protocol across chains]
-⏳ Pending
-
-
-M12 — Devnet + Documentation + Portfolio
-[Deploy, test the complete system on Devnet, document it, and prepare the final portfolio project]
-⏳ Pending
-```
+> **The technical cross-chain CreateStream and TopUp demonstrations are working on EVM Sepolia → Wormhole → Solana Devnet.**
+>
+> **The project is now in M12 documentation and portfolio packaging.**
+>
+> **There is no M13 in the roadmap.**
