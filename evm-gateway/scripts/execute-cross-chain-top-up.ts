@@ -70,11 +70,10 @@ const SOURCE_EMITTER =
     "hex",
   );
 
-const EXPECTED_SEQUENCE =
-  8n;
-
 const NATIVE_STREAM_ID =
-  8n;
+  BigInt(
+    process.env.NATIVE_STREAM_ID ?? "8",
+  );
 
 const VAA_HEADER_LEN =
   51;
@@ -142,10 +141,6 @@ async function main() {
     payer.publicKey.toBase58(),
   );
 
-  console.log(
-    "VAA sequence:",
-    EXPECTED_SEQUENCE.toString(),
-  );
 
   console.log(
     "Native stream ID:",
@@ -168,13 +163,10 @@ async function main() {
   const sequence =
     vaaBody.readBigUInt64BE(42);
 
-  if (
-    sequence !== EXPECTED_SEQUENCE
-  ) {
-    throw new Error(
-      `Expected sequence ${EXPECTED_SEQUENCE}, got ${sequence}`,
-    );
-  }
+  console.log(
+    "VAA sequence:",
+    sequence.toString(),
+  );
 
   const payload =
     vaaBody.subarray(

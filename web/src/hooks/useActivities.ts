@@ -25,7 +25,7 @@ export function useActivities() {
     useState<string>("all");
 
   const refresh = useCallback(
-    async (nextOffset = offset) => {
+    async (nextOffset = 0) => {
       try {
         setLoading(true);
         setError(null);
@@ -48,12 +48,12 @@ export function useActivities() {
         setLoading(false);
       }
     },
-    [offset],
+    [],
   );
 
   useEffect(() => {
     void refresh(0);
-  }, []);
+  }, [refresh]);
 
   const filteredActivities =
     instruction === "all"

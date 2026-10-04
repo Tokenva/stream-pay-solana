@@ -297,6 +297,66 @@ Cross-chain action
 
 ```
 
+## 3. Application / indexing architecture
+
+The application has two distinct data paths:
+
+1. **Native protocol interaction:** the Next.js application reads Solana state and submits native StreamPay transactions through the connected wallet.
+2. **Indexed read path:** the Next.js application requests indexed streams and activity from the Express backend, which reads PostgreSQL populated by the stream and activity indexers.
+
+```mermaid
+flowchart TD
+    User[User / Connected Wallet]
+    Web[Next.js Web App]
+    RPC[Solana Devnet RPC]
+    Program[StreamPay Solana Program]
+    API[Express Backend API]
+    StreamIndexer[Stream Indexer]
+    ActivityIndexer[Activity Indexer]
+    DB[PostgreSQL]
+
+    User --> Web
+    Web -->|native reads + transactions| RPC
+    User -->|signs native transactions| Web
+    RPC --> Program
+
+    Web -->|indexed stream/activity reads| API
+    API --> DB
+
+    StreamIndexer -->|reads stream accounts| RPC
+    ActivityIndexer -->|subscribes to program logs| RPC
+    StreamIndexer --> DB
+    ActivityIndexer --> DB
+```
+
+**Source-of-truth rule:** PostgreSQL is an index/query layer. The Solana program remains authoritative for protocol state, authorization, stream accounting, and claims.
+
+## 4. Cross-chain asset plane — NTT
+
+```mermaid
+flowchart TD
+    EVMAsset[EVM Sepolia ERC-20]
+    EVMNTT[EVM NTT Manager / Transceiver]
+    WormholeNTT[Wormhole NTT Transport]
+    SolanaNTT[Solana NTT Manager / Transceiver]
+    SolanaAsset[Solana Devnet SPL token]
+    Wallet[Destination Wallet]
+    Vault[StreamPay Vault]
+    Escrow[Stream Escrow]
+    Claim[Employee Claim]
+
+    EVMAsset --> EVMNTT
+    EVMNTT --> WormholeNTT
+    WormholeNTT --> SolanaNTT
+    SolanaNTT --> SolanaAsset
+    SolanaAsset --> Wallet
+    Wallet -->|manual deposit| Vault
+    Vault --> Escrow
+    Escrow --> Claim
+```
+
+The demonstrated M11 asset path is **NTT transfer → destination wallet → manual StreamPay Vault deposit**. The prototype does not claim an automated atomic NTT-receive-to-vault relayer.
+
 ---
 
 # Core Solana Concepts
@@ -373,7 +433,7 @@ consume_vaa
 
 ```
 
-## Native lifecycle operations still to finish
+## Native lifecycle operations
 
 ```text
 
@@ -2074,7 +2134,7 @@ M11 ✅ Cross-chain Assets / NTT
 ## Current work
 
 ```text
-M12 🟡 Technical packaging, documentation, reproducibility and portfolio evidence
+M12 ✅ Technical packaging, documentation, reproducibility and final technical evidence
 ```
 
 M12 is the final technical milestone. There is no M13.
@@ -2194,15 +2254,15 @@ The current M11 prototype demonstrates the NTT transfer to the destination walle
 
 ```text
 ☑ README reconciliation
-☐ Final architecture diagrams
-☐ Reproducible setup instructions verified end-to-end
-☐ Deployment instructions verified against current repository state
+☑ Final architecture diagrams
+☑ Reproducible setup instructions verified end-to-end
+☑ Deployment instructions verified against current repository state
 ☑ Security documentation reconciled
-☐ End-to-end demo guide finalized
-☐ Portfolio presentation
-☐ Final documentation review
-☐ Final repository cleanup / git review
-☐ Final regression after all M12 repository changes
+☑ End-to-end demo guide finalized
+☑ Portfolio evidence documented
+☑ Final documentation review
+☑ Final repository cleanup / git review
+☑ Final regression after all M12 repository changes
 ```
 
 ## Current stopping point
@@ -2211,6 +2271,6 @@ The current M11 prototype demonstrates the NTT transfer to the destination walle
 
 > The demonstrated NTT integration path is **NTT transfer → destination wallet → manual StreamPay Vault deposit**, not an automated atomic NTT-receive-to-vault relayer.
 
-> **M12 is now focused on documentation, architecture, reproducibility, final technical evidence, and portfolio packaging.**
+> **M12 is complete: documentation, architecture, reproducibility, final technical evidence, and repository packaging are finished.**
 
 > **There is no M13 in the roadmap.**

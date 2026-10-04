@@ -148,8 +148,6 @@ export function useStream(
       try {
         setError(null);
 
-        const mint =
-          new PublicKey(mintAddress);
 
         const [organization] =
           getOrganizationPda(

@@ -324,12 +324,16 @@ Clean and reconcile:
 
 ## M12.2 — Architecture documentation
 
-Create/finalize diagrams for:
+**Status: ✅ Complete**
+
+The documentation now contains the four required architecture views:
 
 1. Native Solana payroll flow
-2. EVM → Wormhole → Solana message flow
-3. NTT asset flow
-4. Frontend → backend → Solana/indexer architecture
+2. EVM → Wormhole → Solana message/control-plane flow
+3. NTT cross-chain asset flow
+4. Frontend → backend → Solana/indexer application architecture
+
+The application architecture is source-verified against the current frontend/backend implementation: native StreamPay reads and transaction submission use Solana directly, while indexed streams and activity are served through the Express API backed by PostgreSQL.
 
 ## M12.3 — Reproducible demo
 

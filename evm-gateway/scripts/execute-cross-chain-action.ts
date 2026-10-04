@@ -42,8 +42,9 @@ const VAA_PATH =
 const VAA_BODY_PATH =
   "artifacts/cross-chain/vaa-body.bin";
 
-const SEQUENCE = 7n;
-const NATIVE_STREAM_ID = 8n;
+const NATIVE_STREAM_ID = BigInt(
+  process.env.NATIVE_STREAM_ID ?? "8",
+);
 
 const VAA_HEADER_LEN = 51;
 const PAYLOAD_LEN = 416;
@@ -88,7 +89,6 @@ async function main() {
   );
 
   console.log("Payer:", payer.publicKey.toBase58());
-  console.log("VAA sequence:", SEQUENCE.toString());
   console.log(
     "Native stream ID:",
     NATIVE_STREAM_ID.toString(),
@@ -100,6 +100,10 @@ async function main() {
       `Expected 467-byte VAA body, got ${vaaBody.length}`,
     );
   }
+
+  const sequence = vaaBody.readBigUInt64BE(42);
+
+  console.log("VAA sequence:", sequence.toString());
 
   const payload =
     vaaBody.subarray(VAA_HEADER_LEN);
@@ -152,7 +156,7 @@ async function main() {
         SOURCE_EMITTER,
         (() => {
           const b = Buffer.alloc(8);
-          b.writeBigUInt64LE(SEQUENCE);
+          b.writeBigUInt64LE(sequence);
           return b;
         })(),
       ],
@@ -277,7 +281,7 @@ async function main() {
     Buffer.alloc(8);
 
   sequenceBuffer.writeBigUInt64LE(
-    SEQUENCE,
+    sequence,
   );
 
   const nativeStreamIdBuffer2 =
@@ -472,7 +476,7 @@ async function main() {
   console.log("======================================");
   console.log("CROSS-CHAIN CREATE STREAM EXECUTED");
   console.log("======================================");
-  console.log("Sequence:", SEQUENCE.toString());
+  console.log("Sequence:", sequence.toString());
   console.log(
     "Native stream ID:",
     NATIVE_STREAM_ID.toString(),

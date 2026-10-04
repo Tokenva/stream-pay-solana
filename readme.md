@@ -20,7 +20,7 @@ StreamPay is a **Solana-first programmable payroll and payment-streaming protoco
 | M9 — EVM gateway | ✅ Complete |
 | M10 — Wormhole cross-chain messaging | ✅ Complete |
 | M11 — Cross-chain assets / NTT | ✅ Complete |
-| M12 — Devnet + documentation + portfolio | ⏳ In progress |
+| M12 — Devnet + documentation + portfolio | ✅ Complete |
 
 **M12 is the final technical milestone. There is no M13.**
 
@@ -97,6 +97,26 @@ Employee claim
 The M11 demonstration proved a real Sepolia → Solana NTT transfer. The received asset was then manually deposited into the StreamPay vault before being used by the stream.
 
 > **Important:** M11 does not currently prove an automated atomic `NTT receive → StreamPay Vault` relayer transaction. The demonstrated flow is real NTT transfer followed by a manual StreamPay vault deposit.
+
+### Application / indexing architecture
+
+The frontend uses two data paths:
+
+```text
+Native protocol path
+
+Connected wallet → Next.js Web App → Solana Devnet RPC → StreamPay Program
+                         ↓
+                  signs transactions
+
+Indexed read path
+
+Solana Program → RPC → Stream/Activity Indexers → PostgreSQL → Express API
+                                                                  ↓
+                                                           Next.js Web App
+```
+
+The backend provides indexed/query access; it does not replace the Solana program as the source of truth.
 
 ## Core Solana instructions
 
@@ -483,15 +503,16 @@ M12.4  Final technical evidence
 
 The exit criterion is that another developer can understand the architecture and reproduce the documented prototype flow without private verbal instructions.
 
-## M12 remaining work
+## M12 — Final technical milestone complete
 
-- reconcile all repository documentation with actual implementation
-- finalize architecture diagrams
-- document the reproducible Devnet/Sepolia demo
-- capture final screenshots/evidence
-- review generated artifacts and secrets
-- run final regression and application checks
-- finalize the repository and commit/push the intended changes
+M12.1 ✅ Repository documentation
+M12.2 ✅ Architecture documentation
+M12.3 ✅ Reproducible demo
+M12.4 ✅ Final technical evidence
+
+The reproducible demo, deployment identifiers, live transaction evidence, security model, known limitations, and verification commands are recorded in `M12_REPRODUCIBLE_DEMO.md`.
+
+M12 is the final technical milestone. There is no M13.
 
 ## Honest limitations
 

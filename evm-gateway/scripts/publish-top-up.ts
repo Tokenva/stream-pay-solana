@@ -9,7 +9,14 @@ const GATEWAY_ADDRESS =
   "0x13a5b0be7F5841Ac2Cb0D07e71bB4209f469F104";
 
 const STREAM_ID =
+  process.env.STREAM_ID ??
   "0x6f2e2d30c89ea945bd168bf291ff0a35936f9cdb2295200752b52a72b12db7b5";
+
+if (!/^0x[0-9a-fA-F]{64}$/.test(STREAM_ID)) {
+  throw new Error(
+    "STREAM_ID must be a 32-byte 0x-prefixed hex value",
+  );
+}
 
 const TOP_UP_AMOUNT =
   1000n;
