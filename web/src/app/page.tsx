@@ -11,6 +11,7 @@ import { useStream } from "@/hooks/useStream";
 import { useStreamActions } from "@/hooks/useStreamActions";
 import { useIndexedStreams } from "@/hooks/useIndexedStreams";
 import ActivityStats from "@/components/ActivityStats";
+
 const MINT =
   process.env.NEXT_PUBLIC_TOKEN_MINT ?? "";
 
@@ -176,6 +177,7 @@ export default function Home() {
   } = useStream(
     MINT,
     streamId,
+    employeeAddress,
   );
 
   const {

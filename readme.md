@@ -1,68 +1,196 @@
 # StreamPay
 
-StreamPay is a programmable payroll and token-streaming project. Its Solana program supports organization-managed funding, vault custody, per-stream payout schedules, employee claims, and cancellation. The repository also includes an EVM gateway built with Hardhat and Wormhole-related interfaces.
+> **Trustless Cross-Chain Asset Streaming & Payroll Protocol**
 
-## Overview
+StreamPay is a **Solana-first programmable payroll and payment-streaming protocol**. It combines organization-managed treasury vaults, time-based payment streams, employee claims, stream lifecycle controls, an EVM gateway, Wormhole cross-chain messaging, and Wormhole NTT asset transfer.
 
-The program models a streamlined payment system in which:
+## Current status
 
-- an organization creates a protocol-level configuration and a treasury vault,
-- a company deposits SPL tokens into the vault,
-- a stream is created for an employee with a total amount, start time, and end time,
-- tokens are released over time based on earned value,
-- employees can claim vested amounts from escrow,
-- the company can top up or cancel an active stream.
+| Milestone | Status |
+|---|---|
+| M0 — Environment + Solana fundamentals | ✅ Complete |
+| M1 — Protocol configuration | ✅ Complete |
+| M2 — Token vault + deposits | ✅ Complete |
+| M3 — Organization + company treasury | ✅ Complete |
+| M4 — Payment streams + claims | ✅ Complete |
+| M5 — Native lifecycle | ✅ Complete |
+| M6 — Security + comprehensive testing | ✅ Complete |
+| M7 — Frontend | ✅ Complete |
+| M8 — Backend / indexer | ✅ Complete |
+| M9 — EVM gateway | ✅ Complete |
+| M10 — Wormhole cross-chain messaging | ✅ Complete |
+| M11 — Cross-chain assets / NTT | ✅ Complete |
+| M12 — Devnet + documentation + portfolio | ⏳ In progress |
 
-## Core functionality
+**M12 is the final technical milestone. There is no M13.**
 
-The current smart contract exposes the following instructions:
+The latest complete regression recorded in the project context is **41 passed / 0 failed**.
 
-- `initialize_protocol`: initializes the global program configuration PDA
-- `create_organization`: creates an organization account tied to an authority
-- `initialize_vault`: creates the organization vault token account and vault authority PDA
-- `deposit`: transfers funds from the organization wallet into the vault
-- `create_stream`: creates a streaming payment for an employee and escrow account
-- `top_up_stream`: adds additional funds to an existing stream escrow
-- `claim`: allows the employee to claim earned tokens from their stream
-- `cancel_stream`: settles or cancels an active stream and returns remaining unearned funds to the organization
+## What StreamPay does
+
+The native Solana payroll flow is:
+
+```text
+Company Wallet
+      ↓
+Organization
+      ↓
+StreamPay Vault
+      ↓
+Create Stream
+      ↓
+Stream Escrow
+      ↓
+Time-based earning
+      ↓
+Employee Claim
+      ↓
+Employee Token Account
+```
+
+A stream contains the organization, employee, mint, total amount, start/end times, claimed amount, cancellation state, and related custody accounts. `Stream::earned_amount()` calculates the proportional amount earned over the stream window.
+
+## Cross-chain architecture
+
+StreamPay deliberately separates the **control plane** from the **asset plane**.
+
+### Control plane — cross-chain StreamPay actions
+
+```text
+Ethereum Sepolia
+      ↓
+StreamPay EVM Gateway
+      ↓
+Wormhole
+      ↓
+VAA
+      ↓
+Guardian verification
+      ↓
+Solana VAA verification shim
+      ↓
+StreamPay consume_vaa
+      ↓
+Cross-chain StreamPay action
+```
+
+The gateway supports cross-chain intents for `CreateStream`, `TopUpStream`, and `CancelStream`. The live demonstrations recorded in the project context exercised CreateStream and TopUpStream.
+
+### Asset plane — Wormhole NTT
+
+```text
+EVM Sepolia ERC-20
+      ↓
+Wormhole NTT
+      ↓
+Solana Devnet SPL token
+      ↓
+Destination wallet
+      ↓
+StreamPay Vault deposit
+      ↓
+Stream Escrow
+      ↓
+Employee claim
+```
+
+The M11 demonstration proved a real Sepolia → Solana NTT transfer. The received asset was then manually deposited into the StreamPay vault before being used by the stream.
+
+> **Important:** M11 does not currently prove an automated atomic `NTT receive → StreamPay Vault` relayer transaction. The demonstrated flow is real NTT transfer followed by a manual StreamPay vault deposit.
+
+## Core Solana instructions
+
+### Native protocol
+
+- `initialize_protocol`
+- `create_organization`
+- `initialize_vault`
+- `deposit`
+- `create_stream`
+- `top_up_stream`
+- `claim`
+- `cancel_stream`
+
+### Cross-chain execution
+
+- `consume_vaa`
+- `execute_cross_chain_create_stream`
+- `execute_cross_chain_top_up`
 
 ## Account model
 
-The protocol uses the following on-chain account types:
+The main on-chain state types are:
 
-- `ProtocolConfig`: global configuration for the program
-- `Organization`: per-organization metadata and authority
-- `Stream`: payout schedule and stream state
+- `ProtocolConfig` — global protocol configuration
+- `Organization` — company/authority relationship
+- `Stream` — payment schedule and stream state
+- Cross-chain configuration / consumed-message state used by the Wormhole execution path
 
-### Stream state includes
+A stream tracks:
 
-- organization and employee public keys
-- vault and escrow token accounts
-- mint address
+```text
+organization
+employee
+mint
+vault / escrow accounts
+stream ID
+total amount
+start time
+end time
+claimed amount
+canceled flag / cancel time
+bump
+```
+
+## Security model
+
+The cross-chain execution path validates, among other things:
+
+- VAA body structure and length
+- sequence
+- trusted source chain
+- trusted emitter
+- guardian verification
+- payload length
+- message version
+- action
+- destination chain
+- destination program
+- operation ID
 - stream ID
-- total amount
-- start and end time
-- claimed amount
-- canceled flag and cancel time
-- bump seed
+- organization
+- employee
+- amount
+- timestamps
+- payload hash
+- canonical numeric encoding
+- non-zero nonce
+- replay / consumed-message state
 
-The `Stream::earned_amount()` logic calculates proportional payout based on elapsed time and the stream window.
+The native protocol tests also cover unauthorized signers, wrong employee, wrong organization, wrong vault, wrong mint, wrong token program, zero amounts, invalid time ranges, overflow, and invalid lifecycle transitions.
 
-## Repository components
+The current project context records:
 
-- `programs/stream-pay-solana/`: Anchor program and Rust tests for Solana payroll streams.
-- `evm-gateway/`: Solidity gateway contract, Hardhat configuration, scripts, and tests.
-- `backend/`: TypeScript backend services.
-- `web/`: Next.js web application.
+```text
+cross_chain_security.rs  → 19 tests
+security.rs              → 13 tests
+complete cargo regression → 41 passed / 0 failed
+```
 
-## Project structure
+This is a **prototype security model**, not a substitute for an independent production security audit.
+
+## Repository structure
 
 ```text
 .
 ├── Anchor.toml
 ├── Cargo.toml
+├── Cargo.lock
 ├── rust-toolchain.toml
+├── deployment.json
 ├── readme.md
+├── doc.md
+├── StreamPay_Product_Roadmap_M0-M12.md
 ├── app/
 ├── backend/
 │   └── src/
@@ -70,44 +198,54 @@ The `Stream::earned_amount()` logic calculates proportional payout based on elap
 │   ├── contracts/
 │   ├── scripts/
 │   ├── test/
+│   ├── types/
 │   └── hardhat.config.ts
 ├── idls/
 ├── programs/
 │   └── stream-pay-solana/
 │       ├── Cargo.toml
 │       ├── src/
-│       │   ├── constants.rs
-│       │   ├── error.rs
-│       │   ├── instructions.rs
-│       │   ├── lib.rs
-│       │   ├── state.rs
-│       │   └── instructions/
-│       │       ├── cancel_stream.rs
-│       │       ├── claim.rs
-│       │       ├── create_organization.rs
-│       │       ├── create_stream.rs
-│       │       ├── deposit.rs
-│       │       ├── initialize_protocol.rs
-│       │       ├── initialize_vault.rs
-│       │       └── top_up_stream.rs
 │       └── tests/
-│           ├── claim.rs
-│           ├── organization.rs
-│           ├── protocol_config.rs
-│           ├── security.rs
-│           ├── stream.rs
-│           └── vault.rs
 ├── target/
 └── web/
-	└── src/
+    └── src/
 ```
+
+NTT deployment support remains in the separate workspace:
+
+```text
+/projects/stream-pay-ntt
+```
+
+That workspace should not be deleted until M12 evidence/documentation is finalized, and private key material must never be committed.
 
 ## Program details
 
-- Program ID: `4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS`
-- Anchor version: `1.2.0`
-- Solana toolchain version: `4.1.2`
-- Default network: `localnet`
+```text
+Program ID:
+4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS
+
+Anchor:
+1.2.0
+
+Solana CLI:
+4.1.2 (Agave)
+
+Rust:
+1.98.1
+
+Cargo:
+1.98.1
+
+AVM:
+1.2.0
+
+Development / demo cluster:
+Solana Devnet
+
+RPC:
+https://api.devnet.solana.com
+```
 
 ## Solana development
 
@@ -117,40 +255,46 @@ The `Stream::earned_amount()` logic calculates proportional payout based on elap
 - Solana CLI
 - Anchor CLI
 
-### Install Anchor
+### Install / verify Anchor
 
 ```bash
-cargo install --git https://github.com/coral-xyz/anchor --tag v1.2.0 anchor-cli --locked
+anchor --version
 ```
 
-### Build the program
+The project context records Anchor CLI `1.2.0`.
+
+### Build
 
 ```bash
 anchor build
 ```
 
-### Run the test suite
-
-```bash
-anchor test
-```
-
-or
+### Run tests
 
 ```bash
 cargo test
 ```
 
-### Deploy locally
+or, when running the full Anchor test workflow:
+
+```bash
+anchor test
+```
+
+### Local deployment
+
+For local development, use the project's Anchor localnet workflow:
 
 ```bash
 anchor localnet
 anchor deploy
 ```
 
-## EVM gateway development
+For the documented cross-chain prototype evidence, use the configured Solana Devnet deployment rather than assuming localnet state.
 
-The gateway uses Hardhat and Solidity `0.8.28`. Install its dependencies and run the contract checks from the gateway directory:
+## EVM gateway
+
+The EVM gateway is a separate Hardhat project:
 
 ```bash
 cd evm-gateway
@@ -159,35 +303,212 @@ npx hardhat compile
 npx hardhat test
 ```
 
-For Sepolia operations, create a local `.env` file with `SEPOLIA_RPC_URL` and `SEPOLIA_PRIVATE_KEY`. The configuration falls back to a public Sepolia RPC endpoint and uses no signing account when these variables are unset.
+Solidity version:
 
-## Backend development
-
-The backend requires Node.js and a PostgreSQL database. Set `DATABASE_URL` in `backend/.env`; optionally set `SOLANA_RPC_URL` to use a different Solana cluster (the default is Devnet) and `PORT` to change the server port (the default is `4000`). Start the service from the backend directory:
-
-```bash
-cd backend
-npm install
-npm run dev
+```text
+0.8.28
 ```
 
-The API health endpoint is available at `http://localhost:4000/health` by default. The database tables are initialized when the service starts.
+For Sepolia operations, create a local `evm-gateway/.env` with:
 
-## Web development
-
-The Next.js app uses `http://localhost:4000` for its backend API by default. Set `NEXT_PUBLIC_API_URL` and, if needed, `NEXT_PUBLIC_BACKEND_URL` in `web/.env.local` to point to another backend. Start the app from the web directory:
-
-```bash
-cd web
-npm install
-npm run dev
+```text
+SEPOLIA_RPC_URL=...
+SEPOLIA_PRIVATE_KEY=...
 ```
 
-The app is served at `http://localhost:3000` by default. Use `npm run lint` to run ESLint or `npm run build` to create a production build.
+Do not commit `.env` or private keys.
 
-## Notes
+### Current canonical Sepolia gateway
 
-The Solana program provides the payroll-streaming flow, including organization management, token vaults, stream lifecycle management, and claim/cancel settlement logic. The EVM gateway is maintained as a separate Hardhat project under `evm-gateway/`.
+```text
+0x13a5b0be7F5841Ac2Cb0D07e71bB4209f469F104
+```
+
+Older/accidental gateway deployments exist in the project history. The address above is the canonical current gateway reference for documentation.
+
+## Wormhole configuration
+
+```text
+Wormhole Sepolia Core:
+0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78
+
+Wormhole Solana Devnet Core:
+3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5
+
+VAA verification shim:
+EFaNWErqAtVWufdNb7yofSHHfWFos843DFpu4JBw24at
+```
+
+The trusted Sepolia emitter represented on Solana is the canonical gateway address encoded for the Wormhole emitter configuration.
+
+## M11 NTT deployment
+
+NTT work was performed in:
+
+```text
+/projects/stream-pay-ntt
+```
+
+NTT CLI used during setup:
+
+```text
+1.7.0
+```
+
+### EVM side
+
+```text
+NTT Manager:
+0x794513173F19f845e0f65eaa25E1993d155F9617
+
+Wormhole Transceiver:
+0xeD456304d60850A9fE582E34a427005b98eC880f
+
+StreamPay M11 ERC-20:
+0x7E37db0F3b62a2b77E206509235da94CC195016D
+
+Decimals:
+6
+```
+
+The EVM side used locking mode.
+
+### Solana side
+
+```text
+NTT Manager:
+ntt66yTmjfbc459s9m8zhE948bd79vYwvJayV3pXrr5
+
+Solana token:
+6jDvPYSs5qerGyXe3G2FLpFJhFQHHvjbkj9Xi9jYDxhB
+
+Wormhole transceiver:
+36tGDqAkiAuaRhLMkHhvR63hJvTojekuacPGRkFDshvq
+
+Mode:
+burning
+```
+
+The Solana token uses 6 decimals and the legacy SPL Token Program.
+
+### Demonstrated NTT transfer
+
+The recorded transfer command was:
+
+```bash
+ntt token-transfer \
+  --network Testnet \
+  --source-chain Sepolia \
+  --destination-chain Solana \
+  --amount 1 \
+  --destination-address 94K4HrLfv3Ra8o8iCxi5aP8cENt2HBSMkycnkWnwkz1g \
+  --deployment-path ./deployment.json
+```
+
+Recorded source transactions:
+
+```text
+0x6c98267887fcdc296ae7f6fd1da091e0dc22df9720dc3e004c7c5ccddaf41b92
+0xbfd21e50369c0b4c7a589cae38ada14bcff146072f06a92fcaa2d9a6ae9e2e50
+```
+
+Recorded Wormhole sequence:
+
+```text
+2
+```
+
+WormholeScan reference:
+
+```text
+https://wormholescan.io/#/tx/0xbfd21e50369c0b4c7a589cae38ada14bcff146072f06a92fcaa2d9a6ae9e2e50?network=Testnet
+```
+
+The destination wallet received the transferred asset. Exactly `1 SPT` was then manually deposited into the StreamPay vault.
+
+## Important live Solana evidence
+
+### Program
+
+```text
+4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS
+```
+
+### Current vault
+
+```text
+2bUM6WJy5F7cfPs2eV3Umhp6cnYjU6L4rbwQ7tMnusCF
+```
+
+### Stream #14
+
+```text
+Stream:
+9jFund1g7mtFfAAxC2uy4FUytMC9QUTqPRhoymASi2MG
+
+Escrow:
+928WAuWxyzktSLj7YiG5kbHKpRfDtogsNfTfySb2QJFe
+```
+
+### Employee claim
+
+Recorded claim transaction:
+
+```text
+CEDLuqHsNURcNZZyKXd5ycmttgXGFaqCnZr8aNFHA4ppcxMqjeSjApeqbMifmFSMf11CTesoKEZgG9Q9112feDN
+```
+
+Observed reconciliation:
+
+```text
+Employee before: 0
+Escrow before:   50
+
+Employee after:  3.296296
+Escrow after:    46.703704
+
+3.296296 + 46.703704 = 50.000000
+```
+
+## M12 objective
+
+M12 is the final technical milestone. It is focused on turning the existing technical prototype into a reproducible package:
+
+```text
+M12.1  Repository documentation
+M12.2  Architecture documentation
+M12.3  Reproducible demo
+M12.4  Final technical evidence
+```
+
+The exit criterion is that another developer can understand the architecture and reproduce the documented prototype flow without private verbal instructions.
+
+## M12 remaining work
+
+- reconcile all repository documentation with actual implementation
+- finalize architecture diagrams
+- document the reproducible Devnet/Sepolia demo
+- capture final screenshots/evidence
+- review generated artifacts and secrets
+- run final regression and application checks
+- finalize the repository and commit/push the intended changes
+
+## Honest limitations
+
+StreamPay is a technical prototype, not yet a production payroll company.
+
+The project does not yet represent production-ready:
+
+- company onboarding and employee invitation workflows
+- enterprise roles and approval policies
+- production monitoring / retries / failover
+- commercial billing
+- support operations
+- legal/compliance operating structure
+- independent security audit
+- validated design-partner demand
+
+The M11 NTT integration has one explicit prototype limitation: the asset transfer itself is real, but the demonstrated path is **NTT → destination wallet → manual StreamPay vault deposit**, not an automated atomic NTT-receive-to-vault relayer.
 
 ## License
 

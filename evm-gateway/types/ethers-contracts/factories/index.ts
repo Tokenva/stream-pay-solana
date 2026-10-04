@@ -4,3 +4,4 @@
 export * as interfaces from './interfaces/index.js';
 export * as mocks from './mocks/index.js';
 export { StreamPayEvmGateway__factory } from './StreamPayEvmGateway__factory.js';
+export { StreamPayM11Token__factory } from './StreamPayM11Token__factory.js';

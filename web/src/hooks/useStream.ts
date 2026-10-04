@@ -108,6 +108,7 @@ function calculateClaimable(
 export function useStream(
   mintAddress: string,
   streamId: number,
+  employeeAddress: string,
 ) {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
@@ -158,7 +159,7 @@ export function useStream(
         const [streamPda] =
           getStreamPda(
             organization,
-            wallet.publicKey,
+            new PublicKey(employeeAddress),
             streamId,
           );
 
@@ -202,6 +203,7 @@ export function useStream(
       wallet,
       mintAddress,
       streamId,
+      employeeAddress
     ],
   );
 
