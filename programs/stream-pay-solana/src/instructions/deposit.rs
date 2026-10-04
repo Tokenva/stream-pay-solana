@@ -4,7 +4,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 use crate::{
     constants::{ORGANIZATION_SEED, VAULT_SEED},
     error::StreamPayError,
-    state::{Organization, OrganizationRoles},
+    state::{Organization, OrganizationPolicy, OrganizationRoles},
 };
 
 #[derive(Accounts)]
@@ -41,16 +41,35 @@ pub struct Deposit<'info> {
     pub token_program: Program<'info, Token>,
 
     pub roles: Option<Account<'info, OrganizationRoles>>,
+    pub policy: Option<Account<'info, OrganizationPolicy>>,
 }
 
 pub fn handle_deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     let actor = ctx.accounts.depositor.key();
     let authorized = ctx.accounts.organization.authority == actor
         || ctx.accounts.roles.as_ref().is_some_and(|roles| {
-            roles.organization == ctx.accounts.organization.key()
-                && roles.can_deposit(&actor)
+            roles.organization == ctx.accounts.organization.key() && roles.can_deposit(&actor)
         });
     require!(authorized, StreamPayError::Unauthorized);
+
+    if let Some(policy) = ctx.accounts.policy.as_ref() {
+        require!(!policy.paused, StreamPayError::OrganizationPaused);
+        require!(
+            policy.organization == ctx.accounts.organization.key(),
+            StreamPayError::Unauthorized
+        );
+        require!(
+            policy.approved_mint == ctx.accounts.mint.key(),
+            StreamPayError::InvalidPolicyAsset
+        );
+
+        if policy.max_transaction_amount > 0 {
+            require!(
+                amount <= policy.max_transaction_amount,
+                StreamPayError::TransactionLimitExceeded
+            );
+        }
+    }
 
     require!(amount > 0, StreamPayError::InvalidAmount);
 

@@ -9,6 +9,7 @@ import { getProgram } from "@/lib/anchor";
 import {
   getOrganizationPda,
   getOrganizationRolesPda,
+  getOrganizationPolicyPda,
   getVaultPda,
   SPL_TOKEN_PROGRAM_ID,
 } from "@/lib/pdas";
@@ -36,7 +37,7 @@ function toBaseUnits(value: string, decimals: number): BN {
     .add(new BN(paddedFraction || "0"));
 }
 
-export function useDeposit(mintAddress: string, onDeposited?: () => Promise<void>) {
+export function useDeposit(mintAddress: string, onDeposited?: () => Promise<void>, companyOwnerAddress = "") {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
 
@@ -122,11 +123,22 @@ export function useDeposit(mintAddress: string, onDeposited?: () => Promise<void
 
       const mint = new PublicKey(mintAddress);
 
+      const owner =
+        new PublicKey(
+          companyOwnerAddress.trim() ||
+            wallet.publicKey.toBase58(),
+        );
+
       const [organization] =
-        getOrganizationPda(wallet.publicKey);
+        getOrganizationPda(owner);
 
       const [roles] =
         getOrganizationRolesPda(
+          organization,
+        );
+
+      const [policy] =
+        getOrganizationPolicyPda(
           organization,
         );
 
@@ -139,6 +151,16 @@ export function useDeposit(mintAddress: string, onDeposited?: () => Promise<void
       if (rawAmount.isZero()) {
         throw new Error("Deposit amount must be greater than zero");
       }
+
+      const rolesAccount =
+        await connection.getAccountInfo(
+          roles,
+        );
+
+      const policyAccount =
+        await connection.getAccountInfo(
+          policy,
+        );
 
       const program = getProgram(
         connection,
@@ -155,11 +177,12 @@ export function useDeposit(mintAddress: string, onDeposited?: () => Promise<void
             .accountsPartial({
               depositor: wallet.publicKey,
               organization,
-              roles,
               depositorTokenAccount: tokenAccount,
               mint,
               vault,
               tokenProgram: SPL_TOKEN_PROGRAM_ID,
+              ...(rolesAccount ? { roles } : {}),
+              ...(policyAccount ? { policy } : {}),
             })
             .rpc();
 
@@ -190,6 +213,7 @@ export function useDeposit(mintAddress: string, onDeposited?: () => Promise<void
       decimals,
       loadTokenAccount,
       onDeposited,
+      companyOwnerAddress,
     ],
   );
 

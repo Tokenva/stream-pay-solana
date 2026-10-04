@@ -11,24 +11,87 @@ import idl from "../../target/idl/stream_pay_solana.json" with {
 };
 
 import type { StreamPaySolana } from "../../target/types/stream_pay_solana.js";
+import { log } from "./logger.js";
 
-const rpcUrl =
+const rpcUrls = (
+  process.env.SOLANA_RPC_URLS ??
   process.env.SOLANA_RPC_URL ??
-  "https://api.devnet.solana.com";
+  "https://api.devnet.solana.com"
+)
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
+
+if (rpcUrls.length === 0) {
+  throw new Error("No Solana RPC URLs configured.");
+}
 
 export const PROGRAM_ID = new PublicKey(
   "4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS",
 );
 
-export const connection = new Connection(
-  rpcUrl,
-  "confirmed",
+export const rpcConnections = rpcUrls.map(
+  (url) => new Connection(url, "confirmed"),
 );
 
-export const program =
-  new Program<StreamPaySolana>(
+export const connection = rpcConnections[0];
+
+export async function withRpcFailover<T>(
+  operation: (rpcConnection: Connection) => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let index = 0; index < rpcConnections.length; index++) {
+    const rpcConnection = rpcConnections[index];
+
+    try {
+      return await operation(rpcConnection);
+    } catch (error) {
+      lastError = error;
+
+      log("warn", "rpc_endpoint_failed", {
+        endpointIndex: index + 1,
+        endpointCount: rpcConnections.length,
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      });
+
+      if (index < rpcConnections.length - 1) {
+        log("info", "rpc_failover", {
+          fromEndpoint: index + 1,
+          toEndpoint: index + 2,
+        });
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("All Solana RPC endpoints failed.");
+}
+
+export function getProgramForConnection(
+  rpcConnection: Connection,
+): Program<StreamPaySolana> {
+  return new Program<StreamPaySolana>(
     idl as StreamPaySolana,
     {
-      connection,
+      connection: rpcConnection,
     },
   );
+}
+
+export async function withProgramFailover<T>(
+  operation: (
+    rpcProgram: Program<StreamPaySolana>,
+  ) => Promise<T>,
+): Promise<T> {
+  return withRpcFailover((rpcConnection) =>
+    operation(getProgramForConnection(rpcConnection)),
+  );
+}
+
+export const program = getProgramForConnection(connection);
+

@@ -13,9 +13,12 @@ import {
 } from "@solana/wallet-adapter-react";
 
 import { getProgram } from "@/lib/anchor";
-import { getOrganizationPda, getOrganizationRolesPda } from "@/lib/pdas";
+import {
+  getOrganizationPda,
+  getOrganizationRolesPda,
+} from "@/lib/pdas";
 
-type OrganizationRolesData = {
+export type OrganizationRolesData = {
   organization: PublicKey;
   admin: PublicKey;
   finance: PublicKey;
@@ -23,14 +26,20 @@ type OrganizationRolesData = {
   viewer: PublicKey;
 };
 
-export function useOrganization() {
+export function useOrganization(companyOwnerAddress = "") {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
 
   const walletKey =
-    wallet?.publicKey.toBase58() ?? null;
+    wallet?.publicKey.toBase58() ?? "";
+
+  const ownerKey =
+    companyOwnerAddress.trim() || walletKey;
 
   const [organization, setOrganization] =
+    useState<PublicKey | null>(null);
+
+  const [organizationAuthority, setOrganizationAuthority] =
     useState<PublicKey | null>(null);
 
   const [organizationRoles, setOrganizationRoles] =
@@ -51,17 +60,15 @@ export function useOrganization() {
   const [error, setError] =
     useState<string | null>(null);
 
-  const loadedWalletRef =
+  const loadedKeyRef =
     useRef<string | null>(null);
-
-  const loadingRef =
-    useRef(false);
 
   const loadOrganization = useCallback(
     async (force = false) => {
-      if (!walletKey) {
-        loadedWalletRef.current = null;
+      if (!ownerKey) {
+        loadedKeyRef.current = null;
         setOrganization(null);
+        setOrganizationAuthority(null);
         setOrganizationRoles(null);
         setOrganizationRolesPda(null);
         setRolesExists(false);
@@ -70,29 +77,20 @@ export function useOrganization() {
         return;
       }
 
-      if (
-        !force &&
-        loadedWalletRef.current === walletKey
-      ) {
+      const loadKey = `${walletKey}:${ownerKey}`;
+
+      if (!force && loadedKeyRef.current === loadKey) {
         return;
       }
 
-      if (loadingRef.current) {
-        return;
-      }
-
-      loadingRef.current = true;
       setLoading(true);
       setError(null);
 
       try {
-        const walletPublicKey =
-          new PublicKey(walletKey);
+        const owner = new PublicKey(ownerKey);
 
         const [organizationPda] =
-          getOrganizationPda(
-            walletPublicKey,
-          );
+          getOrganizationPda(owner);
 
         const account =
           await connection.getAccountInfo(
@@ -102,130 +100,78 @@ export function useOrganization() {
         setOrganization(organizationPda);
         setExists(account !== null);
 
+        if (!account || !wallet) {
+          setOrganizationAuthority(null);
+          setOrganizationRoles(null);
+          setOrganizationRolesPda(null);
+          setRolesExists(false);
+          loadedKeyRef.current = loadKey;
+          return;
+        }
+
+        const program =
+          getProgram(connection, wallet);
+
+        const organizationData =
+          await program.account.organization.fetch(
+            organizationPda,
+          );
+
+        setOrganizationAuthority(
+          organizationData.authority,
+        );
+
         const [rolesPda] =
-          getOrganizationRolesPda(organizationPda);
+          getOrganizationRolesPda(
+            organizationPda,
+          );
 
         setOrganizationRolesPda(rolesPda);
 
         const rolesAccount =
-          await connection.getAccountInfo(rolesPda);
+          await connection.getAccountInfo(
+            rolesPda,
+          );
 
-        setRolesExists(rolesAccount !== null);
+        setRolesExists(
+          rolesAccount !== null,
+        );
 
-        if (rolesAccount && wallet) {
-          try {
-            const program = getProgram(
-              connection,
-              wallet,
+        if (rolesAccount) {
+          const roleData =
+            await program.account.organizationRoles.fetch(
+              rolesPda,
             );
 
-            const roleData =
-              await program.account.organizationRoles.fetch(
-                rolesPda,
-              );
-
-            setOrganizationRoles(
-              roleData as OrganizationRolesData,
-            );
-          } catch (rolesErr) {
-            console.error(
-              "Failed to read organization roles",
-              rolesErr,
-            );
-            setOrganizationRoles(null);
-          }
+          setOrganizationRoles(
+            roleData as OrganizationRolesData,
+          );
         } else {
           setOrganizationRoles(null);
         }
 
-        loadedWalletRef.current = walletKey;
+        loadedKeyRef.current = loadKey;
       } catch (err) {
-        console.error(err);
-
         setError(
           err instanceof Error
             ? err.message
             : "Failed to read Organization",
         );
       } finally {
-        loadingRef.current = false;
         setLoading(false);
       }
-    },
-    [connection, walletKey, wallet],
-  );
-
-  useEffect(() => {
-    void loadOrganization(true);
-  }, [loadOrganization, walletKey]);
-
-  const initializeOrganizationRoles = useCallback(
-    async (
-      admin: PublicKey,
-      finance: PublicKey,
-      approver: PublicKey,
-      viewer: PublicKey,
-    ) => {
-      if (!wallet) {
-        throw new Error(
-          "Connect your wallet first",
-        );
-      }
-
-      const [organizationPda] =
-        getOrganizationPda(
-          wallet.publicKey,
-        );
-
-      const [rolesPda] =
-        getOrganizationRolesPda(
-          organizationPda,
-        );
-
-      const existing =
-        await connection.getAccountInfo(
-          rolesPda,
-        );
-
-      if (existing) {
-        throw new Error(
-          "Organization roles are already initialized",
-        );
-      }
-
-      const program = getProgram(
-        connection,
-        wallet,
-      );
-
-      const signature =
-        await program.methods
-          .initializeOrganizationRoles(
-            admin,
-            finance,
-            approver,
-            viewer,
-          )
-          .accountsPartial({
-            authority: wallet.publicKey,
-            organization: organizationPda,
-            roles: rolesPda,
-          })
-          .rpc();
-
-      await loadOrganization(true);
-
-      return {
-        signature,
-        rolesPda,
-      };
     },
     [
       connection,
       wallet,
-      loadOrganization,
+      walletKey,
+      ownerKey,
     ],
   );
+
+  useEffect(() => {
+    void loadOrganization(true);
+  }, [loadOrganization]);
 
   const createOrganization = useCallback(
     async () => {
@@ -235,10 +181,8 @@ export function useOrganization() {
         );
       }
 
-      const program = getProgram(
-        connection,
-        wallet,
-      );
+      const program =
+        getProgram(connection, wallet);
 
       const [organizationPda] =
         getOrganizationPda(
@@ -267,8 +211,86 @@ export function useOrganization() {
     ],
   );
 
+  const initializeOrganizationRoles =
+    useCallback(
+      async (
+        admin: PublicKey,
+        finance: PublicKey,
+        approver: PublicKey,
+        viewer: PublicKey,
+      ) => {
+        if (!wallet) {
+          throw new Error(
+            "Connect your wallet first",
+          );
+        }
+
+        const owner =
+          new PublicKey(ownerKey);
+
+        const [organizationPda] =
+          getOrganizationPda(owner);
+
+        const [rolesPda] =
+          getOrganizationRolesPda(
+            organizationPda,
+          );
+
+        const existing =
+          await connection.getAccountInfo(
+            rolesPda,
+          );
+
+        if (existing) {
+          throw new Error(
+            "Organization roles are already initialized",
+          );
+        }
+
+        if (!organizationAuthority ||
+            !wallet.publicKey.equals(organizationAuthority)) {
+          throw new Error(
+            "Only the company owner can initialize roles",
+          );
+        }
+
+        const program =
+          getProgram(connection, wallet);
+
+        const signature =
+          await program.methods
+            .initializeOrganizationRoles(
+              admin,
+              finance,
+              approver,
+              viewer,
+            )
+            .accountsPartial({
+              authority: wallet.publicKey,
+              organization: organizationPda,
+              roles: rolesPda,
+            })
+            .rpc();
+
+        await loadOrganization(true);
+
+        return {
+          signature,
+          rolesPda,
+        };
+      },
+      [
+        connection,
+        wallet,
+        ownerKey,
+        organizationAuthority,
+        loadOrganization,
+      ],
+    );
+
   return {
     organization,
+    organizationAuthority,
     organizationRoles,
     organizationRolesPda,
     rolesExists,

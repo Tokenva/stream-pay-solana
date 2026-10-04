@@ -13,8 +13,8 @@ use stream_pay_solana::{
     constants::{
         CONSUMED_VAA_SEED, CROSS_CHAIN_ASSET_CONFIG_SEED, CROSS_CHAIN_CONFIG_SEED,
         CROSS_CHAIN_STREAM_SEED, ORGANIZATION_ROLES_SEED, ORGANIZATION_SEED, PROTOCOL_CONFIG_SEED,
-        STREAM_ESCROW_SEED,
-        STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED, WORMHOLE_SEPOLIA_CHAIN_ID,
+        STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
+        WORMHOLE_SEPOLIA_CHAIN_ID,
     },
     instruction,
     state::ConsumedVaa,
@@ -215,6 +215,33 @@ fn setup() -> TestContext {
         .data(),
     };
 
+    let (policy_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[b"organization_policy", organization.as_ref()],
+        &ID,
+    );
+    let policy = Address::new_from_array(policy_anchor.to_bytes());
+
+    let mint_anchor = anchor_lang::prelude::Pubkey::new_from_array(mint.to_bytes());
+
+    let initialize_policy_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
+            AccountMeta::new(policy, false),
+            AccountMeta::new_readonly(system_program, false),
+        ],
+        data: instruction::InitializeOrganizationPolicy {
+            approved_mint: mint_anchor,
+            max_transaction_amount: 10_000_000_000,
+            max_payroll_amount: 10_000_000_000,
+            max_employee_amount: 10_000_000_000,
+            require_approval: false,
+            paused: false,
+        }
+        .data(),
+    };
+
     let deposit_ix = Instruction {
         program_id,
         accounts: vec![
@@ -225,6 +252,7 @@ fn setup() -> TestContext {
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(token_program, false),
             AccountMeta::new_readonly(organization_roles, false),
+            AccountMeta::new_readonly(policy, false),
         ],
         data: instruction::Deposit {
             amount: 1_250_000_000,
@@ -240,6 +268,7 @@ fn setup() -> TestContext {
                 create_organization_ix,
                 initialize_vault_ix,
                 initialize_organization_roles_ix,
+                initialize_policy_ix,
                 deposit_ix,
             ],
             Some(&company.pubkey()),
@@ -317,13 +346,8 @@ fn write_u64_word(payload: &mut [u8], offset: usize, value: u64) {
     payload[offset + 24..offset + 32].copy_from_slice(&value.to_be_bytes());
 }
 
-fn write_u16_word(
-    payload: &mut [u8],
-    offset: usize,
-    value: u16,
-) {
-    payload[offset..offset + 2]
-        .copy_from_slice(&value.to_be_bytes());
+fn write_u16_word(payload: &mut [u8], offset: usize, value: u16) {
+    payload[offset..offset + 2].copy_from_slice(&value.to_be_bytes());
 }
 
 fn base_payload(ctx: &TestContext) -> Vec<u8> {

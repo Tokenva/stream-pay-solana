@@ -2,15 +2,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
 use crate::{
-    constants::{
-        CROSS_CHAIN_ASSET_CONFIG_SEED,
-        PROTOCOL_CONFIG_SEED,
-    },
+    constants::{CROSS_CHAIN_ASSET_CONFIG_SEED, PROTOCOL_CONFIG_SEED},
     error::StreamPayError,
-    state::{
-        CrossChainAssetConfig,
-        ProtocolConfig,
-    },
+    state::{CrossChainAssetConfig, ProtocolConfig},
 };
 
 #[derive(Accounts)]
@@ -52,10 +46,7 @@ pub fn handle_initialize_cross_chain_asset_config(
     config.bump = ctx.bumps.cross_chain_asset_config;
     config.created_at = now;
 
-    msg!(
-        "Cross-chain settlement mint initialized: {}",
-        config.mint
-    );
+    msg!("Cross-chain settlement mint initialized: {}", config.mint);
 
     Ok(())
 }

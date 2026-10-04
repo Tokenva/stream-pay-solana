@@ -127,13 +127,6 @@ fn unauthorized_authority_cannot_initialize_cross_chain_asset_config() {
     svm.airdrop(&attacker.pubkey(), 10_000_000_000)
         .expect("failed to fund attacker");
 
-    let authority_mint = CreateMint::new(&mut svm, &authority)
-        .authority(&authority.pubkey())
-        .decimals(6)
-        .token_program_id(&TOKEN_ID)
-        .send()
-        .expect("failed to create authority mint");
-
     let attacker_mint = CreateMint::new(&mut svm, &attacker)
         .authority(&attacker.pubkey())
         .decimals(6)

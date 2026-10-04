@@ -4,14 +4,11 @@ use solana_keccak_hasher::hash;
 
 use crate::{
     constants::{
-        CONSUMED_VAA_SEED, CROSS_CHAIN_CONFIG_SEED, CROSS_CHAIN_STREAM_SEED,
-        ORGANIZATION_SEED, STREAM_ESCROW_SEED, STREAM_SEED,
-        VAULT_AUTHORITY_SEED, VAULT_SEED,
+        CONSUMED_VAA_SEED, CROSS_CHAIN_CONFIG_SEED, CROSS_CHAIN_STREAM_SEED, ORGANIZATION_SEED,
+        STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     error::StreamPayError,
-    state::{
-        ConsumedVaa, CrossChainConfig, CrossChainStream, Organization, Stream,
-    },
+    state::{ConsumedVaa, CrossChainConfig, CrossChainStream, Organization, Stream},
 };
 
 const VAA_HEADER_LEN: usize = 51;
@@ -219,8 +216,7 @@ pub fn handle_execute_cross_chain_top_up(
     );
 
     require!(
-        ctx.accounts.consumed_vaa.emitter_address
-            == ctx.accounts.cross_chain_config.source_emitter,
+        ctx.accounts.consumed_vaa.emitter_address == ctx.accounts.cross_chain_config.source_emitter,
         StreamPayError::InvalidVaaEmitter
     );
 
@@ -249,21 +245,15 @@ pub fn handle_execute_cross_chain_top_up(
         .try_into()
         .unwrap();
 
-    let employee_bytes: [u8; 32] = payload
-        [PAYLOAD_EMPLOYEE_OFFSET..PAYLOAD_EMPLOYEE_OFFSET + 32]
+    let employee_bytes: [u8; 32] = payload[PAYLOAD_EMPLOYEE_OFFSET..PAYLOAD_EMPLOYEE_OFFSET + 32]
         .try_into()
         .unwrap();
 
-    let organization_key =
-        Pubkey::new_from_array(organization_bytes);
+    let organization_key = Pubkey::new_from_array(organization_bytes);
 
-    let employee_key =
-        Pubkey::new_from_array(employee_bytes);
+    let employee_key = Pubkey::new_from_array(employee_bytes);
 
-    require!(
-        operation_id != [0u8; 32],
-        StreamPayError::InvalidVaaPayload
-    );
+    require!(operation_id != [0u8; 32], StreamPayError::InvalidVaaPayload);
 
     require!(
         external_stream_id != [0u8; 32],
@@ -281,8 +271,7 @@ pub fn handle_execute_cross_chain_top_up(
     );
 
     require!(
-        external_stream_id
-            == ctx.accounts.cross_chain_stream.external_stream_id,
+        external_stream_id == ctx.accounts.cross_chain_stream.external_stream_id,
         StreamPayError::InvalidVaaPayload
     );
 
@@ -297,44 +286,35 @@ pub fn handle_execute_cross_chain_top_up(
     );
 
     require!(
-        ctx.accounts.cross_chain_stream.organization
-            == ctx.accounts.organization.key(),
+        ctx.accounts.cross_chain_stream.organization == ctx.accounts.organization.key(),
         StreamPayError::InvalidVaaPayload
     );
 
     require!(
-        ctx.accounts.cross_chain_stream.employee
-            == ctx.accounts.employee.key(),
+        ctx.accounts.cross_chain_stream.employee == ctx.accounts.employee.key(),
         StreamPayError::InvalidVaaPayload
     );
 
     require!(
-        ctx.accounts.cross_chain_stream.native_stream_id
-            == native_stream_id,
+        ctx.accounts.cross_chain_stream.native_stream_id == native_stream_id,
         StreamPayError::InvalidVaaPayload
     );
 
     require!(
-        ctx.accounts.cross_chain_stream.mint
-            == ctx.accounts.mint.key(),
+        ctx.accounts.cross_chain_stream.mint == ctx.accounts.mint.key(),
         StreamPayError::InvalidVaaPayload
     );
 
-    let amount = decode_u64_word(
-        &payload[PAYLOAD_AMOUNT_OFFSET..PAYLOAD_AMOUNT_OFFSET + 32],
-    )?;
+    let amount = decode_u64_word(&payload[PAYLOAD_AMOUNT_OFFSET..PAYLOAD_AMOUNT_OFFSET + 32])?;
 
-    let start_time_u64 = decode_u64_word(
-        &payload[PAYLOAD_START_TIME_OFFSET..PAYLOAD_START_TIME_OFFSET + 32],
-    )?;
+    let start_time_u64 =
+        decode_u64_word(&payload[PAYLOAD_START_TIME_OFFSET..PAYLOAD_START_TIME_OFFSET + 32])?;
 
-    let end_time_u64 = decode_u64_word(
-        &payload[PAYLOAD_END_TIME_OFFSET..PAYLOAD_END_TIME_OFFSET + 32],
-    )?;
+    let end_time_u64 =
+        decode_u64_word(&payload[PAYLOAD_END_TIME_OFFSET..PAYLOAD_END_TIME_OFFSET + 32])?;
 
-    let message_nonce = decode_u64_word(
-        &payload[PAYLOAD_MESSAGE_NONCE_OFFSET..PAYLOAD_MESSAGE_NONCE_OFFSET + 32],
-    )?;
+    let message_nonce =
+        decode_u64_word(&payload[PAYLOAD_MESSAGE_NONCE_OFFSET..PAYLOAD_MESSAGE_NONCE_OFFSET + 32])?;
 
     require!(
         amount == ctx.accounts.consumed_vaa.amount,
@@ -351,21 +331,15 @@ pub fn handle_execute_cross_chain_top_up(
         StreamPayError::InvalidVaaPayload
     );
 
-    require!(
-        message_nonce > 0,
-        StreamPayError::InvalidVaaPayload
-    );
+    require!(message_nonce > 0, StreamPayError::InvalidVaaPayload);
 
-    require!(
-        native_stream_id > 0,
-        StreamPayError::InvalidVaaPayload
-    );
+    require!(native_stream_id > 0, StreamPayError::InvalidVaaPayload);
 
-    let start_time = i64::try_from(start_time_u64)
-        .map_err(|_| error!(StreamPayError::InvalidVaaPayload))?;
+    let start_time =
+        i64::try_from(start_time_u64).map_err(|_| error!(StreamPayError::InvalidVaaPayload))?;
 
-    let end_time = i64::try_from(end_time_u64)
-        .map_err(|_| error!(StreamPayError::InvalidVaaPayload))?;
+    let end_time =
+        i64::try_from(end_time_u64).map_err(|_| error!(StreamPayError::InvalidVaaPayload))?;
 
     require!(
         start_time == ctx.accounts.stream.start_time,
@@ -377,10 +351,7 @@ pub fn handle_execute_cross_chain_top_up(
         StreamPayError::InvalidVaaPayload
     );
 
-    require!(
-        amount > 0,
-        StreamPayError::InvalidAmount
-    );
+    require!(amount > 0, StreamPayError::InvalidAmount);
 
     require!(
         !ctx.accounts.stream.canceled,
@@ -401,14 +372,11 @@ pub fn handle_execute_cross_chain_top_up(
         .checked_add(amount)
         .ok_or(StreamPayError::ArithmeticOverflow)?;
 
-    let organization_key =
-        ctx.accounts.organization.key();
+    let organization_key = ctx.accounts.organization.key();
 
-    let mint_key =
-        ctx.accounts.mint.key();
+    let mint_key = ctx.accounts.mint.key();
 
-    let vault_authority_bump =
-        [ctx.bumps.vault_authority];
+    let vault_authority_bump = [ctx.bumps.vault_authority];
 
     let vault_authority_seeds: &[&[u8]] = &[
         VAULT_AUTHORITY_SEED,
@@ -432,11 +400,7 @@ pub fn handle_execute_cross_chain_top_up(
         &signer_seeds,
     );
 
-    token::transfer_checked(
-        cpi_ctx,
-        amount,
-        ctx.accounts.mint.decimals,
-    )?;
+    token::transfer_checked(cpi_ctx, amount, ctx.accounts.mint.decimals)?;
 
     ctx.accounts.stream.total_amount = new_total;
 
@@ -450,10 +414,7 @@ pub fn handle_execute_cross_chain_top_up(
 }
 
 fn decode_u64_word(word: &[u8]) -> Result<u64> {
-    require!(
-        word.len() == 32,
-        StreamPayError::InvalidVaaPayload
-    );
+    require!(word.len() == 32, StreamPayError::InvalidVaaPayload);
 
     require!(
         word[..24].iter().all(|byte| *byte == 0),

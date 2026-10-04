@@ -58,4 +58,22 @@ pub enum StreamPayError {
 
     #[msg("The VAA sequence does not match")]
     InvalidVaaSequence,
+
+    #[msg("The organization is paused")]
+    OrganizationPaused,
+
+    #[msg("The provided asset is not approved for this organization")]
+    InvalidPolicyAsset,
+
+    #[msg("The transaction exceeds the organization transaction limit")]
+    TransactionLimitExceeded,
+
+    #[msg("The payroll exceeds the organization payroll limit")]
+    PayrollLimitExceeded,
+
+    #[msg("The payroll exceeds the per-employee limit")]
+    EmployeeLimitExceeded,
+
+    #[msg("This payroll requires approval by the Approver role")]
+    ApprovalRequired,
 }

@@ -1,11 +1,13 @@
 import { pool } from "./db.js";
-import { program } from "./solana.js";
+import { withProgramFailover } from "./solana.js";
 export let lastSyncAt: Date | null = null;
 export let lastSyncCount = 0;
 
 export async function syncStreams() {
   const accounts =
-    await program.account.stream.all();
+    await withProgramFailover((rpcProgram) =>
+      rpcProgram.account.stream.all(),
+    );
 
   for (const { publicKey, account } of accounts) {
     await pool.query(

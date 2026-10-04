@@ -14,7 +14,7 @@ import {
   getVaultPda,
 } from "@/lib/pdas";
 
-export function useVault(mintAddress: string) {
+export function useVault(mintAddress: string, companyOwnerAddress = "") {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
 
@@ -43,8 +43,14 @@ export function useVault(mintAddress: string) {
     try {
       const mint = new PublicKey(mintAddress);
 
+      const owner =
+        new PublicKey(
+          companyOwnerAddress.trim() ||
+            wallet.publicKey.toBase58(),
+        );
+
       const [organizationPda] =
-        getOrganizationPda(wallet.publicKey);
+        getOrganizationPda(owner);
 
       const [vaultPda] = getVaultPda(
         organizationPda,
@@ -95,7 +101,7 @@ export function useVault(mintAddress: string) {
     } finally {
       setLoading(false);
     }
-  }, [connection, wallet, mintAddress]);
+  }, [connection, wallet, mintAddress, companyOwnerAddress]);
 
   useEffect(() => {
     void loadVault();

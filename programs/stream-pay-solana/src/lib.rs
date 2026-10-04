@@ -31,11 +31,47 @@ pub mod stream_pay_solana {
         viewer: Pubkey,
     ) -> Result<()> {
         crate::instructions::initialize_organization_roles::handle_initialize_organization_roles(
+            ctx, admin, finance, approver, viewer,
+        )
+    }
+
+    pub fn initialize_organization_policy(
+        ctx: Context<InitializeOrganizationPolicy>,
+        approved_mint: Pubkey,
+        max_transaction_amount: u64,
+        max_payroll_amount: u64,
+        max_employee_amount: u64,
+        require_approval: bool,
+        paused: bool,
+    ) -> Result<()> {
+        crate::instructions::initialize_organization_policy::handle_initialize_organization_policy(
             ctx,
-            admin,
-            finance,
-            approver,
-            viewer,
+            approved_mint,
+            max_transaction_amount,
+            max_payroll_amount,
+            max_employee_amount,
+            require_approval,
+            paused,
+        )
+    }
+
+    pub fn update_organization_policy(
+        ctx: Context<UpdateOrganizationPolicy>,
+        approved_mint: Pubkey,
+        max_transaction_amount: u64,
+        max_payroll_amount: u64,
+        max_employee_amount: u64,
+        require_approval: bool,
+        paused: bool,
+    ) -> Result<()> {
+        crate::instructions::update_organization_policy::handle_update_organization_policy(
+            ctx,
+            approved_mint,
+            max_transaction_amount,
+            max_payroll_amount,
+            max_employee_amount,
+            require_approval,
+            paused,
         )
     }
 

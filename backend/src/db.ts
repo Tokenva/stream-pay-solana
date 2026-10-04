@@ -75,4 +75,193 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_activities_organization
     ON activities (organization);
   `);
+
+  // Webhook endpoints
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS webhook_endpoints (
+      id BIGSERIAL PRIMARY KEY,
+      url TEXT NOT NULL UNIQUE,
+      secret TEXT NOT NULL,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_active
+    ON webhook_endpoints (active);
+  `);
+
+  // Webhook delivery history
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS webhook_deliveries (
+      id BIGSERIAL PRIMARY KEY,
+      webhook_id BIGINT NOT NULL REFERENCES webhook_endpoints(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      payload JSONB NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      response_status INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      delivered_at TIMESTAMPTZ,
+      UNIQUE (webhook_id, event_type, event_id)
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status
+    ON webhook_deliveries (status);
+
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook
+    ON webhook_deliveries (webhook_id);
+
+    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_created
+    ON webhook_deliveries (created_at DESC);
+  `);
+
+  // Audit log
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id BIGSERIAL PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      actor_type TEXT NOT NULL,
+      actor_id TEXT,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT,
+      organization TEXT,
+      employee TEXT,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_event
+    ON audit_logs (event_type, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_entity
+    ON audit_logs (entity_type, entity_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_organization
+    ON audit_logs (organization, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
+    ON audit_logs (created_at DESC);
+  `);
+
+  // Transaction status table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS transactions (
+      id BIGSERIAL PRIMARY KEY,
+      signature TEXT NOT NULL UNIQUE,
+      action TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'submitted',
+      organization TEXT,
+      employee TEXT,
+      slot BIGINT,
+      error TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      confirmed_at TIMESTAMPTZ
+    );
+  `);
+
+  // Persistent background job queue
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS job_queue (
+      id BIGSERIAL PRIMARY KEY,
+      job_type TEXT NOT NULL,
+      payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 5,
+      run_after TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      locked_at TIMESTAMPTZ,
+      last_error TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      completed_at TIMESTAMPTZ
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_job_queue_ready
+    ON job_queue (status, run_after, id);
+
+    CREATE INDEX IF NOT EXISTS idx_job_queue_type
+    ON job_queue (job_type, status);
+  `);
+
+  // Transaction indexes
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_transactions_status
+    ON transactions (status);
+
+    CREATE INDEX IF NOT EXISTS idx_transactions_organization
+    ON transactions (organization);
+
+    CREATE INDEX IF NOT EXISTS idx_transactions_employee
+    ON transactions (employee);
+
+    CREATE INDEX IF NOT EXISTS idx_transactions_created_at
+    ON transactions (created_at DESC);
+  `);
+
+  // Cross-chain message tracking
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cross_chain_messages (
+      id BIGSERIAL PRIMARY KEY,
+      gateway_tx_hash TEXT NOT NULL UNIQUE,
+      action TEXT NOT NULL,
+      operation_id TEXT NOT NULL,
+      wormhole_sequence NUMERIC(78, 0),
+      source_chain INTEGER NOT NULL DEFAULT 10002,
+      destination_chain INTEGER NOT NULL DEFAULT 1,
+      organization TEXT,
+      employee TEXT,
+      vaa_id TEXT,
+      consume_tx_hash TEXT,
+      destination_tx_hash TEXT,
+      status TEXT NOT NULL DEFAULT 'created'
+        CHECK (
+          status IN (
+            'created',
+            'submitted',
+            'source_confirmed',
+            'message_observed',
+            'vaa_available',
+            'destination_submitted',
+            'destination_confirmed',
+            'failed'
+          )
+        ),
+      error TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      completed_at TIMESTAMPTZ
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_cross_chain_messages_status
+    ON cross_chain_messages (status, updated_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_cross_chain_messages_operation
+    ON cross_chain_messages (operation_id);
+
+    CREATE INDEX IF NOT EXISTS idx_cross_chain_messages_organization
+    ON cross_chain_messages (organization, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_cross_chain_messages_employee
+    ON cross_chain_messages (employee, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_cross_chain_messages_created
+    ON cross_chain_messages (created_at DESC);
+  `);
 }
+
+

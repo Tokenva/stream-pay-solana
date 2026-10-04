@@ -6,7 +6,7 @@ use crate::{
         ORGANIZATION_SEED, STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     error::StreamPayError,
-    state::{Organization, OrganizationRoles, Stream},
+    state::{Organization, OrganizationPolicy, OrganizationRoles, Stream},
 };
 
 #[derive(Accounts)]
@@ -84,16 +84,35 @@ pub struct TopUpStream<'info> {
     pub token_program: Program<'info, Token>,
 
     pub roles: Option<Account<'info, OrganizationRoles>>,
+    pub policy: Option<Account<'info, OrganizationPolicy>>,
 }
 
 pub fn handle_top_up_stream(ctx: Context<TopUpStream>, _stream_id: u64, amount: u64) -> Result<()> {
     let actor = ctx.accounts.authority.key();
     let authorized = ctx.accounts.organization.authority == actor
         || ctx.accounts.roles.as_ref().is_some_and(|roles| {
-            roles.organization == ctx.accounts.organization.key()
-                && roles.can_top_up(&actor)
+            roles.organization == ctx.accounts.organization.key() && roles.can_top_up(&actor)
         });
     require!(authorized, StreamPayError::Unauthorized);
+
+    if let Some(policy) = ctx.accounts.policy.as_ref() {
+        require!(!policy.paused, StreamPayError::OrganizationPaused);
+        require!(
+            policy.organization == ctx.accounts.organization.key(),
+            StreamPayError::Unauthorized
+        );
+        require!(
+            policy.approved_mint == ctx.accounts.mint.key(),
+            StreamPayError::InvalidPolicyAsset
+        );
+
+        if policy.max_transaction_amount > 0 {
+            require!(
+                amount <= policy.max_transaction_amount,
+                StreamPayError::TransactionLimitExceeded
+            );
+        }
+    }
 
     require!(amount > 0, StreamPayError::InvalidAmount);
     require!(

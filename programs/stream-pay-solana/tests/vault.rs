@@ -12,9 +12,7 @@ use solana_signer::Signer;
 use solana_transaction::Transaction;
 
 use stream_pay_solana::{
-    constants::{
-        ORGANIZATION_ROLES_SEED, ORGANIZATION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
-    },
+    constants::{ORGANIZATION_ROLES_SEED, ORGANIZATION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     instruction, ID,
 };
 
@@ -144,6 +142,34 @@ fn initialize_vault_and_deposit() {
         .data(),
     };
 
+    let (policy_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[b"organization_policy", organization.as_ref()],
+        &ID,
+    );
+
+    let policy = Address::new_from_array(policy_anchor.to_bytes());
+
+    let mint_anchor = anchor_lang::prelude::Pubkey::new_from_array(mint.to_bytes());
+
+    let initialize_policy_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
+            AccountMeta::new(policy, false),
+            AccountMeta::new_readonly(system_program, false),
+        ],
+        data: instruction::InitializeOrganizationPolicy {
+            approved_mint: mint_anchor,
+            max_transaction_amount: 10_000_000_000,
+            max_payroll_amount: 10_000_000_000,
+            max_employee_amount: 10_000_000_000,
+            require_approval: false,
+            paused: false,
+        }
+        .data(),
+    };
+
     let setup_tx = Transaction::new(
         &[&company],
         Message::new(
@@ -151,6 +177,7 @@ fn initialize_vault_and_deposit() {
                 create_organization_ix,
                 initialize_vault_ix,
                 initialize_organization_roles_ix,
+                initialize_policy_ix,
             ],
             Some(&company.pubkey()),
         ),
@@ -171,6 +198,7 @@ fn initialize_vault_and_deposit() {
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(token_program, false),
             AccountMeta::new_readonly(organization_roles, false),
+            AccountMeta::new_readonly(policy, false),
         ],
         data: instruction::Deposit {
             amount: 1_000_000_000,

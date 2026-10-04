@@ -199,6 +199,10 @@ export type StreamPaySolana = {
         {
           "name": "roles",
           "optional": true
+        },
+        {
+          "name": "policy",
+          "optional": true
         }
       ],
       "args": [
@@ -648,6 +652,10 @@ export type StreamPaySolana = {
         {
           "name": "roles",
           "optional": true
+        },
+        {
+          "name": "policy",
+          "optional": true
         }
       ],
       "args": [
@@ -755,6 +763,10 @@ export type StreamPaySolana = {
         },
         {
           "name": "roles",
+          "optional": true
+        },
+        {
+          "name": "policy",
           "optional": true
         }
       ],
@@ -1499,6 +1511,120 @@ export type StreamPaySolana = {
       ]
     },
     {
+      "name": "initializeOrganizationPolicy",
+      "discriminator": [
+        108,
+        159,
+        78,
+        97,
+        63,
+        202,
+        35,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "organization",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103,
+                  97,
+                  110,
+                  105,
+                  122,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103,
+                  97,
+                  110,
+                  105,
+                  122,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "organization"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "approvedMint",
+          "type": "pubkey"
+        },
+        {
+          "name": "maxTransactionAmount",
+          "type": "u64"
+        },
+        {
+          "name": "maxPayrollAmount",
+          "type": "u64"
+        },
+        {
+          "name": "maxEmployeeAmount",
+          "type": "u64"
+        },
+        {
+          "name": "requireApproval",
+          "type": "bool"
+        },
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "initializeOrganizationRoles",
       "discriminator": [
         38,
@@ -1952,6 +2078,10 @@ export type StreamPaySolana = {
         {
           "name": "roles",
           "optional": true
+        },
+        {
+          "name": "policy",
+          "optional": true
         }
       ],
       "args": [
@@ -1962,6 +2092,116 @@ export type StreamPaySolana = {
         {
           "name": "amount",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "updateOrganizationPolicy",
+      "discriminator": [
+        138,
+        224,
+        162,
+        159,
+        45,
+        41,
+        9,
+        59
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "organization",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103,
+                  97,
+                  110,
+                  105,
+                  122,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103,
+                  97,
+                  110,
+                  105,
+                  122,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "organization"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "approvedMint",
+          "type": "pubkey"
+        },
+        {
+          "name": "maxTransactionAmount",
+          "type": "u64"
+        },
+        {
+          "name": "maxPayrollAmount",
+          "type": "u64"
+        },
+        {
+          "name": "maxEmployeeAmount",
+          "type": "u64"
+        },
+        {
+          "name": "requireApproval",
+          "type": "bool"
+        },
+        {
+          "name": "paused",
+          "type": "bool"
         }
       ]
     }
@@ -2030,6 +2270,19 @@ export type StreamPaySolana = {
         57,
         118,
         160
+      ]
+    },
+    {
+      "name": "organizationPolicy",
+      "discriminator": [
+        187,
+        187,
+        89,
+        231,
+        33,
+        123,
+        45,
+        63
       ]
     },
     {
@@ -2182,6 +2435,36 @@ export type StreamPaySolana = {
       "code": 6018,
       "name": "invalidVaaSequence",
       "msg": "The VAA sequence does not match"
+    },
+    {
+      "code": 6019,
+      "name": "organizationPaused",
+      "msg": "The organization is paused"
+    },
+    {
+      "code": 6020,
+      "name": "invalidPolicyAsset",
+      "msg": "The provided asset is not approved for this organization"
+    },
+    {
+      "code": 6021,
+      "name": "transactionLimitExceeded",
+      "msg": "The transaction exceeds the organization transaction limit"
+    },
+    {
+      "code": 6022,
+      "name": "payrollLimitExceeded",
+      "msg": "The payroll exceeds the organization payroll limit"
+    },
+    {
+      "code": 6023,
+      "name": "employeeLimitExceeded",
+      "msg": "The payroll exceeds the per-employee limit"
+    },
+    {
+      "code": 6024,
+      "name": "approvalRequired",
+      "msg": "This payroll requires approval by the Approver role"
     }
   ],
   "types": [
@@ -2439,6 +2722,50 @@ export type StreamPaySolana = {
       }
     },
     {
+      "name": "organizationPolicy",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "organization",
+            "type": "pubkey"
+          },
+          {
+            "name": "approvedMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "maxTransactionAmount",
+            "type": "u64"
+          },
+          {
+            "name": "maxPayrollAmount",
+            "type": "u64"
+          },
+          {
+            "name": "maxEmployeeAmount",
+            "type": "u64"
+          },
+          {
+            "name": "requireApproval",
+            "type": "bool"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "organizationRoles",
       "type": {
         "kind": "struct",
@@ -2583,6 +2910,11 @@ export type StreamPaySolana = {
       "name": "crossChainStreamSeed",
       "type": "bytes",
       "value": "[99, 114, 111, 115, 115, 45, 115, 116, 114, 101, 97, 109]"
+    },
+    {
+      "name": "organizationPolicySeed",
+      "type": "bytes",
+      "value": "[111, 114, 103, 97, 110, 105, 122, 97, 116, 105, 111, 110, 95, 112, 111, 108, 105, 99, 121]"
     },
     {
       "name": "organizationSeed",

@@ -8,6 +8,9 @@ pub const ORGANIZATION_SEED: &[u8] = b"organization";
 pub const ORGANIZATION_ROLES_SEED: &[u8] = b"organization_roles";
 
 #[constant]
+pub const ORGANIZATION_POLICY_SEED: &[u8] = b"organization_policy";
+
+#[constant]
 pub const VAULT_SEED: &[u8] = b"vault";
 
 #[constant]

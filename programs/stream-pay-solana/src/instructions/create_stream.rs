@@ -6,7 +6,7 @@ use crate::{
         ORGANIZATION_SEED, STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     error::StreamPayError,
-    state::{Organization, OrganizationRoles, Stream},
+    state::{Organization, OrganizationPolicy, OrganizationRoles, Stream},
 };
 
 #[derive(Accounts)]
@@ -81,6 +81,7 @@ pub struct CreateStream<'info> {
     pub token_program: Program<'info, Token>,
 
     pub roles: Option<Account<'info, OrganizationRoles>>,
+    pub policy: Option<Account<'info, OrganizationPolicy>>,
 }
 
 pub fn handle_create_stream(
@@ -97,6 +98,48 @@ pub fn handle_create_stream(
                 && roles.can_create_payroll(&actor)
         });
     require!(authorized, StreamPayError::Unauthorized);
+
+    if let Some(policy) = ctx.accounts.policy.as_ref() {
+        require!(!policy.paused, StreamPayError::OrganizationPaused);
+        require!(
+            policy.organization == ctx.accounts.organization.key(),
+            StreamPayError::Unauthorized
+        );
+        require!(
+            policy.approved_mint == ctx.accounts.mint.key(),
+            StreamPayError::InvalidPolicyAsset
+        );
+
+        if policy.max_transaction_amount > 0 {
+            require!(
+                total_amount <= policy.max_transaction_amount,
+                StreamPayError::TransactionLimitExceeded
+            );
+        }
+
+        if policy.max_payroll_amount > 0 {
+            require!(
+                total_amount <= policy.max_payroll_amount,
+                StreamPayError::PayrollLimitExceeded
+            );
+        }
+
+        if policy.max_employee_amount > 0 {
+            require!(
+                total_amount <= policy.max_employee_amount,
+                StreamPayError::EmployeeLimitExceeded
+            );
+        }
+
+        if policy.require_approval && actor != ctx.accounts.organization.authority {
+            let approved = ctx.accounts.roles.as_ref().is_some_and(|roles| {
+                roles.organization == ctx.accounts.organization.key()
+                    && roles.can_approve_payroll(&actor)
+            });
+
+            require!(approved, StreamPayError::ApprovalRequired);
+        }
+    }
 
     require!(total_amount > 0, StreamPayError::InvalidAmount);
     require!(end_time > start_time, StreamPayError::InvalidAmount);

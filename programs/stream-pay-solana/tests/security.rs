@@ -20,6 +20,10 @@ struct TestContext {
     svm: LiteSVM,
     program_id: Address,
     company: Keypair,
+    admin: Keypair,
+    finance: Keypair,
+    approver: Keypair,
+    viewer: Keypair,
     employee: Keypair,
     wrong_employee: Keypair,
     token_program: Address,
@@ -47,11 +51,27 @@ fn setup() -> TestContext {
     .expect("failed to load StreamPay program");
 
     let company = Keypair::new();
+    let admin = Keypair::new();
+    let finance = Keypair::new();
+    let approver = Keypair::new();
+    let viewer = Keypair::new();
     let employee = Keypair::new();
     let wrong_employee = Keypair::new();
 
     svm.airdrop(&company.pubkey(), 10_000_000_000)
         .expect("failed to fund company");
+
+    svm.airdrop(&admin.pubkey(), 1_000_000_000)
+        .expect("failed to fund admin");
+
+    svm.airdrop(&finance.pubkey(), 1_000_000_000)
+        .expect("failed to fund finance");
+
+    svm.airdrop(&approver.pubkey(), 1_000_000_000)
+        .expect("failed to fund approver");
+
+    svm.airdrop(&viewer.pubkey(), 1_000_000_000)
+        .expect("failed to fund viewer");
 
     svm.airdrop(&employee.pubkey(), 1_000_000_000)
         .expect("failed to fund employee");
@@ -145,15 +165,17 @@ fn setup() -> TestContext {
         data: instruction::InitializeVault {}.data(),
     };
 
-    let (roles_anchor, _) =
-        anchor_lang::prelude::Pubkey::find_program_address(
-            &[b"organization_roles", organization.as_ref()],
-            &ID,
-        );
+    let (roles_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[b"organization_roles", organization.as_ref()],
+        &ID,
+    );
     let roles = Address::new_from_array(roles_anchor.to_bytes());
 
-    let company_anchor =
-        anchor_lang::prelude::Pubkey::new_from_array(company.pubkey().to_bytes());
+    let admin_anchor = anchor_lang::prelude::Pubkey::new_from_array(admin.pubkey().to_bytes());
+    let finance_anchor = anchor_lang::prelude::Pubkey::new_from_array(finance.pubkey().to_bytes());
+    let approver_anchor =
+        anchor_lang::prelude::Pubkey::new_from_array(approver.pubkey().to_bytes());
+    let viewer_anchor = anchor_lang::prelude::Pubkey::new_from_array(viewer.pubkey().to_bytes());
 
     let initialize_roles_ix = Instruction {
         program_id,
@@ -164,10 +186,37 @@ fn setup() -> TestContext {
             AccountMeta::new_readonly(system_program, false),
         ],
         data: instruction::InitializeOrganizationRoles {
-            admin: company_anchor,
-            finance: company_anchor,
-            approver: company_anchor,
-            viewer: company_anchor,
+            admin: admin_anchor,
+            finance: finance_anchor,
+            approver: approver_anchor,
+            viewer: viewer_anchor,
+        }
+        .data(),
+    };
+
+    let (policy_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[b"organization_policy", organization.as_ref()],
+        &ID,
+    );
+    let policy = Address::new_from_array(policy_anchor.to_bytes());
+
+    let mint_anchor = anchor_lang::prelude::Pubkey::new_from_array(mint.to_bytes());
+
+    let initialize_policy_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
+            AccountMeta::new(policy, false),
+            AccountMeta::new_readonly(system_program, false),
+        ],
+        data: instruction::InitializeOrganizationPolicy {
+            approved_mint: mint_anchor,
+            max_transaction_amount: 10_000_000_000,
+            max_payroll_amount: 10_000_000_000,
+            max_employee_amount: 10_000_000_000,
+            require_approval: false,
+            paused: false,
         }
         .data(),
     };
@@ -182,6 +231,7 @@ fn setup() -> TestContext {
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(token_program, false),
             AccountMeta::new_readonly(roles, false),
+            AccountMeta::new_readonly(policy, false),
         ],
         data: instruction::Deposit {
             amount: 1_250_000_000,
@@ -192,7 +242,13 @@ fn setup() -> TestContext {
     let setup_tx = Transaction::new(
         &[&company],
         Message::new(
-            &[create_organization_ix, initialize_roles_ix, initialize_vault_ix, deposit_ix],
+            &[
+                create_organization_ix,
+                initialize_roles_ix,
+                initialize_vault_ix,
+                initialize_policy_ix,
+                deposit_ix,
+            ],
             Some(&company.pubkey()),
         ),
         svm.latest_blockhash(),
@@ -226,6 +282,10 @@ fn setup() -> TestContext {
         svm,
         program_id,
         company,
+        admin,
+        finance,
+        approver,
+        viewer,
         employee,
         wrong_employee,
         token_program,
@@ -242,13 +302,114 @@ fn setup() -> TestContext {
     }
 }
 
+fn organization_policy(ctx: &TestContext) -> Address {
+    let (policy_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[b"organization_policy", ctx.organization.as_ref()],
+        &ID,
+    );
+    Address::new_from_array(policy_anchor.to_bytes())
+}
+
+fn update_policy(
+    ctx: &mut TestContext,
+    approved_mint: Address,
+    max_transaction_amount: u64,
+    max_payroll_amount: u64,
+    max_employee_amount: u64,
+    require_approval: bool,
+    paused: bool,
+) {
+    let policy = organization_policy(ctx);
+
+    let approved_mint_anchor =
+        anchor_lang::prelude::Pubkey::new_from_array(approved_mint.to_bytes());
+
+    let update_ix = Instruction {
+        program_id: ctx.program_id,
+        accounts: vec![
+            AccountMeta::new(ctx.company.pubkey(), true),
+            AccountMeta::new_readonly(ctx.organization, false),
+            AccountMeta::new(policy, false),
+        ],
+        data: instruction::UpdateOrganizationPolicy {
+            approved_mint: approved_mint_anchor,
+            max_transaction_amount,
+            max_payroll_amount,
+            max_employee_amount,
+            require_approval,
+            paused,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new(
+        &[&ctx.company],
+        Message::new(&[update_ix], Some(&ctx.company.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    ctx.svm.send_transaction(tx).expect("policy update failed");
+}
+
 fn organization_roles(ctx: &TestContext) -> Address {
-    let (roles_anchor, _) =
-        anchor_lang::prelude::Pubkey::find_program_address(
-            &[b"organization_roles", ctx.organization.as_ref()],
-            &ID,
-        );
+    let (roles_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[b"organization_roles", ctx.organization.as_ref()],
+        &ID,
+    );
     Address::new_from_array(roles_anchor.to_bytes())
+}
+
+fn role_create_stream_ix(
+    ctx: &TestContext,
+    authority: Address,
+    stream_id: u64,
+    amount: u64,
+    start_time: i64,
+    end_time: i64,
+) -> Instruction {
+    let (stream_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[
+            STREAM_SEED,
+            ctx.organization.as_ref(),
+            ctx.employee.pubkey().as_ref(),
+            &stream_id.to_le_bytes(),
+        ],
+        &ID,
+    );
+
+    let stream = Address::new_from_array(stream_anchor.to_bytes());
+
+    let (escrow_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[STREAM_ESCROW_SEED, stream.as_ref()],
+        &ID,
+    );
+
+    let stream_escrow = Address::new_from_array(escrow_anchor.to_bytes());
+
+    Instruction {
+        program_id: ctx.program_id,
+        accounts: vec![
+            AccountMeta::new(authority, true),
+            AccountMeta::new_readonly(ctx.organization, false),
+            AccountMeta::new_readonly(ctx.employee.pubkey(), false),
+            AccountMeta::new_readonly(ctx.mint, false),
+            AccountMeta::new(ctx.vault, false),
+            AccountMeta::new_readonly(ctx.vault_authority, false),
+            AccountMeta::new(stream, false),
+            AccountMeta::new(stream_escrow, false),
+            AccountMeta::new_readonly(ctx.system_program, false),
+            AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(ctx), false),
+            AccountMeta::new_readonly(organization_policy(ctx), false),
+        ],
+        data: instruction::CreateStream {
+            stream_id,
+            total_amount: amount,
+            start_time,
+            end_time,
+        }
+        .data(),
+    }
 }
 
 fn create_stream(ctx: &mut TestContext, amount: u64, start_time: i64, end_time: i64) {
@@ -266,6 +427,7 @@ fn create_stream(ctx: &mut TestContext, amount: u64, start_time: i64, end_time: 
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -286,6 +448,138 @@ fn create_stream(ctx: &mut TestContext, amount: u64, start_time: i64, end_time: 
 }
 
 #[test]
+fn admin_can_create_when_approval_is_not_required() {
+    let mut ctx = setup();
+
+    let ix = role_create_stream_ix(&ctx, ctx.admin.pubkey(), 2, 1_000_000_000, 1_000, 2_000);
+
+    let tx = Transaction::new(
+        &[&ctx.admin],
+        Message::new(&[ix], Some(&ctx.admin.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    ctx.svm
+        .send_transaction(tx)
+        .expect("admin should create when approval is not required");
+}
+
+#[test]
+fn approval_required_rejects_admin_create_stream() {
+    let mut ctx = setup();
+
+    let policy_mint = ctx.mint;
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        true,
+        false,
+    );
+
+    let ix = role_create_stream_ix(&ctx, ctx.admin.pubkey(), 2, 1_000_000_000, 1_000, 2_000);
+
+    let tx = Transaction::new(
+        &[&ctx.admin],
+        Message::new(&[ix], Some(&ctx.admin.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    assert!(
+        ctx.svm.send_transaction(tx).is_err(),
+        "admin should not create when approval is required"
+    );
+}
+
+#[test]
+fn approval_required_allows_approver_create_stream() {
+    let mut ctx = setup();
+
+    let policy_mint = ctx.mint;
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        true,
+        false,
+    );
+
+    let ix = role_create_stream_ix(&ctx, ctx.approver.pubkey(), 2, 1_000_000_000, 1_000, 2_000);
+
+    let tx = Transaction::new(
+        &[&ctx.approver],
+        Message::new(&[ix], Some(&ctx.approver.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    ctx.svm
+        .send_transaction(tx)
+        .expect("approver should create when approval is required");
+}
+
+#[test]
+fn approval_required_rejects_finance_create_stream() {
+    let mut ctx = setup();
+
+    let policy_mint = ctx.mint;
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        true,
+        false,
+    );
+
+    let ix = role_create_stream_ix(&ctx, ctx.finance.pubkey(), 2, 1_000_000_000, 1_000, 2_000);
+
+    let tx = Transaction::new(
+        &[&ctx.finance],
+        Message::new(&[ix], Some(&ctx.finance.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    assert!(
+        ctx.svm.send_transaction(tx).is_err(),
+        "finance should not create payroll streams"
+    );
+}
+
+#[test]
+fn approval_required_rejects_viewer_create_stream() {
+    let mut ctx = setup();
+
+    let policy_mint = ctx.mint;
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        true,
+        false,
+    );
+
+    let ix = role_create_stream_ix(&ctx, ctx.viewer.pubkey(), 2, 1_000_000_000, 1_000, 2_000);
+
+    let tx = Transaction::new(
+        &[&ctx.viewer],
+        Message::new(&[ix], Some(&ctx.viewer.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    assert!(
+        ctx.svm.send_transaction(tx).is_err(),
+        "viewer should not create payroll streams"
+    );
+}
+
+#[test]
 fn create_stream_rejects_zero_amount() {
     let mut ctx = setup();
 
@@ -303,6 +597,7 @@ fn create_stream_rejects_zero_amount() {
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -343,6 +638,7 @@ fn create_stream_rejects_invalid_time_range() {
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -423,6 +719,7 @@ fn top_up_after_stream_started_fails() {
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::TopUpStream {
             stream_id: ctx.stream_id,
@@ -458,6 +755,7 @@ fn cancel_stream(ctx: &mut TestContext) {
             AccountMeta::new(ctx.employee_token_account, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(ctx), false),
         ],
         data: instruction::CancelStream {
             stream_id: ctx.stream_id,
@@ -503,6 +801,7 @@ fn cancel_stream_cannot_be_called_twice() {
             AccountMeta::new(ctx.employee_token_account, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::CancelStream {
             stream_id: ctx.stream_id,
@@ -569,17 +868,12 @@ fn wrong_organization_is_rejected() {
         .airdrop(&other_company.pubkey(), 1_000_000_000)
         .expect("failed to fund other company");
 
-    let (other_org_anchor, _) =
-        anchor_lang::prelude::Pubkey::find_program_address(
-            &[
-                ORGANIZATION_SEED,
-                other_company.pubkey().as_ref(),
-            ],
-            &ID,
-        );
+    let (other_org_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[ORGANIZATION_SEED, other_company.pubkey().as_ref()],
+        &ID,
+    );
 
-    let other_organization =
-        Address::new_from_array(other_org_anchor.to_bytes());
+    let other_organization = Address::new_from_array(other_org_anchor.to_bytes());
 
     let ix = Instruction {
         program_id: ctx.program_id,
@@ -595,6 +889,7 @@ fn wrong_organization_is_rejected() {
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -607,10 +902,7 @@ fn wrong_organization_is_rejected() {
 
     let tx = Transaction::new(
         &[&ctx.company],
-        Message::new(
-            &[ix],
-            Some(&ctx.company.pubkey()),
-        ),
+        Message::new(&[ix], Some(&ctx.company.pubkey())),
         ctx.svm.latest_blockhash(),
     );
 
@@ -640,6 +932,7 @@ fn wrong_vault_is_rejected() {
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -652,10 +945,7 @@ fn wrong_vault_is_rejected() {
 
     let tx = Transaction::new(
         &[&ctx.company],
-        Message::new(
-            &[ix],
-            Some(&ctx.company.pubkey()),
-        ),
+        Message::new(&[ix], Some(&ctx.company.pubkey())),
         ctx.svm.latest_blockhash(),
     );
 
@@ -669,12 +959,7 @@ fn wrong_vault_is_rejected() {
 fn wrong_mint_claim_is_rejected() {
     let mut ctx = setup();
 
-    create_stream(
-        &mut ctx,
-        1_000_000_000,
-        1_000,
-        2_000,
-    );
+    create_stream(&mut ctx, 1_000_000_000, 1_000, 2_000);
 
     let wrong_mint = CreateMint::new(&mut ctx.svm, &ctx.company)
         .authority(&ctx.company.pubkey())
@@ -702,10 +987,7 @@ fn wrong_mint_claim_is_rejected() {
 
     let tx = Transaction::new(
         &[&ctx.employee],
-        Message::new(
-            &[ix],
-            Some(&ctx.employee.pubkey()),
-        ),
+        Message::new(&[ix], Some(&ctx.employee.pubkey())),
         ctx.svm.latest_blockhash(),
     );
 
@@ -719,12 +1001,7 @@ fn wrong_mint_claim_is_rejected() {
 fn wrong_token_program_is_rejected() {
     let mut ctx = setup();
 
-    create_stream(
-        &mut ctx,
-        1_000_000_000,
-        1_000,
-        2_000,
-    );
+    create_stream(&mut ctx, 1_000_000_000, 1_000, 2_000);
 
     let mut clock = ctx.svm.get_sysvar::<Clock>();
     clock.unix_timestamp = 1_500;
@@ -738,7 +1015,6 @@ fn wrong_token_program_is_rejected() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new(ctx.employee_token_account, false),
-
             // Deliberately pass System Program instead of Token Program.
             AccountMeta::new_readonly(ctx.system_program, false),
         ],
@@ -747,10 +1023,7 @@ fn wrong_token_program_is_rejected() {
 
     let tx = Transaction::new(
         &[&ctx.employee],
-        Message::new(
-            &[ix],
-            Some(&ctx.employee.pubkey()),
-        ),
+        Message::new(&[ix], Some(&ctx.employee.pubkey())),
         ctx.svm.latest_blockhash(),
     );
 
@@ -779,6 +1052,7 @@ fn create_stream_requires_authority_signer() {
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -791,10 +1065,7 @@ fn create_stream_requires_authority_signer() {
 
     let tx = Transaction::new(
         &[&ctx.employee],
-        Message::new(
-            &[ix],
-            Some(&ctx.employee.pubkey()),
-        ),
+        Message::new(&[ix], Some(&ctx.employee.pubkey())),
         ctx.svm.latest_blockhash(),
     );
 
@@ -808,12 +1079,7 @@ fn create_stream_requires_authority_signer() {
 fn top_up_zero_amount_is_rejected() {
     let mut ctx = setup();
 
-    create_stream(
-        &mut ctx,
-        1_000_000_000,
-        1_000,
-        2_000,
-    );
+    create_stream(&mut ctx, 1_000_000_000, 1_000, 2_000);
 
     let ix = Instruction {
         program_id: ctx.program_id,
@@ -828,6 +1094,7 @@ fn top_up_zero_amount_is_rejected() {
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::TopUpStream {
             stream_id: ctx.stream_id,
@@ -838,10 +1105,7 @@ fn top_up_zero_amount_is_rejected() {
 
     let tx = Transaction::new(
         &[&ctx.company],
-        Message::new(
-            &[ix],
-            Some(&ctx.company.pubkey()),
-        ),
+        Message::new(&[ix], Some(&ctx.company.pubkey())),
         ctx.svm.latest_blockhash(),
     );
 
@@ -855,12 +1119,7 @@ fn top_up_zero_amount_is_rejected() {
 fn top_up_arithmetic_overflow_is_rejected() {
     let mut ctx = setup();
 
-    create_stream(
-        &mut ctx,
-        1_000_000_000,
-        1_000,
-        2_000,
-    );
+    create_stream(&mut ctx, 1_000_000_000, 1_000, 2_000);
 
     let ix = Instruction {
         program_id: ctx.program_id,
@@ -875,6 +1134,7 @@ fn top_up_arithmetic_overflow_is_rejected() {
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new_readonly(ctx.token_program, false),
             AccountMeta::new_readonly(organization_roles(&ctx), false),
+            AccountMeta::new_readonly(organization_policy(&ctx), false),
         ],
         data: instruction::TopUpStream {
             stream_id: ctx.stream_id,
@@ -885,10 +1145,7 @@ fn top_up_arithmetic_overflow_is_rejected() {
 
     let tx = Transaction::new(
         &[&ctx.company],
-        Message::new(
-            &[ix],
-            Some(&ctx.company.pubkey()),
-        ),
+        Message::new(&[ix], Some(&ctx.company.pubkey())),
         ctx.svm.latest_blockhash(),
     );
 
@@ -898,3 +1155,397 @@ fn top_up_arithmetic_overflow_is_rejected() {
     );
 }
 
+#[test]
+fn policy_paused_organization_rejects_create_stream() {
+    let mut ctx = setup();
+
+    let policy_mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        false,
+        true,
+    );
+
+    assert!(
+        ctx.svm
+            .send_transaction({
+                let ix = Instruction {
+                    program_id: ctx.program_id,
+                    accounts: vec![
+                        AccountMeta::new(ctx.company.pubkey(), true),
+                        AccountMeta::new_readonly(ctx.organization, false),
+                        AccountMeta::new_readonly(ctx.employee.pubkey(), false),
+                        AccountMeta::new_readonly(ctx.mint, false),
+                        AccountMeta::new(ctx.vault, false),
+                        AccountMeta::new_readonly(ctx.vault_authority, false),
+                        AccountMeta::new(ctx.stream, false),
+                        AccountMeta::new(ctx.stream_escrow, false),
+                        AccountMeta::new_readonly(ctx.system_program, false),
+                        AccountMeta::new_readonly(ctx.token_program, false),
+                        AccountMeta::new_readonly(organization_roles(&ctx), false),
+                        AccountMeta::new_readonly(organization_policy(&ctx), false),
+                    ],
+                    data: instruction::CreateStream {
+                        stream_id: ctx.stream_id,
+                        total_amount: 1_000_000_000,
+                        start_time: 1_000,
+                        end_time: 2_000,
+                    }
+                    .data(),
+                };
+
+                Transaction::new(
+                    &[&ctx.company],
+                    Message::new(&[ix], Some(&ctx.company.pubkey())),
+                    ctx.svm.latest_blockhash(),
+                )
+            })
+            .is_err(),
+        "create stream must fail while organization is paused"
+    );
+}
+
+#[test]
+fn policy_transaction_limit_rejects_create_stream() {
+    let mut ctx = setup();
+
+    let policy_mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        500_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        false,
+        false,
+    );
+
+    assert!(
+        ctx.svm
+            .send_transaction({
+                let ix = Instruction {
+                    program_id: ctx.program_id,
+                    accounts: vec![
+                        AccountMeta::new(ctx.company.pubkey(), true),
+                        AccountMeta::new_readonly(ctx.organization, false),
+                        AccountMeta::new_readonly(ctx.employee.pubkey(), false),
+                        AccountMeta::new_readonly(ctx.mint, false),
+                        AccountMeta::new(ctx.vault, false),
+                        AccountMeta::new_readonly(ctx.vault_authority, false),
+                        AccountMeta::new(ctx.stream, false),
+                        AccountMeta::new(ctx.stream_escrow, false),
+                        AccountMeta::new_readonly(ctx.system_program, false),
+                        AccountMeta::new_readonly(ctx.token_program, false),
+                        AccountMeta::new_readonly(organization_roles(&ctx), false),
+                        AccountMeta::new_readonly(organization_policy(&ctx), false),
+                    ],
+                    data: instruction::CreateStream {
+                        stream_id: ctx.stream_id,
+                        total_amount: 1_000_000_000,
+                        start_time: 1_000,
+                        end_time: 2_000,
+                    }
+                    .data(),
+                };
+
+                Transaction::new(
+                    &[&ctx.company],
+                    Message::new(&[ix], Some(&ctx.company.pubkey())),
+                    ctx.svm.latest_blockhash(),
+                )
+            })
+            .is_err(),
+        "create stream must fail when transaction limit is exceeded"
+    );
+}
+
+#[test]
+fn policy_payroll_limit_rejects_create_stream() {
+    let mut ctx = setup();
+
+    let policy_mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        500_000_000,
+        10_000_000_000,
+        false,
+        false,
+    );
+
+    assert!(
+        ctx.svm
+            .send_transaction({
+                let ix = Instruction {
+                    program_id: ctx.program_id,
+                    accounts: vec![
+                        AccountMeta::new(ctx.company.pubkey(), true),
+                        AccountMeta::new_readonly(ctx.organization, false),
+                        AccountMeta::new_readonly(ctx.employee.pubkey(), false),
+                        AccountMeta::new_readonly(ctx.mint, false),
+                        AccountMeta::new(ctx.vault, false),
+                        AccountMeta::new_readonly(ctx.vault_authority, false),
+                        AccountMeta::new(ctx.stream, false),
+                        AccountMeta::new(ctx.stream_escrow, false),
+                        AccountMeta::new_readonly(ctx.system_program, false),
+                        AccountMeta::new_readonly(ctx.token_program, false),
+                        AccountMeta::new_readonly(organization_roles(&ctx), false),
+                        AccountMeta::new_readonly(organization_policy(&ctx), false),
+                    ],
+                    data: instruction::CreateStream {
+                        stream_id: ctx.stream_id,
+                        total_amount: 1_000_000_000,
+                        start_time: 1_000,
+                        end_time: 2_000,
+                    }
+                    .data(),
+                };
+
+                Transaction::new(
+                    &[&ctx.company],
+                    Message::new(&[ix], Some(&ctx.company.pubkey())),
+                    ctx.svm.latest_blockhash(),
+                )
+            })
+            .is_err(),
+        "create stream must fail when payroll limit is exceeded"
+    );
+}
+
+#[test]
+fn policy_employee_limit_rejects_create_stream() {
+    let mut ctx = setup();
+
+    let policy_mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        10_000_000_000,
+        500_000_000,
+        false,
+        false,
+    );
+
+    assert!(
+        ctx.svm
+            .send_transaction({
+                let ix = Instruction {
+                    program_id: ctx.program_id,
+                    accounts: vec![
+                        AccountMeta::new(ctx.company.pubkey(), true),
+                        AccountMeta::new_readonly(ctx.organization, false),
+                        AccountMeta::new_readonly(ctx.employee.pubkey(), false),
+                        AccountMeta::new_readonly(ctx.mint, false),
+                        AccountMeta::new(ctx.vault, false),
+                        AccountMeta::new_readonly(ctx.vault_authority, false),
+                        AccountMeta::new(ctx.stream, false),
+                        AccountMeta::new(ctx.stream_escrow, false),
+                        AccountMeta::new_readonly(ctx.system_program, false),
+                        AccountMeta::new_readonly(ctx.token_program, false),
+                        AccountMeta::new_readonly(organization_roles(&ctx), false),
+                        AccountMeta::new_readonly(organization_policy(&ctx), false),
+                    ],
+                    data: instruction::CreateStream {
+                        stream_id: ctx.stream_id,
+                        total_amount: 1_000_000_000,
+                        start_time: 1_000,
+                        end_time: 2_000,
+                    }
+                    .data(),
+                };
+
+                Transaction::new(
+                    &[&ctx.company],
+                    Message::new(&[ix], Some(&ctx.company.pubkey())),
+                    ctx.svm.latest_blockhash(),
+                )
+            })
+            .is_err(),
+        "create stream must fail when employee limit is exceeded"
+    );
+}
+
+#[test]
+fn policy_paused_organization_rejects_top_up() {
+    let mut ctx = setup();
+
+    create_stream(&mut ctx, 1_000_000_000, 1_000, 2_000);
+
+    let policy_mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        false,
+        true,
+    );
+
+    assert!(
+        ctx.svm
+            .send_transaction({
+                let ix = Instruction {
+                    program_id: ctx.program_id,
+                    accounts: vec![
+                        AccountMeta::new(ctx.company.pubkey(), true),
+                        AccountMeta::new_readonly(ctx.organization, false),
+                        AccountMeta::new_readonly(ctx.employee.pubkey(), false),
+                        AccountMeta::new(ctx.stream, false),
+                        AccountMeta::new(ctx.vault, false),
+                        AccountMeta::new_readonly(ctx.vault_authority, false),
+                        AccountMeta::new(ctx.stream_escrow, false),
+                        AccountMeta::new_readonly(ctx.mint, false),
+                        AccountMeta::new_readonly(ctx.token_program, false),
+                        AccountMeta::new_readonly(organization_roles(&ctx), false),
+                        AccountMeta::new_readonly(organization_policy(&ctx), false),
+                    ],
+                    data: instruction::TopUpStream {
+                        stream_id: ctx.stream_id,
+                        amount: 1,
+                    }
+                    .data(),
+                };
+
+                Transaction::new(
+                    &[&ctx.company],
+                    Message::new(&[ix], Some(&ctx.company.pubkey())),
+                    ctx.svm.latest_blockhash(),
+                )
+            })
+            .is_err(),
+        "top-up must fail while organization is paused"
+    );
+}
+
+#[test]
+fn policy_transaction_limit_rejects_top_up() {
+    let mut ctx = setup();
+
+    create_stream(&mut ctx, 1_000_000_000, 1_000, 2_000);
+
+    let policy_mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        1,
+        10_000_000_000,
+        10_000_000_000,
+        false,
+        false,
+    );
+
+    assert!(
+        ctx.svm
+            .send_transaction({
+                let ix = Instruction {
+                    program_id: ctx.program_id,
+                    accounts: vec![
+                        AccountMeta::new(ctx.company.pubkey(), true),
+                        AccountMeta::new_readonly(ctx.organization, false),
+                        AccountMeta::new_readonly(ctx.employee.pubkey(), false),
+                        AccountMeta::new(ctx.stream, false),
+                        AccountMeta::new(ctx.vault, false),
+                        AccountMeta::new_readonly(ctx.vault_authority, false),
+                        AccountMeta::new(ctx.stream_escrow, false),
+                        AccountMeta::new_readonly(ctx.mint, false),
+                        AccountMeta::new_readonly(ctx.token_program, false),
+                        AccountMeta::new_readonly(organization_roles(&ctx), false),
+                        AccountMeta::new_readonly(organization_policy(&ctx), false),
+                    ],
+                    data: instruction::TopUpStream {
+                        stream_id: ctx.stream_id,
+                        amount: 2,
+                    }
+                    .data(),
+                };
+
+                Transaction::new(
+                    &[&ctx.company],
+                    Message::new(&[ix], Some(&ctx.company.pubkey())),
+                    ctx.svm.latest_blockhash(),
+                )
+            })
+            .is_err(),
+        "top-up must fail when transaction limit is exceeded"
+    );
+}
+
+#[test]
+fn policy_update_requires_organization_owner() {
+    let mut ctx = setup();
+
+    let attacker = Keypair::new();
+
+    ctx.svm
+        .airdrop(&attacker.pubkey(), 1_000_000_000)
+        .expect("failed to fund attacker");
+
+    let policy = organization_policy(&ctx);
+
+    let update_ix = Instruction {
+        program_id: ctx.program_id,
+        accounts: vec![
+            AccountMeta::new(attacker.pubkey(), true),
+            AccountMeta::new_readonly(ctx.organization, false),
+            AccountMeta::new(policy, false),
+        ],
+        data: instruction::UpdateOrganizationPolicy {
+            approved_mint: anchor_lang::prelude::Pubkey::new_from_array(ctx.mint.to_bytes()),
+            max_transaction_amount: 1,
+            max_payroll_amount: 1,
+            max_employee_amount: 1,
+            require_approval: false,
+            paused: false,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new(
+        &[&attacker],
+        Message::new(&[update_ix], Some(&attacker.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    assert!(
+        ctx.svm.send_transaction(tx).is_err(),
+        "non-owner must not update organization policy"
+    );
+}
+
+#[test]
+fn policy_paused_organization_still_allows_cancel() {
+    let mut ctx = setup();
+
+    create_stream(&mut ctx, 1_000_000_000, 1_000, 2_000);
+
+    let mut clock = ctx.svm.get_sysvar::<Clock>();
+    clock.unix_timestamp = 1_500;
+    ctx.svm.set_sysvar::<Clock>(&clock);
+
+    let policy_mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        policy_mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        false,
+        true,
+    );
+
+    cancel_stream(&mut ctx);
+}

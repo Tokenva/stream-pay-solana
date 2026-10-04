@@ -130,10 +130,12 @@ impl OrganizationRoles {
         *authority == self.admin || *authority == self.approver
     }
 
+    pub fn can_approve_payroll(&self, authority: &Pubkey) -> bool {
+        *authority == self.approver
+    }
+
     pub fn can_top_up(&self, authority: &Pubkey) -> bool {
-        *authority == self.admin
-            || *authority == self.finance
-            || *authority == self.approver
+        *authority == self.admin || *authority == self.finance || *authority == self.approver
     }
 
     pub fn can_cancel(&self, authority: &Pubkey) -> bool {
@@ -143,4 +145,18 @@ impl OrganizationRoles {
     pub fn can_deposit(&self, authority: &Pubkey) -> bool {
         *authority == self.admin || *authority == self.finance
     }
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct OrganizationPolicy {
+    pub organization: Pubkey,
+    pub approved_mint: Pubkey,
+    pub max_transaction_amount: u64,
+    pub max_payroll_amount: u64,
+    pub max_employee_amount: u64,
+    pub require_approval: bool,
+    pub paused: bool,
+    pub bump: u8,
+    pub created_at: i64,
 }
