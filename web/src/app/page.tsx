@@ -129,6 +129,92 @@ export default function Home() {
   const [employeeWalletValid, setEmployeeWalletValid] =
     useState(false);
 
+  const [payrollReport, setPayrollReport] =
+    useState<{
+      month: string;
+      employees: number;
+      grossPayout: string;
+      totalClaimed: string;
+      completed: number;
+      pending: number;
+      canceled: number;
+      streamCount: number;
+    } | null>(null);
+
+  const [payrollReportLoading, setPayrollReportLoading] =
+    useState(false);
+
+  const [payrollReportError, setPayrollReportError] =
+    useState<string | null>(null);
+
+  const [employeeReports, setEmployeeReports] =
+    useState<
+      {
+        employee: string;
+        streamCount: number;
+        grossPayout: string;
+        totalClaimed: string;
+        remaining: string;
+        completed: number;
+        pending: number;
+        canceled: number;
+      }[]
+    >([]);
+
+  const [employeeReportLoading, setEmployeeReportLoading] =
+    useState(false);
+
+  const [employeeReportError, setEmployeeReportError] =
+    useState<string | null>(null);
+
+  const [treasuryReport, setTreasuryReport] =
+    useState<{
+      month: string;
+      streamCount: number;
+      grossPayout: string;
+      totalClaimed: string;
+      outstanding: string;
+      active: number;
+      completed: number;
+      canceled: number;
+      transactions: Record<string, number>;
+    } | null>(null);
+
+  const [treasuryReportLoading, setTreasuryReportLoading] =
+    useState(false);
+
+  const [treasuryReportError, setTreasuryReportError] =
+    useState<string | null>(null);
+
+  const [reconciliationReport, setReconciliationReport] =
+    useState<{
+      checked: number;
+      databaseStreams: number;
+      matched: number;
+      mismatched: number;
+      missingFromDb: number;
+      staleInDb: number;
+      healthy: boolean;
+      details: Array<{
+        type: string;
+        address: string;
+        fields?: string[];
+      }>;
+    } | null>(null);
+
+  const [
+    reconciliationLoading,
+    setReconciliationLoading,
+  ] = useState(false);
+
+  const [
+    reconciliationError,
+    setReconciliationError,
+  ] = useState<string | null>(null);
+
+  const [exportLoading, setExportLoading] =
+    useState<string | null>(null);
+
   useEffect(() => {
     setMounted(true);
 
@@ -240,6 +326,230 @@ export default function Home() {
   } = useIndexedStreams(
     publicKey?.toBase58(),
   );
+
+  async function loadPayrollReport() {
+    try {
+      setPayrollReportLoading(true);
+      setPayrollReportError(null);
+
+      const month = new Date()
+        .toISOString()
+        .slice(0, 7);
+
+      const response = await fetch(
+        `http://localhost:4000/api/reports/payroll?month=${month}`,
+        {
+          cache: "no-store",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Failed to load payroll report",
+        );
+      }
+
+      const data = await response.json();
+
+      setPayrollReport(data);
+    } catch (err) {
+      setPayrollReportError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load payroll report",
+      );
+    } finally {
+      setPayrollReportLoading(false);
+    }
+  }
+  useEffect(() => {
+    void loadPayrollReport();
+  }, []);
+
+  async function loadEmployeeReports() {
+    try {
+      setEmployeeReportLoading(true);
+      setEmployeeReportError(null);
+
+      const month = new Date()
+        .toISOString()
+        .slice(0, 7);
+
+      const response = await fetch(
+        `http://localhost:4000/api/reports/employees?month=${month}`,
+        {
+          cache: "no-store",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Failed to load employee reports",
+        );
+      }
+
+      const data = await response.json();
+
+      setEmployeeReports(
+        Array.isArray(data.employees)
+          ? data.employees
+          : [],
+      );
+    } catch (err) {
+      setEmployeeReportError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load employee reports",
+      );
+    } finally {
+      setEmployeeReportLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadEmployeeReports();
+  }, []);
+
+  async function loadTreasuryReport() {
+    try {
+      setTreasuryReportLoading(true);
+      setTreasuryReportError(null);
+
+      const month = new Date()
+        .toISOString()
+        .slice(0, 7);
+
+      const response = await fetch(
+        `http://localhost:4000/api/reports/treasury?month=${month}`,
+        {
+          cache: "no-store",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Failed to load treasury report",
+        );
+      }
+
+      const data =
+        await response.json();
+
+      setTreasuryReport(data);
+    } catch (err) {
+      setTreasuryReportError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load treasury report",
+      );
+    } finally {
+      setTreasuryReportLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadTreasuryReport();
+  }, []);
+
+  async function loadReconciliationReport() {
+    try {
+      setReconciliationLoading(true);
+      setReconciliationError(null);
+
+      const response = await fetch(
+        "http://localhost:4000/api/reports/reconciliation",
+        {
+          cache: "no-store",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Failed to load reconciliation report",
+        );
+      }
+
+      const data =
+        await response.json();
+
+      setReconciliationReport(data);
+    } catch (err) {
+      setReconciliationError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load reconciliation report",
+      );
+    } finally {
+      setReconciliationLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadReconciliationReport();
+  }, []);
+
+  async function downloadReportCsv(
+    type:
+      | "payroll"
+      | "employees"
+      | "transactions",
+  ) {
+    try {
+      setExportLoading(type);
+
+      const month = new Date()
+        .toISOString()
+        .slice(0, 7);
+
+      const url =
+        type === "transactions"
+          ? "http://localhost:4000/api/reports/transactions.csv"
+          : `http://localhost:4000/api/reports/${type}.csv?month=${month}`;
+
+      const response =
+        await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to export ${type} CSV`,
+        );
+      }
+
+      const blob =
+        await response.blob();
+
+      const downloadUrl =
+        URL.createObjectURL(blob);
+
+      const anchor =
+        document.createElement("a");
+
+      anchor.href = downloadUrl;
+
+      anchor.download =
+        `streampay-${type}-${month}.csv`;
+
+      document.body.appendChild(
+        anchor,
+      );
+
+      anchor.click();
+
+      anchor.remove();
+
+      URL.revokeObjectURL(
+        downloadUrl,
+      );
+    } catch (err) {
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : "CSV export failed",
+      );
+    } finally {
+      setExportLoading(null);
+    }
+  }
 
   async function handleCompanySetup() {
     try {
@@ -399,7 +709,7 @@ export default function Home() {
       formatDateTimeLocal(
         new Date(
           start.getTime() +
-            days * 24 * 60 * 60 * 1000,
+          days * 24 * 60 * 60 * 1000,
         ),
       ),
     );
@@ -578,7 +888,15 @@ export default function Home() {
               },
               {
                 label: "Payroll This Month",
-                value: "—",
+                value: payrollReport
+                  ? formatTokenAmount(
+                    BigInt(
+                      payrollReport.grossPayout,
+                    ),
+                  )
+                  : payrollReportLoading
+                    ? "Loading..."
+                    : "0",
               },
               {
                 label: "Active Streams",
@@ -617,6 +935,554 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+        <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm text-zinc-400">
+                Finance
+              </p>
+
+              <h2 className="mt-1 text-xl font-semibold">
+                Monthly Payroll Summary
+              </h2>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Payroll activity reported from indexed
+                StreamPay streams.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  void loadPayrollReport()
+                }
+                disabled={payrollReportLoading}
+                className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              >
+                {payrollReportLoading
+                  ? "Refreshing..."
+                  : "Refresh Report"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void downloadReportCsv("payroll")
+                }
+                disabled={
+                  exportLoading !== null
+                }
+                className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              >
+                {exportLoading === "payroll"
+                  ? "Exporting..."
+                  : "Export Payroll CSV"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void downloadReportCsv("employees")
+                }
+                disabled={
+                  exportLoading !== null
+                }
+                className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              >
+                {exportLoading === "employees"
+                  ? "Exporting..."
+                  : "Export Employee CSV"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void downloadReportCsv("transactions")
+                }
+                disabled={
+                  exportLoading !== null
+                }
+                className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              >
+                {exportLoading === "transactions"
+                  ? "Exporting..."
+                  : "Export Transactions CSV"}
+              </button>
+            </div>
+          </div>
+
+          {payrollReportError && (
+            <p className="mt-5 text-sm text-red-400">
+              {payrollReportError}
+            </p>
+          )}
+
+          {payrollReport && (
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-sm text-zinc-500">
+                  Employees
+                </p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {payrollReport.employees}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-sm text-zinc-500">
+                  Gross Payout
+                </p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {formatTokenAmount(
+                    BigInt(
+                      payrollReport.grossPayout,
+                    ),
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-sm text-zinc-500">
+                  Total Claimed
+                </p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {formatTokenAmount(
+                    BigInt(
+                      payrollReport.totalClaimed,
+                    ),
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-sm text-zinc-500">
+                  Completed
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-green-400">
+                  {payrollReport.completed}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-sm text-zinc-500">
+                  Pending
+                </p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {payrollReport.pending}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-sm text-zinc-500">
+                  Canceled
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-red-400">
+                  {payrollReport.canceled}
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm text-zinc-400">
+                Finance
+              </p>
+
+              <h2 className="mt-1 text-xl font-semibold">
+                Treasury Payroll Obligations
+              </h2>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Current-month payroll obligations derived from indexed streams.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                void loadTreasuryReport()
+              }
+              disabled={treasuryReportLoading}
+              className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+            >
+              {treasuryReportLoading
+                ? "Refreshing..."
+                : "Refresh Report"}
+            </button>
+          </div>
+
+          {treasuryReportError && (
+            <p className="mt-5 text-sm text-red-400">
+              {treasuryReportError}
+            </p>
+          )}
+
+          {treasuryReport && (
+            <>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Gross Payroll
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {formatTokenAmount(
+                      BigInt(
+                        treasuryReport.grossPayout,
+                      ),
+                    )}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Claimed
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-green-400">
+                    {formatTokenAmount(
+                      BigInt(
+                        treasuryReport.totalClaimed,
+                      ),
+                    )}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Outstanding
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {formatTokenAmount(
+                      BigInt(
+                        treasuryReport.outstanding,
+                      ),
+                    )}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Streams
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {treasuryReport.streamCount}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Active
+                  </p>
+                  <p className="mt-2 text-xl font-semibold">
+                    {treasuryReport.active}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Completed
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-green-400">
+                    {treasuryReport.completed}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Canceled
+                  </p>
+                  <p className="mt-2 text-xl font-semibold text-red-400">
+                    {treasuryReport.canceled}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 text-xs text-zinc-600">
+                Treasury cash-in/cash-out amounts are not reported here because the current transaction record stores status and metadata, but not transaction amounts.
+              </p>
+            </>
+          )}
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm text-zinc-400">
+                Operations
+              </p>
+
+              <h2 className="mt-1 text-xl font-semibold">
+                Stream Reconciliation
+              </h2>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Compares on-chain stream accounts with indexed database records.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                void loadReconciliationReport()
+              }
+              disabled={reconciliationLoading}
+              className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+            >
+              {reconciliationLoading
+                ? "Checking..."
+                : "Run Reconciliation"}
+            </button>
+          </div>
+
+          {reconciliationError && (
+            <p className="mt-5 text-sm text-red-400">
+              {reconciliationError}
+            </p>
+          )}
+
+          {reconciliationReport && (
+            <>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Checked
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {reconciliationReport.checked}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Matched
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-green-400">
+                    {reconciliationReport.matched}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Mismatched
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-red-400">
+                    {reconciliationReport.mismatched}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 p-4">
+                  <p className="text-sm text-zinc-500">
+                    Missing / Stale
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {reconciliationReport.missingFromDb +
+                      reconciliationReport.staleInDb}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-xl border border-zinc-800 p-4">
+                <p
+                  className={
+                    reconciliationReport.healthy
+                      ? "text-sm font-semibold text-green-400"
+                      : "text-sm font-semibold text-red-400"
+                  }
+                >
+                  {reconciliationReport.healthy
+                    ? "Database is synchronized with on-chain streams."
+                    : "Reconciliation found differences that require investigation."}
+                </p>
+              </div>
+
+              {reconciliationReport.details.length > 0 && (
+                <div className="mt-5 space-y-3">
+                  {reconciliationReport.details.map(
+                    (detail, index) => (
+                      <div
+                        key={`${detail.type}-${detail.address}-${index}`}
+                        className="rounded-xl border border-red-950 bg-red-950/20 p-4"
+                      >
+                        <p className="text-sm font-medium text-red-300">
+                          {detail.type}
+                        </p>
+
+                        <p className="mt-1 break-all text-xs text-zinc-500">
+                          {detail.address}
+                        </p>
+
+                        {detail.fields &&
+                          detail.fields.length > 0 && (
+                            <p className="mt-2 text-xs text-zinc-400">
+                              Fields:{" "}
+                              {detail.fields.join(
+                                ", ",
+                              )}
+                            </p>
+                          )}
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+<section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <p className="text-sm text-zinc-400">
+        Finance
+      </p>
+
+      <h2 className="mt-1 text-xl font-semibold">
+        Employee Payroll Report
+      </h2>
+
+      <p className="mt-2 text-sm text-zinc-500">
+        Monthly payroll totals grouped by employee wallet.
+      </p>
+    </div>
+
+    <button
+      type="button"
+      onClick={() =>
+        void loadEmployeeReports()
+      }
+      disabled={employeeReportLoading}
+      className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+    >
+      {employeeReportLoading
+        ? "Refreshing..."
+        : "Refresh Report"}
+    </button>
+  </div>
+
+  {employeeReportError && (
+    <p className="mt-5 text-sm text-red-400">
+      {employeeReportError}
+    </p>
+  )}
+
+  {employeeReportLoading &&
+    employeeReports.length === 0 && (
+      <p className="mt-6 text-sm text-zinc-500">
+        Loading employee reports...
+      </p>
+    )}
+
+  {!employeeReportLoading &&
+    !employeeReportError &&
+    employeeReports.length === 0 && (
+      <p className="mt-6 text-sm text-zinc-500">
+        No employee payroll records found for this month.
+      </p>
+    )}
+
+  {employeeReports.length > 0 && (
+    <div className="mt-6 overflow-x-auto">
+      <table className="w-full min-w-[900px] text-left">
+        <thead>
+          <tr className="border-b border-zinc-800 text-sm text-zinc-500">
+            <th className="px-3 py-3 font-medium">
+              Employee
+            </th>
+            <th className="px-3 py-3 font-medium">
+              Streams
+            </th>
+            <th className="px-3 py-3 font-medium">
+              Gross Payout
+            </th>
+            <th className="px-3 py-3 font-medium">
+              Claimed
+            </th>
+            <th className="px-3 py-3 font-medium">
+              Remaining
+            </th>
+            <th className="px-3 py-3 font-medium">
+              Status
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {employeeReports.map((employee) => (
+            <tr
+              key={employee.employee}
+              className="border-b border-zinc-900"
+            >
+              <td className="px-3 py-4">
+                <p className="text-sm font-medium">
+                  {shortenAddress(
+                    employee.employee,
+                  )}
+                </p>
+
+                <p className="mt-1 break-all text-xs text-zinc-500">
+                  {employee.employee}
+                </p>
+              </td>
+
+              <td className="px-3 py-4 text-sm">
+                {employee.streamCount}
+              </td>
+
+              <td className="px-3 py-4 text-sm">
+                {formatTokenAmount(
+                  BigInt(
+                    employee.grossPayout,
+                  ),
+                )}
+              </td>
+
+              <td className="px-3 py-4 text-sm text-green-400">
+                {formatTokenAmount(
+                  BigInt(
+                    employee.totalClaimed,
+                  ),
+                )}
+              </td>
+
+              <td className="px-3 py-4 text-sm">
+                {formatTokenAmount(
+                  BigInt(
+                    employee.remaining,
+                  ),
+                )}
+              </td>
+
+              <td className="px-3 py-4">
+                <div className="space-y-1 text-xs">
+                  <p className="text-green-400">
+                    Completed:{" "}
+                    {employee.completed}
+                  </p>
+
+                  <p className="text-zinc-400">
+                    Pending:{" "}
+                    {employee.pending}
+                  </p>
+
+                  <p className="text-red-400">
+                    Canceled:{" "}
+                    {employee.canceled}
+                  </p>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
 
         <OperationalDashboard />
 
@@ -713,11 +1579,10 @@ export default function Home() {
                   {label}
                 </p>
                 <p
-                  className={`mt-2 text-sm ${
-                    allowed
-                      ? "text-green-400"
-                      : "text-zinc-600"
-                  }`}
+                  className={`mt-2 text-sm ${allowed
+                    ? "text-green-400"
+                    : "text-zinc-600"
+                    }`}
                 >
                   {allowed ? "Available" : "Restricted"}
                 </p>
@@ -852,11 +1717,10 @@ export default function Home() {
             </button>
           </div>
 
-          <p className={`mt-4 text-sm ${
-            employeeWalletValid
-              ? "text-green-400"
-              : "text-zinc-500"
-          }`}>
+          <p className={`mt-4 text-sm ${employeeWalletValid
+            ? "text-green-400"
+            : "text-zinc-500"
+            }`}>
             {employeeWalletValid
               ? "Wallet address validated"
               : "Employee wallet not validated"}
@@ -929,11 +1793,10 @@ export default function Home() {
             Fund company payroll
           </h2>
 
-          <p className={`mt-2 text-sm ${
-            canManageTreasury
-              ? "text-green-400"
-              : "text-zinc-600"
-          }`}>
+          <p className={`mt-2 text-sm ${canManageTreasury
+            ? "text-green-400"
+            : "text-zinc-600"
+            }`}>
             {canManageTreasury
               ? "Your role can fund the company treasury."
               : "Your current role cannot perform treasury deposits."}
@@ -1096,7 +1959,7 @@ export default function Home() {
           >
             {streamLoading
               ? "Creating..."
-              : `Create ${payrollType} Payroll` }
+              : `Create ${payrollType} Payroll`}
           </button>
         </section>
 
@@ -1149,11 +2012,10 @@ export default function Home() {
                   <p className="text-xs text-zinc-500">
                     Stream Management
                   </p>
-                  <p className={`mt-2 text-sm ${
-                    canManageStreams
-                      ? "text-green-400"
-                      : "text-zinc-600"
-                  }`}>
+                  <p className={`mt-2 text-sm ${canManageStreams
+                    ? "text-green-400"
+                    : "text-zinc-600"
+                    }`}>
                     {canManageStreams
                       ? `${currentRole} can top up and cancel streams.`
                       : `${currentRole} has read-only stream access.`}

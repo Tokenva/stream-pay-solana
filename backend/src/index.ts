@@ -69,6 +69,44 @@ const RETRY_MAX_DELAY_SECONDS = 300;
 const QUEUE_WORKER_INTERVAL_MS = 5_000;
 const STALE_JOB_TIMEOUT_SECONDS = 120;
 
+function escapeCsvCell(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  const text =
+    value instanceof Date
+      ? value.toISOString()
+      : String(value);
+
+  if (
+    text.includes(",") ||
+    text.includes('"') ||
+    text.includes("\n") ||
+    text.includes("\r")
+  ) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  return text;
+}
+
+function buildCsv(
+  headers: string[],
+  rows: unknown[][],
+) {
+  return [
+    headers,
+    ...rows,
+  ]
+    .map((row) =>
+      row
+        .map(escapeCsvCell)
+        .join(","),
+    )
+    .join("\n") + "\n";
+}
+
 app.get("/health", async (_req, res) => {
   let database = "ok";
   let rpc = "ok";
@@ -1300,7 +1338,7 @@ async function retryJob(
 
   const delaySeconds = Math.min(
     2 ** Math.max(attempts - 1, 0) *
-      RETRY_BASE_DELAY_SECONDS,
+    RETRY_BASE_DELAY_SECONDS,
     RETRY_MAX_DELAY_SECONDS,
   );
 
@@ -2082,7 +2120,1184 @@ app.patch(
   },
 );
 
+app.get("/api/reports/employees", async (req, res) => {
+  try {
+    const month =
+      typeof req.query.month === "string"
+        ? req.query.month.trim()
+        : "";
 
+    const targetMonth =
+      /^\d{4}-\d{2}$/.test(month)
+        ? month
+        : new Date().toISOString().slice(0, 7);
+
+    const [yearRaw, monthRaw] =
+      targetMonth.split("-");
+
+    const year = Number(yearRaw);
+    const monthNumber = Number(monthRaw);
+
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(monthNumber) ||
+      monthNumber < 1 ||
+      monthNumber > 12
+    ) {
+      return res.status(400).json({
+        error: "month must use YYYY-MM format",
+      });
+    }
+
+    const monthStart = Math.floor(
+      Date.UTC(
+        year,
+        monthNumber - 1,
+        1,
+      ) / 1000,
+    );
+
+    const nextMonthStart = Math.floor(
+      Date.UTC(
+        monthNumber === 12
+          ? year + 1
+          : year,
+        monthNumber === 12
+          ? 0
+          : monthNumber,
+        1,
+      ) / 1000,
+    );
+
+    const result = await pool.query(
+      `
+      SELECT
+        employee,
+        total_amount,
+        claimed_amount,
+        start_time,
+        end_time,
+        canceled
+      FROM streams
+      WHERE start_time >= $1
+        AND start_time < $2
+      ORDER BY start_time ASC
+      `,
+      [
+        monthStart,
+        nextMonthStart,
+      ],
+    );
+
+    const nowSeconds = Math.floor(
+      Date.now() / 1000,
+    );
+
+    const employeeMap = new Map<
+      string,
+      {
+        streamCount: number;
+        grossPayout: bigint;
+        totalClaimed: bigint;
+        completed: number;
+        pending: number;
+        canceled: number;
+      }
+    >();
+
+    for (const stream of result.rows) {
+      const employee = stream.employee;
+
+      const totalAmount = BigInt(
+        stream.total_amount.toString(),
+      );
+
+      const claimedAmount = BigInt(
+        stream.claimed_amount.toString(),
+      );
+
+      let report = employeeMap.get(employee);
+
+      if (!report) {
+        report = {
+          streamCount: 0,
+          grossPayout: BigInt(0),
+          totalClaimed: BigInt(0),
+          completed: 0,
+          pending: 0,
+          canceled: 0,
+        };
+
+        employeeMap.set(
+          employee,
+          report,
+        );
+      }
+
+      report.streamCount += 1;
+      report.grossPayout += totalAmount;
+      report.totalClaimed += claimedAmount;
+
+      if (stream.canceled) {
+        report.canceled += 1;
+      } else if (
+        Number(stream.end_time) <=
+        nowSeconds
+      ) {
+        report.completed += 1;
+      } else {
+        report.pending += 1;
+      }
+    }
+
+    const employees = Array.from(
+      employeeMap.entries(),
+    ).map(
+      ([
+        employee,
+        report,
+      ]) => {
+        const remaining =
+          report.grossPayout -
+          report.totalClaimed;
+
+        return {
+          employee,
+          streamCount:
+            report.streamCount,
+          grossPayout:
+            report.grossPayout.toString(),
+          totalClaimed:
+            report.totalClaimed.toString(),
+          remaining:
+            remaining.toString(),
+          completed:
+            report.completed,
+          pending:
+            report.pending,
+          canceled:
+            report.canceled,
+        };
+      },
+    );
+
+    return res.json({
+      month: targetMonth,
+      employeeCount:
+        employees.length,
+      employees,
+    });
+  } catch (error) {
+    log(
+      "error",
+      "employee_report_failed",
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+
+    return res.status(500).json({
+      error:
+        "Failed to generate employee report",
+    });
+  }
+});
+
+app.get("/api/reports/treasury", async (req, res) => {
+  try {
+    const month =
+      typeof req.query.month === "string"
+        ? req.query.month.trim()
+        : "";
+
+    const targetMonth =
+      /^\d{4}-\d{2}$/.test(month)
+        ? month
+        : new Date().toISOString().slice(0, 7);
+
+    const [yearRaw, monthRaw] =
+      targetMonth.split("-");
+
+    const year = Number(yearRaw);
+    const monthNumber = Number(monthRaw);
+
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(monthNumber) ||
+      monthNumber < 1 ||
+      monthNumber > 12
+    ) {
+      return res.status(400).json({
+        error: "month must use YYYY-MM format",
+      });
+    }
+
+    const monthStart = Math.floor(
+      Date.UTC(
+        year,
+        monthNumber - 1,
+        1,
+      ) / 1000,
+    );
+
+    const nextMonthStart = Math.floor(
+      Date.UTC(
+        monthNumber === 12
+          ? year + 1
+          : year,
+        monthNumber === 12
+          ? 0
+          : monthNumber,
+        1,
+      ) / 1000,
+    );
+
+    const nowSeconds = Math.floor(
+      Date.now() / 1000,
+    );
+
+    const result = await pool.query(
+      `
+      SELECT
+        COUNT(*)::integer AS stream_count,
+        COALESCE(
+          SUM(total_amount),
+          0
+        ) AS gross_payout,
+        COALESCE(
+          SUM(claimed_amount),
+          0
+        ) AS total_claimed,
+        COUNT(*) FILTER (
+          WHERE canceled = TRUE
+        )::integer AS canceled,
+        COUNT(*) FILTER (
+          WHERE canceled = FALSE
+            AND end_time <= $3
+        )::integer AS completed,
+        COUNT(*) FILTER (
+          WHERE canceled = FALSE
+            AND end_time > $3
+        )::integer AS active
+      FROM streams
+      WHERE start_time >= $1
+        AND start_time < $2
+      `,
+      [
+        monthStart,
+        nextMonthStart,
+        nowSeconds,
+      ],
+    );
+
+    const row = result.rows[0];
+
+    const grossPayout = BigInt(
+      row?.gross_payout?.toString() ?? "0",
+    );
+
+    const totalClaimed = BigInt(
+      row?.total_claimed?.toString() ?? "0",
+    );
+
+    const outstanding =
+      grossPayout - totalClaimed;
+
+    const transactionResult =
+      await pool.query(
+        `
+        SELECT
+          status,
+          COUNT(*)::integer AS count
+        FROM transactions
+        WHERE created_at >= to_timestamp($1)
+          AND created_at < to_timestamp($2)
+        GROUP BY status
+        ORDER BY status
+        `,
+        [
+          monthStart,
+          nextMonthStart,
+        ],
+      );
+
+    const transactions: Record<
+      string,
+      number
+    > = {};
+
+    for (
+      const transaction
+      of transactionResult.rows
+    ) {
+      transactions[
+        transaction.status
+      ] = transaction.count;
+    }
+
+    return res.json({
+      month: targetMonth,
+      streamCount:
+        row?.stream_count ?? 0,
+      grossPayout:
+        grossPayout.toString(),
+      totalClaimed:
+        totalClaimed.toString(),
+      outstanding:
+        outstanding.toString(),
+      active:
+        row?.active ?? 0,
+      completed:
+        row?.completed ?? 0,
+      canceled:
+        row?.canceled ?? 0,
+      transactions,
+    });
+  } catch (error) {
+    log(
+      "error",
+      "treasury_report_failed",
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+
+    return res.status(500).json({
+      error:
+        "Failed to generate treasury report",
+    });
+  }
+});
+
+app.get("/api/reports/payroll.csv", async (req, res) => {
+  try {
+    const month =
+      typeof req.query.month === "string"
+        ? req.query.month.trim()
+        : "";
+
+    const targetMonth =
+      /^\d{4}-\d{2}$/.test(month)
+        ? month
+        : new Date().toISOString().slice(0, 7);
+
+    const [yearRaw, monthRaw] =
+      targetMonth.split("-");
+
+    const year = Number(yearRaw);
+    const monthNumber = Number(monthRaw);
+
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(monthNumber) ||
+      monthNumber < 1 ||
+      monthNumber > 12
+    ) {
+      return res.status(400).json({
+        error: "month must use YYYY-MM format",
+      });
+    }
+
+    const monthStart = Math.floor(
+      Date.UTC(
+        year,
+        monthNumber - 1,
+        1,
+      ) / 1000,
+    );
+
+    const nextMonthStart = Math.floor(
+      Date.UTC(
+        monthNumber === 12
+          ? year + 1
+          : year,
+        monthNumber === 12
+          ? 0
+          : monthNumber,
+        1,
+      ) / 1000,
+    );
+
+    const result = await pool.query(
+      `
+      SELECT
+        address,
+        organization,
+        employee,
+        stream_id,
+        total_amount,
+        claimed_amount,
+        start_time,
+        end_time,
+        canceled,
+        cancel_time
+      FROM streams
+      WHERE start_time >= $1
+        AND start_time < $2
+      ORDER BY start_time ASC
+      `,
+      [
+        monthStart,
+        nextMonthStart,
+      ],
+    );
+
+    const nowSeconds = Math.floor(
+      Date.now() / 1000,
+    );
+
+    const rows = result.rows.map(
+      (stream) => {
+        const totalAmount =
+          BigInt(
+            stream.total_amount.toString(),
+          );
+
+        const claimedAmount =
+          BigInt(
+            stream.claimed_amount.toString(),
+          );
+
+        let status = "pending";
+
+        if (stream.canceled) {
+          status = "canceled";
+        } else if (
+          Number(stream.end_time) <=
+          nowSeconds
+        ) {
+          status = "completed";
+        }
+
+        return [
+          stream.address,
+          stream.organization,
+          stream.employee,
+          stream.stream_id,
+          totalAmount.toString(),
+          claimedAmount.toString(),
+          (
+            totalAmount -
+            claimedAmount
+          ).toString(),
+          stream.start_time,
+          stream.end_time,
+          status,
+          stream.cancel_time,
+        ];
+      },
+    );
+
+    const csv = buildCsv(
+      [
+        "address",
+        "organization",
+        "employee",
+        "stream_id",
+        "total_amount_base_units",
+        "claimed_amount_base_units",
+        "remaining_amount_base_units",
+        "start_time",
+        "end_time",
+        "status",
+        "cancel_time",
+      ],
+      rows,
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "text/csv; charset=utf-8",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="streampay-payroll-${targetMonth}.csv"`,
+    );
+
+    return res.send(csv);
+  } catch (error) {
+    log(
+      "error",
+      "payroll_csv_export_failed",
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+
+    return res.status(500).json({
+      error:
+        "Failed to export payroll CSV",
+    });
+  }
+});
+
+app.get("/api/reports/employees.csv", async (req, res) => {
+  try {
+    const month =
+      typeof req.query.month === "string"
+        ? req.query.month.trim()
+        : "";
+
+    const targetMonth =
+      /^\d{4}-\d{2}$/.test(month)
+        ? month
+        : new Date().toISOString().slice(0, 7);
+
+    const [yearRaw, monthRaw] =
+      targetMonth.split("-");
+
+    const year = Number(yearRaw);
+    const monthNumber = Number(monthRaw);
+
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(monthNumber) ||
+      monthNumber < 1 ||
+      monthNumber > 12
+    ) {
+      return res.status(400).json({
+        error: "month must use YYYY-MM format",
+      });
+    }
+
+    const monthStart = Math.floor(
+      Date.UTC(
+        year,
+        monthNumber - 1,
+        1,
+      ) / 1000,
+    );
+
+    const nextMonthStart = Math.floor(
+      Date.UTC(
+        monthNumber === 12
+          ? year + 1
+          : year,
+        monthNumber === 12
+          ? 0
+          : monthNumber,
+        1,
+      ) / 1000,
+    );
+
+    const nowSeconds = Math.floor(
+      Date.now() / 1000,
+    );
+
+    const result = await pool.query(
+      `
+      SELECT
+        employee,
+        COUNT(*)::integer AS stream_count,
+        COALESCE(
+          SUM(total_amount),
+          0
+        ) AS gross_payout,
+        COALESCE(
+          SUM(claimed_amount),
+          0
+        ) AS total_claimed,
+        COUNT(*) FILTER (
+          WHERE canceled = TRUE
+        )::integer AS canceled,
+        COUNT(*) FILTER (
+          WHERE canceled = FALSE
+            AND end_time <= $3
+        )::integer AS completed,
+        COUNT(*) FILTER (
+          WHERE canceled = FALSE
+            AND end_time > $3
+        )::integer AS pending
+      FROM streams
+      WHERE start_time >= $1
+        AND start_time < $2
+      GROUP BY employee
+      ORDER BY employee ASC
+      `,
+      [
+        monthStart,
+        nextMonthStart,
+        nowSeconds,
+      ],
+    );
+
+    const rows = result.rows.map(
+      (employee) => {
+        const grossPayout =
+          BigInt(
+            employee.gross_payout.toString(),
+          );
+
+        const totalClaimed =
+          BigInt(
+            employee.total_claimed.toString(),
+          );
+
+        return [
+          employee.employee,
+          employee.stream_count,
+          grossPayout.toString(),
+          totalClaimed.toString(),
+          (
+            grossPayout -
+            totalClaimed
+          ).toString(),
+          employee.completed,
+          employee.pending,
+          employee.canceled,
+        ];
+      },
+    );
+
+    const csv = buildCsv(
+      [
+        "employee",
+        "stream_count",
+        "gross_payout_base_units",
+        "total_claimed_base_units",
+        "remaining_base_units",
+        "completed",
+        "pending",
+        "canceled",
+      ],
+      rows,
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "text/csv; charset=utf-8",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="streampay-employees-${targetMonth}.csv"`,
+    );
+
+    return res.send(csv);
+  } catch (error) {
+    log(
+      "error",
+      "employee_csv_export_failed",
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+
+    return res.status(500).json({
+      error:
+        "Failed to export employee CSV",
+    });
+  }
+});
+
+
+app.get("/api/reports/transactions.csv", async (req, res) => {
+  try {
+    const {
+      organization,
+      employee,
+      status,
+    } = req.query;
+
+    const conditions: string[] = [];
+    const values: string[] = [];
+
+    if (typeof organization === "string") {
+      values.push(
+        organization.trim(),
+      );
+
+      conditions.push(
+        `organization = $${values.length}`,
+      );
+    }
+
+    if (typeof employee === "string") {
+      values.push(
+        employee.trim(),
+      );
+
+      conditions.push(
+        `employee = $${values.length}`,
+      );
+    }
+
+    if (typeof status === "string") {
+      values.push(
+        status.trim(),
+      );
+
+      conditions.push(
+        `status = $${values.length}`,
+      );
+    }
+
+    const whereClause =
+      conditions.length > 0
+        ? `WHERE ${conditions.join(" AND ")}`
+        : "";
+
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        signature,
+        action,
+        status,
+        organization,
+        employee,
+        slot,
+        error,
+        created_at,
+        updated_at,
+        confirmed_at
+      FROM transactions
+      ${whereClause}
+      ORDER BY created_at DESC
+      `,
+      values,
+    );
+
+    const rows = result.rows.map(
+      (transaction) => [
+        transaction.id,
+        transaction.signature,
+        transaction.action,
+        transaction.status,
+        transaction.organization,
+        transaction.employee,
+        transaction.slot,
+        transaction.error,
+        transaction.created_at,
+        transaction.updated_at,
+        transaction.confirmed_at,
+      ],
+    );
+
+    const csv = buildCsv(
+      [
+        "id",
+        "signature",
+        "action",
+        "status",
+        "organization",
+        "employee",
+        "slot",
+        "error",
+        "created_at",
+        "updated_at",
+        "confirmed_at",
+      ],
+      rows,
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "text/csv; charset=utf-8",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="streampay-transactions.csv"',
+    );
+
+    return res.send(csv);
+  } catch (error) {
+    log(
+      "error",
+      "transaction_csv_export_failed",
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+
+    return res.status(500).json({
+      error:
+        "Failed to export transaction CSV",
+    });
+  }
+});
+
+
+app.get(
+  "/api/reports/reconciliation",
+  async (_req, res) => {
+    try {
+      const [
+        chainAccounts,
+        dbResult,
+      ] = await Promise.all([
+        withProgramFailover((rpcProgram) =>
+          rpcProgram.account.stream.all(),
+        ),
+        pool.query(`
+          SELECT
+            address,
+            organization,
+            employee,
+            vault,
+            escrow,
+            mint,
+            stream_id,
+            total_amount,
+            start_time,
+            end_time,
+            claimed_amount,
+            canceled,
+            cancel_time
+          FROM streams
+        `),
+      ]);
+
+      const dbMap = new Map(
+        dbResult.rows.map(
+          (stream) => [
+            stream.address,
+            stream,
+          ],
+        ),
+      );
+
+      const chainMap = new Map(
+        chainAccounts.map(
+          ({ publicKey, account }) => [
+            publicKey.toBase58(),
+            {
+              address:
+                publicKey.toBase58(),
+              organization:
+                account.organization.toBase58(),
+              employee:
+                account.employee.toBase58(),
+              vault:
+                account.vault.toBase58(),
+              escrow:
+                account.escrow.toBase58(),
+              mint:
+                account.mint.toBase58(),
+              stream_id:
+                account.streamId.toString(),
+              total_amount:
+                account.totalAmount.toString(),
+              start_time:
+                account.startTime.toString(),
+              end_time:
+                account.endTime.toString(),
+              claimed_amount:
+                account.claimedAmount.toString(),
+              canceled:
+                account.canceled,
+              cancel_time:
+                account.cancelTime.toString(),
+            },
+          ],
+        ),
+      );
+
+      let matched = 0;
+      let mismatched = 0;
+      let missingFromDb = 0;
+      let staleInDb = 0;
+
+      const details: Array<
+        Record<string, unknown>
+      > = [];
+
+      for (
+        const [
+          address,
+          chainStream,
+        ] of chainMap
+      ) {
+        const dbStream =
+          dbMap.get(address);
+
+        if (!dbStream) {
+          missingFromDb += 1;
+
+          details.push({
+            type: "missing_from_db",
+            address,
+          });
+
+          continue;
+        }
+
+        const fields = [
+          "organization",
+          "employee",
+          "vault",
+          "escrow",
+          "mint",
+          "stream_id",
+          "total_amount",
+          "start_time",
+          "end_time",
+          "claimed_amount",
+          "canceled",
+          "cancel_time",
+        ] as const;
+
+        const differences =
+          fields.filter(
+            (field) => {
+              const chainValue =
+                String(
+                  chainStream[field],
+                );
+
+              const dbValue =
+                String(
+                  dbStream[field],
+                );
+
+              return (
+                chainValue !==
+                dbValue
+              );
+            },
+          );
+
+        if (differences.length === 0) {
+          matched += 1;
+        } else {
+          mismatched += 1;
+
+          details.push({
+            type: "mismatch",
+            address,
+            fields: differences,
+          });
+        }
+      }
+
+      for (
+        const address of dbMap.keys()
+      ) {
+        if (!chainMap.has(address)) {
+          staleInDb += 1;
+
+          details.push({
+            type: "stale_in_db",
+            address,
+          });
+        }
+      }
+
+      return res.json({
+        checked:
+          chainMap.size,
+        databaseStreams:
+          dbMap.size,
+        matched,
+        mismatched,
+        missingFromDb,
+        staleInDb,
+        healthy:
+          mismatched === 0 &&
+          missingFromDb === 0 &&
+          staleInDb === 0,
+        details:
+          details.slice(0, 100),
+      });
+    } catch (error) {
+      log(
+        "error",
+        "reconciliation_report_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
+
+      return res.status(500).json({
+        error:
+          "Failed to generate reconciliation report",
+      });
+    }
+  },
+);
+
+app.get("/api/reports/payroll", async (req, res) => {
+  try {
+    const month =
+      typeof req.query.month === "string"
+        ? req.query.month.trim()
+        : "";
+
+    const targetMonth =
+      /^\d{4}-\d{2}$/.test(month)
+        ? month
+        : new Date().toISOString().slice(0, 7);
+
+    const [yearRaw, monthRaw] =
+      targetMonth.split("-");
+
+    const year = Number(yearRaw);
+    const monthNumber = Number(monthRaw);
+
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(monthNumber) ||
+      monthNumber < 1 ||
+      monthNumber > 12
+    ) {
+      return res.status(400).json({
+        error: "month must use YYYY-MM format",
+      });
+    }
+
+    const monthStart = Math.floor(
+      Date.UTC(year, monthNumber - 1, 1) / 1000,
+    );
+
+    const nextMonthStart = Math.floor(
+      Date.UTC(
+        monthNumber === 12
+          ? year + 1
+          : year,
+        monthNumber === 12
+          ? 0
+          : monthNumber,
+        1,
+      ) / 1000,
+    );
+
+    const result = await pool.query(
+      `
+      SELECT
+        address,
+        employee,
+        total_amount,
+        claimed_amount,
+        start_time,
+        end_time,
+        canceled
+      FROM streams
+      WHERE start_time >= $1
+        AND start_time < $2
+      ORDER BY start_time ASC
+      `,
+      [
+        monthStart,
+        nextMonthStart,
+      ],
+    );
+
+    const nowSeconds = Math.floor(
+      Date.now() / 1000,
+    );
+
+    let grossPayout = BigInt(0);
+    let totalClaimed = BigInt(0);
+    let completed = 0;
+    let pending = 0;
+    let canceled = 0;
+
+    const employees = new Set<string>();
+
+    const reportStreams = result.rows.map(
+      (stream) => {
+        const totalAmount = BigInt(
+          stream.total_amount.toString(),
+        );
+
+        const claimedAmount = BigInt(
+          stream.claimed_amount.toString(),
+        );
+
+        grossPayout += totalAmount;
+        totalClaimed += claimedAmount;
+
+        employees.add(stream.employee);
+
+        let status:
+          | "completed"
+          | "pending"
+          | "canceled";
+
+        if (stream.canceled) {
+          status = "canceled";
+          canceled += 1;
+        } else if (
+          Number(stream.end_time) <=
+          nowSeconds
+        ) {
+          status = "completed";
+          completed += 1;
+        } else {
+          status = "pending";
+          pending += 1;
+        }
+
+        return {
+          address: stream.address,
+          employee: stream.employee,
+          totalAmount:
+            totalAmount.toString(),
+          claimedAmount:
+            claimedAmount.toString(),
+          startTime:
+            Number(stream.start_time),
+          endTime:
+            Number(stream.end_time),
+          canceled:
+            stream.canceled,
+          status,
+        };
+      },
+    );
+
+    return res.json({
+      month: targetMonth,
+      employees: employees.size,
+      grossPayout:
+        grossPayout.toString(),
+      totalClaimed:
+        totalClaimed.toString(),
+      completed,
+      pending,
+      canceled,
+      streamCount:
+        reportStreams.length,
+      streams:
+        reportStreams,
+    });
+  } catch (error) {
+    log(
+      "error",
+      "payroll_report_failed",
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+
+    return res.status(500).json({
+      error: "Failed to generate payroll report",
+    });
+  }
+});
 
 
 app.get("/api/ops/audit-logs", async (req, res) => {
