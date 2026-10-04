@@ -771,9 +771,15 @@ async function syncTransactionWebhookEvents() {
   }
 }
 
-async function reconcileTransactionStatuses() {
+async function reconcileTransactionStatuses(): Promise<{
+  checked: number;
+  updated: number;
+}> {
   if (transactionStatusCheckRunning) {
-    return;
+    return {
+      checked: 0,
+      updated: 0,
+    };
   }
 
   transactionStatusCheckRunning = true;
@@ -790,7 +796,10 @@ async function reconcileTransactionStatuses() {
     );
 
     if (pending.rows.length === 0) {
-      return;
+      return {
+        checked: 0,
+        updated: 0,
+      };
     }
 
     const signatures = pending.rows.map(
@@ -806,6 +815,8 @@ async function reconcileTransactionStatuses() {
           },
         ),
       );
+
+    let updated = 0;
 
     for (
       let index = 0;
@@ -846,14 +857,13 @@ async function reconcileTransactionStatuses() {
           },
         });
 
+        updated += 1;
         continue;
       }
 
       if (
-        status.confirmationStatus ===
-        "confirmed" ||
-        status.confirmationStatus ===
-        "finalized"
+        status.confirmationStatus === "confirmed" ||
+        status.confirmationStatus === "finalized"
       ) {
         await pool.query(
           `
@@ -888,8 +898,15 @@ async function reconcileTransactionStatuses() {
               status.confirmationStatus,
           },
         });
+
+        updated += 1;
       }
     }
+
+    return {
+      checked: signatures.length,
+      updated,
+    };
   } catch (error) {
     log("error", "transaction_reconciliation_failed", {
       error:
@@ -897,11 +914,256 @@ async function reconcileTransactionStatuses() {
           ? error.message
           : String(error),
     });
+
+    // Important: allow the queue worker to retry this job.
+    throw error;
   } finally {
     transactionStatusCheckRunning = false;
   }
 }
 
+async function reconcileCrossChainMessages(): Promise<{
+  checked: number;
+  updated: number;
+}> {
+  const result = await pool.query(
+    `
+    SELECT
+      id,
+      operation_id,
+      organization,
+      employee,
+      destination_tx_hash
+    FROM cross_chain_messages
+    WHERE status NOT IN (
+      'destination_confirmed',
+      'failed'
+    )
+      AND destination_tx_hash IS NOT NULL
+    ORDER BY updated_at ASC
+    LIMIT 100
+    `,
+  );
+
+  let checked = 0;
+  let updated = 0;
+
+  for (const message of result.rows) {
+    checked += 1;
+
+    const transactionResult = await pool.query(
+      `
+      SELECT
+        status,
+        error
+      FROM transactions
+      WHERE signature = $1
+      LIMIT 1
+      `,
+      [message.destination_tx_hash],
+    );
+
+    const transaction =
+      transactionResult.rows[0];
+
+    if (!transaction) {
+      continue;
+    }
+
+    if (transaction.status === "confirmed") {
+      await pool.query(
+        `
+        UPDATE cross_chain_messages
+        SET
+          status = 'destination_confirmed',
+          error = NULL,
+          updated_at = NOW(),
+          completed_at =
+            COALESCE(completed_at, NOW())
+        WHERE id = $1
+        `,
+        [message.id],
+      );
+
+      await auditLog({
+        eventType:
+          "cross_chain_message_reconciled",
+        actorType: "worker",
+        entityType: "cross_chain_message",
+        entityId: String(message.id),
+        organization:
+          message.organization,
+        employee: message.employee,
+        metadata: {
+          operationId:
+            message.operation_id,
+          destinationTxHash:
+            message.destination_tx_hash,
+          reconciledStatus:
+            "destination_confirmed",
+        },
+      });
+
+      log(
+        "info",
+        "cross_chain_message_reconciled",
+        {
+          id: message.id,
+          operationId:
+            message.operation_id,
+          status:
+            "destination_confirmed",
+        },
+      );
+
+      updated += 1;
+      continue;
+    }
+
+    if (transaction.status === "failed") {
+      const errorMessage =
+        transaction.error
+          ? `Destination transaction failed: ${transaction.error}`
+          : "Destination transaction failed";
+
+      await pool.query(
+        `
+        UPDATE cross_chain_messages
+        SET
+          status = 'failed',
+          error = $2,
+          updated_at = NOW()
+        WHERE id = $1
+        `,
+        [
+          message.id,
+          errorMessage,
+        ],
+      );
+
+      await auditLog({
+        eventType:
+          "cross_chain_message_reconciled",
+        actorType: "worker",
+        entityType: "cross_chain_message",
+        entityId: String(message.id),
+        organization:
+          message.organization,
+        employee: message.employee,
+        metadata: {
+          operationId:
+            message.operation_id,
+          destinationTxHash:
+            message.destination_tx_hash,
+          reconciledStatus:
+            "failed",
+          error:
+            errorMessage,
+        },
+      });
+
+      log(
+        "error",
+        "cross_chain_message_reconciled",
+        {
+          id: message.id,
+          operationId:
+            message.operation_id,
+          status: "failed",
+          error: errorMessage,
+        },
+      );
+
+      updated += 1;
+    }
+  }
+
+  return {
+    checked,
+    updated,
+  };
+}
+
+async function runReconciliation() {
+  const transactions =
+    await reconcileTransactionStatuses();
+
+  const crossChain =
+    await reconcileCrossChainMessages();
+
+  const summary = {
+    transactions,
+    crossChain,
+  };
+
+  log(
+    "info",
+    "reconciliation_completed",
+    summary,
+  );
+
+  await auditLog({
+    eventType:
+      "reconciliation_completed",
+    actorType: "worker",
+    entityType: "system",
+    entityId: "streampay",
+    metadata: summary,
+  });
+}
+
+async function scheduleReconciliationJob() {
+  try {
+    const result = await pool.query(`
+      WITH lock AS (
+        SELECT pg_advisory_xact_lock(417001)
+      )
+      INSERT INTO job_queue (
+        job_type,
+        payload,
+        run_after,
+        updated_at
+      )
+      SELECT
+        'reconciliation',
+        '{}'::jsonb,
+        NOW(),
+        NOW()
+      FROM lock
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM job_queue
+        WHERE job_type = 'reconciliation'
+          AND status IN (
+            'pending',
+            'running'
+          )
+      )
+      RETURNING id
+    `);
+
+    if (result.rows[0]) {
+      log(
+        "info",
+        "reconciliation_job_enqueued",
+        {
+          jobId: result.rows[0].id,
+        },
+      );
+    }
+  } catch (error) {
+    log(
+      "error",
+      "reconciliation_job_schedule_failed",
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+  }
+}
 
 async function enqueueJob(
   jobType: string,
@@ -1074,6 +1336,12 @@ async function processJob(job: {
   attempts: number;
   max_attempts: number;
 }) {
+  if (job.job_type === "reconciliation") {
+    await runReconciliation();
+    await completeJob(job.id);
+    return;
+  }
+
   if (job.job_type === "webhook_delivery") {
     const deliveryId = job.payload.deliveryId;
 
@@ -1815,6 +2083,8 @@ app.patch(
 );
 
 
+
+
 app.get("/api/ops/audit-logs", async (req, res) => {
   try {
     const limitRaw =
@@ -1874,9 +2144,8 @@ async function startServer() {
   startActivitySubscription();
 
   void recoverStaleJobs();
+  void scheduleReconciliationJob();
   void runQueueWorker();
-
-  void reconcileTransactionStatuses();
 
   void checkOperationalAlerts(lastSyncAt);
 
@@ -1899,8 +2168,8 @@ async function startServer() {
 
   setInterval(() => {
     void recoverStaleJobs();
+    void scheduleReconciliationJob();
     void runQueueWorker();
-    void reconcileTransactionStatuses();
     void syncTransactionWebhookEvents();
   }, QUEUE_WORKER_INTERVAL_MS);
 
