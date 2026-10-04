@@ -9,3 +9,4 @@ ignition/deployments/
 .env.*
 !.env.example
 artifacts/cross-chain/guardian-signatures-keypair.json
+types/
