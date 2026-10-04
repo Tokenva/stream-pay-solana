@@ -237,7 +237,7 @@ NTT deployment support remains in the separate workspace:
 /projects/stream-pay-ntt
 ```
 
-That workspace should not be deleted until M12 evidence/documentation is finalized, and private key material must never be committed.
+NTT deployment support remains in the separate workspace for reproducibility. Private key material from that workspace must never be committed.
 
 ## Program details
 
@@ -490,29 +490,46 @@ Escrow after:    46.703704
 3.296296 + 46.703704 = 50.000000
 ```
 
-## M12 objective
-
-M12 is the final technical milestone. It is focused on turning the existing technical prototype into a reproducible package:
-
-```text
-M12.1  Repository documentation
-M12.2  Architecture documentation
-M12.3  Reproducible demo
-M12.4  Final technical evidence
-```
-
-The exit criterion is that another developer can understand the architecture and reproduce the documented prototype flow without private verbal instructions.
-
 ## M12 — Final technical milestone complete
 
-M12.1 ✅ Repository documentation
-M12.2 ✅ Architecture documentation
-M12.3 ✅ Reproducible demo
-M12.4 ✅ Final technical evidence
+M12 is the final technical milestone. The complete technical prototype is now packaged with reproducible documentation, architecture descriptions, deployment identifiers, live transaction evidence, security notes, known limitations, and verification commands.
 
-The reproducible demo, deployment identifiers, live transaction evidence, security model, known limitations, and verification commands are recorded in `M12_REPRODUCIBLE_DEMO.md`.
+### M12 completion
 
-M12 is the final technical milestone. There is no M13.
+```text
+M12.1  ✅ Repository documentation
+M12.2  ✅ Architecture documentation
+M12.3  ✅ Reproducible demo
+M12.4  ✅ Final technical evidence
+```
+
+### Final verification
+
+```text
+Solana / Rust tests   41 passed / 0 failed
+EVM Hardhat tests      9 passed / 0 failed
+Backend typecheck      PASS
+Web lint               PASS
+Web production build   PASS
+EVM compile            PASS
+git diff --check       PASS
+git status              CLEAN
+```
+
+A non-blocking Rust warning remains in `programs/stream-pay-solana/tests/cross_chain_asset.rs` for an unused `authority_mint` test variable. It does not affect the passing regression.
+
+The final M12 work was committed and pushed as:
+
+```text
+61d3755  chore: complete M12 technical packaging
+e9d491b  chore: ignore generated EVM types
+```
+
+The EVM TypeChain artifacts are generated files; the tracked generated changes were restored after verification and future generated `types/` output is ignored by `evm-gateway/.gitignore`.
+
+### Next phase
+
+The technical milestone track is finished. The next phase is **P1 — Product Definition + Customer Discovery**. No new M13 technical milestone is planned.
 
 ## Honest limitations
 

@@ -427,8 +427,9 @@ Backend typecheck  PASS
 Web lint           PASS
 Web build          PASS
 EVM compile        PASS
-EVM tests          PASS
+EVM tests          9 passed / 0 failed
 git diff --check   PASS
+git working tree   CLEAN
 ```
 
 ---
@@ -439,7 +440,7 @@ git diff --check   PASS
 Documentation complete
 Reproducible demo documented
 Technical evidence recorded
-Screenshots captured
+Visual screenshots are not claimed as captured; transaction/explorer evidence is recorded for technical verification.
 Secrets excluded
 Final regression passes
 Git review complete
@@ -447,3 +448,24 @@ Final commit pushed
 ```
 
 M12 is the final technical milestone.
+
+Final repository state:
+
+```text
+M12 technical package       COMPLETE
+Solana / Rust tests         41 passed / 0 failed
+EVM Hardhat tests            9 passed / 0 failed
+Backend typecheck            PASS
+Web lint                     PASS
+Web production build         PASS
+EVM compile                  PASS
+Git working tree             CLEAN
+
+Commit 1: 61d3755
+Commit 2: e9d491b
+Remote: origin/main updated
+```
+
+One non-blocking Rust warning remains for an unused `authority_mint` test variable in `cross_chain_asset.rs`. The regression itself is fully passing.
+
+Next phase: **P1 — Product Definition + Customer Discovery**.

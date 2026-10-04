@@ -65,6 +65,19 @@ The recorded complete regression is:
 0 failed
 ```
 
+The final M12 application/tooling verification is:
+
+```text
+Solana / Rust tests   41 passed / 0 failed
+EVM Hardhat tests      9 passed / 0 failed
+Backend typecheck      PASS
+Web lint               PASS
+Web production build   PASS
+EVM compile            PASS
+git diff --check       PASS
+git working tree       CLEAN
+```
+
 The technical milestone status is:
 
 ```text
@@ -80,7 +93,7 @@ M8  ✅
 M9  ✅
 M10 ✅
 M11 ✅
-M12 🟡 In progress
+M12 ✅ Complete
 ```
 
 ## What the prototype is NOT yet
@@ -117,11 +130,11 @@ M11 also has a specific integration limitation: the NTT asset transfer is real, 
 | M9 | EVM gateway | ✅ Complete | Production hardening later |
 | M10 | Cross-chain messaging | ✅ Complete | Production observability later |
 | M11 | Cross-chain assets / NTT | ✅ Complete | Atomic relay integration is a future enhancement |
-| M12 | Devnet + docs + portfolio | 🟡 In progress | Finalize reproducibility, architecture, evidence, and repository packaging |
+| M12 | Devnet + docs + portfolio | ✅ Complete | None for the technical milestone; product work moves to P1–P9 |
 
 ### Technical completion target
 
-The technical prototype reaches its final technical state when M0–M11 are verified and M12 packaging is complete.
+The technical prototype has reached its final technical state: M0–M12 are complete and the final regression is green.
 
 ---
 # 4. M6 — Finish Security
@@ -301,7 +314,7 @@ The prototype does **not** claim an automated atomic `NTT receive → StreamPay 
 
 # 6. M12 — Finish Technical Prototype Packaging
 
-**Status: 🟡 In progress**
+**Status: ✅ Complete**
 
 ## Goal
 
@@ -309,7 +322,9 @@ Make the complete technical prototype reproducible and understandable by another
 
 ## M12.1 — Repository documentation
 
-Clean and reconcile:
+**Status: ✅ Complete**
+
+Cleaned and reconciled:
 
 - `readme.md`
 - `doc.md`
@@ -337,7 +352,9 @@ The application architecture is source-verified against the current frontend/bac
 
 ## M12.3 — Reproducible demo
 
-Document:
+**Status: ✅ Complete**
+
+Documented:
 
 ```text
 Install
@@ -377,7 +394,9 @@ Verify balances
 
 ## M12.4 — Final technical evidence
 
-Record:
+**Status: ✅ Complete**
+
+Recorded:
 
 - program ID
 - EVM gateway address
@@ -385,9 +404,10 @@ Record:
 - Devnet/Sepolia configuration
 - important transaction hashes/links
 - test results
-- screenshots
 - final architecture
 - known limitations
+
+Transaction hashes, explorer references, account identifiers and final test results are recorded. Screenshots are not claimed as captured; visual portfolio polish is optional post-M12 work.
 
 ## M12 exit criteria
 
@@ -407,6 +427,8 @@ The purpose of the product track is to answer a different question:
 ---
 
 # 8. P1 — Product Definition + Customer Discovery
+
+**Status: NEXT — Not started**
 
 ## Goal
 
@@ -1202,9 +1224,9 @@ No marking a milestone complete just because similar functionality exists elsewh
 
 # 23. Immediate Execution Order
 
-## NEXT — M12
+## NEXT — P1
 
-Finish technical documentation, architecture, reproducibility, final evidence, and repository packaging.
+Begin customer discovery and product definition before major commercial feature expansion.
 
 ## THEN — P1
 

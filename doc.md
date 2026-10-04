@@ -72,7 +72,7 @@ StreamPay is a **Solana-first payroll protocol** that combines time-based paymen
 | **M9** | EVM gateway | ✅ Complete |
 | **M10** | Cross-chain messaging | ✅ Complete |
 | **M11** | Cross-chain assets / NTT | ✅ Complete |
-| **M12** | Devnet + documentation + portfolio | 🟡 In progress |
+| **M12** | Devnet + documentation + portfolio | ✅ Complete |
 
 ### Important status clarification
 
@@ -82,7 +82,7 @@ StreamPay is a **Solana-first payroll protocol** that combines time-based paymen
 
 **M11 does not currently prove an automated atomic `NTT receive → StreamPay Vault` relayer transaction.**
 
-**M12 is in progress.** The technical prototype is now being packaged into reproducible documentation, architecture diagrams, demo instructions, evidence, and portfolio material.
+**M12 is complete.** The technical prototype is packaged with reproducible documentation, architecture views, demo instructions, public deployment identifiers, live transaction evidence, security notes, and known limitations. The next phase is **P1 — Product Definition + Customer Discovery**.
 
 ---
 # What StreamPay Does
@@ -1500,11 +1500,26 @@ Documentation should preserve this distinction.
 ---
 # M12 — Devnet + Documentation + Portfolio
 
-**Status: 🟡 In Progress**
+**Status: ✅ Complete**
 
 ## Goal
 
 Turn the working protocol into a reproducible, explainable, portfolio-ready project.
+
+The technical milestone is closed. The final verification recorded in the repository is:
+
+```text
+Solana / Rust tests   41 passed / 0 failed
+EVM Hardhat tests      9 passed / 0 failed
+Backend typecheck      PASS
+Web lint               PASS
+Web production build   PASS
+EVM compile            PASS
+git diff --check       PASS
+git working tree       CLEAN
+```
+
+The complete reproducible procedure and evidence are maintained in `M12_REPRODUCIBLE_DEMO.md`.
 
 ## Completed technical demonstration
 
@@ -2250,27 +2265,29 @@ The current M11 prototype demonstrates the NTT transfer to the destination walle
 
 ---
 
-# M12 Remaining Checklist
+# M12 Final Checklist
 
 ```text
 ☑ README reconciliation
-☑ Final architecture diagrams
-☑ Reproducible setup instructions verified end-to-end
-☑ Deployment instructions verified against current repository state
-☑ Security documentation reconciled
-☑ End-to-end demo guide finalized
-☑ Portfolio evidence documented
+☑ Final architecture documentation
+☑ Reproducible setup documentation
+☑ Deployment/configuration documentation
+☑ Security documentation reconciliation
+☑ End-to-end demo guide
+☑ Final technical evidence
 ☑ Final documentation review
 ☑ Final repository cleanup / git review
-☑ Final regression after all M12 repository changes
+☑ Final regression after M12 changes
+☑ Secrets excluded from Git tracking
+☑ Technical M12 exit criteria satisfied
 ```
 
-## Current stopping point
+## M12 closure
 
-> **M11 is complete: the real NTT asset-transfer demonstration was completed from EVM Sepolia to Solana Devnet.**
+> **M12 is complete.** The technical milestone track M0–M12 is finished, the final regression is green, the repository was reviewed for generated artifacts and secrets, and the intended changes were committed and pushed.
 
-> The demonstrated NTT integration path is **NTT transfer → destination wallet → manual StreamPay Vault deposit**, not an automated atomic NTT-receive-to-vault relayer.
+> The demonstrated M11 NTT integration remains **NTT transfer → destination wallet → manual StreamPay Vault deposit**. An automated atomic `NTT receive → StreamPay Vault` relayer was not demonstrated.
 
-> **M12 is complete: documentation, architecture, reproducibility, final technical evidence, and repository packaging are finished.**
+> **Next phase: P1 — Product Definition + Customer Discovery.** The product track begins with customer validation before major commercial feature expansion.
 
-> **There is no M13 in the roadmap.**
+> **There is no M13 in the technical roadmap.**
