@@ -9,11 +9,7 @@ import {
 
 import {IWormhole} from "./interfaces/IWormhole.sol";
 
-contract StreamPayEvmGateway is
-    Ownable,
-    Pausable,
-    ReentrancyGuard
-{
+contract StreamPayEvmGateway is Ownable, Pausable, ReentrancyGuard {
     enum Action {
         CreateStream,
         TopUpStream,
@@ -35,8 +31,7 @@ contract StreamPayEvmGateway is
 
     uint64 public nonce;
 
-    mapping(bytes32 => bool)
-        public usedOperationIds;
+    mapping(bytes32 => bool) public usedOperationIds;
 
     struct Stream {
         bool exists;
@@ -48,8 +43,7 @@ contract StreamPayEvmGateway is
         uint64 endTime;
     }
 
-    mapping(bytes32 => Stream)
-        public streams;
+    mapping(bytes32 => Stream) public streams;
 
     error InvalidChainId();
     error InvalidSolanaProgram();
@@ -65,6 +59,7 @@ contract StreamPayEvmGateway is
     error StreamAlreadyCanceled();
     error NonceTooLarge();
     error InvalidWormholeFee();
+    error StreamAlreadyStarted();
 
     event GatewayMessagePublished(
         bytes32 indexed operationId,
@@ -90,9 +85,7 @@ contract StreamPayEvmGateway is
         uint256 newTotalAmount
     );
 
-    event StreamIntentCanceled(
-        bytes32 indexed streamId
-    );
+    event StreamIntentCanceled(bytes32 indexed streamId);
 
     constructor(
         uint16 _sourceWormholeChainId,
@@ -100,19 +93,12 @@ contract StreamPayEvmGateway is
         bytes32 _solanaProgram,
         address _wormhole,
         address initialOwner
-    )
-        Ownable(initialOwner)
-    {
-        if (
-            _sourceWormholeChainId == 0 ||
-            _destinationWormholeChainId == 0
-        ) {
+    ) Ownable(initialOwner) {
+        if (_sourceWormholeChainId == 0 || _destinationWormholeChainId == 0) {
             revert InvalidChainId();
         }
 
-        if (
-            _solanaProgram == bytes32(0)
-        ) {
+        if (_solanaProgram == bytes32(0)) {
             revert InvalidSolanaProgram();
         }
 
@@ -120,36 +106,24 @@ contract StreamPayEvmGateway is
             revert InvalidWormhole();
         }
 
-        sourceWormholeChainId =
-            _sourceWormholeChainId;
+        sourceWormholeChainId = _sourceWormholeChainId;
 
-        destinationWormholeChainId =
-            _destinationWormholeChainId;
+        destinationWormholeChainId = _destinationWormholeChainId;
 
         solanaProgram = _solanaProgram;
 
         wormhole = _wormhole;
     }
 
-    function pause()
-        external
-        onlyOwner
-    {
+    function pause() external onlyOwner {
         _pause();
     }
 
-    function unpause()
-        external
-        onlyOwner
-    {
+    function unpause() external onlyOwner {
         _unpause();
     }
 
-    function wormholeMessageFee()
-        external
-        view
-        returns (uint256)
-    {
+    function wormholeMessageFee() external view returns (uint256) {
         return IWormhole(wormhole).messageFee();
     }
 
@@ -205,24 +179,19 @@ contract StreamPayEvmGateway is
 
         messageNonce = ++nonce;
 
-        bytes memory payload =
-            _encodePayload(
-                Action.CreateStream,
-                operationId,
-                streamId,
-                organization,
-                employee,
-                amount,
-                startTime,
-                endTime,
-                messageNonce
-            );
+        bytes memory payload = _encodePayload(
+            Action.CreateStream,
+            operationId,
+            streamId,
+            organization,
+            employee,
+            amount,
+            startTime,
+            endTime,
+            messageNonce
+        );
 
-        uint64 sequence =
-            _publishMessage(
-                payload,
-                messageNonce
-            );
+        uint64 sequence = _publishMessage(payload, messageNonce);
 
         emit StreamIntentCreated(
             streamId,
@@ -265,8 +234,7 @@ contract StreamPayEvmGateway is
             revert AmountTooLarge();
         }
 
-        Stream storage stream =
-            streams[streamId];
+        Stream storage stream = streams[streamId];
 
         if (!stream.exists) {
             revert StreamNotFound();
@@ -276,36 +244,31 @@ contract StreamPayEvmGateway is
             revert StreamAlreadyCanceled();
         }
 
+        if (block.timestamp >= stream.startTime) {
+            revert StreamAlreadyStarted();
+        }
+
         usedOperationIds[operationId] = true;
 
         stream.totalAmount += amount;
 
         messageNonce = ++nonce;
 
-        bytes memory payload =
-            _encodePayload(
-                Action.TopUpStream,
-                operationId,
-                streamId,
-                stream.organization,
-                stream.employee,
-                amount,
-                stream.startTime,
-                stream.endTime,
-                messageNonce
-            );
-
-        uint64 sequence =
-            _publishMessage(
-                payload,
-                messageNonce
-            );
-
-        emit StreamIntentToppedUp(
+        bytes memory payload = _encodePayload(
+            Action.TopUpStream,
+            operationId,
             streamId,
+            stream.organization,
+            stream.employee,
             amount,
-            stream.totalAmount
+            stream.startTime,
+            stream.endTime,
+            messageNonce
         );
+
+        uint64 sequence = _publishMessage(payload, messageNonce);
+
+        emit StreamIntentToppedUp(streamId, amount, stream.totalAmount);
 
         emit GatewayMessagePublished(
             operationId,
@@ -330,8 +293,7 @@ contract StreamPayEvmGateway is
     {
         _validateOperation(operationId);
 
-        Stream storage stream =
-            streams[streamId];
+        Stream storage stream = streams[streamId];
 
         if (!stream.exists) {
             revert StreamNotFound();
@@ -347,28 +309,21 @@ contract StreamPayEvmGateway is
 
         messageNonce = ++nonce;
 
-        bytes memory payload =
-            _encodePayload(
-                Action.CancelStream,
-                operationId,
-                streamId,
-                stream.organization,
-                stream.employee,
-                0,
-                stream.startTime,
-                stream.endTime,
-                messageNonce
-            );
-
-        uint64 sequence =
-            _publishMessage(
-                payload,
-                messageNonce
-            );
-
-        emit StreamIntentCanceled(
-            streamId
+        bytes memory payload = _encodePayload(
+            Action.CancelStream,
+            operationId,
+            streamId,
+            stream.organization,
+            stream.employee,
+            0,
+            stream.startTime,
+            stream.endTime,
+            messageNonce
         );
+
+        uint64 sequence = _publishMessage(payload, messageNonce);
+
+        emit StreamIntentCanceled(streamId);
 
         emit GatewayMessagePublished(
             operationId,
@@ -380,22 +335,11 @@ contract StreamPayEvmGateway is
         );
     }
 
-    function getStream(
-        bytes32 streamId
-    )
-        external
-        view
-        returns (Stream memory)
-    {
+    function getStream(bytes32 streamId) external view returns (Stream memory) {
         return streams[streamId];
     }
 
-    function _validateOperation(
-        bytes32 operationId
-    )
-        internal
-        view
-    {
+    function _validateOperation(bytes32 operationId) internal view {
         if (operationId == bytes32(0)) {
             revert ZeroOperationId();
         }
@@ -408,31 +352,22 @@ contract StreamPayEvmGateway is
     function _publishMessage(
         bytes memory payload,
         uint64 gatewayNonce
-    )
-        internal
-        returns (uint64 sequence)
-    {
-        if (
-            gatewayNonce >
-            type(uint32).max
-        ) {
+    ) internal returns (uint64 sequence) {
+        if (gatewayNonce > type(uint32).max) {
             revert NonceTooLarge();
         }
 
-        uint256 fee =
-            IWormhole(wormhole).messageFee();
+        uint256 fee = IWormhole(wormhole).messageFee();
 
         if (msg.value != fee) {
             revert InvalidWormholeFee();
         }
 
-        sequence =
-            IWormhole(wormhole)
-                .publishMessage{value: fee}(
-                    uint32(gatewayNonce),
-                    payload,
-                    WORMHOLE_FINALITY
-                );
+        sequence = IWormhole(wormhole).publishMessage{value: fee}(
+            uint32(gatewayNonce),
+            payload,
+            WORMHOLE_FINALITY
+        );
     }
 
     function _encodePayload(
@@ -445,25 +380,22 @@ contract StreamPayEvmGateway is
         uint64 startTime,
         uint64 endTime,
         uint64 messageNonce
-    )
-        internal
-        view
-        returns (bytes memory)
-    {
-        return abi.encode(
-            MESSAGE_VERSION,
-            uint8(action),
-            sourceWormholeChainId,
-            destinationWormholeChainId,
-            operationId,
-            solanaProgram,
-            organization,
-            employee,
-            streamId,
-            amount,
-            startTime,
-            endTime,
-            messageNonce
-        );
+    ) internal view returns (bytes memory) {
+        return
+            abi.encode(
+                MESSAGE_VERSION,
+                uint8(action),
+                sourceWormholeChainId,
+                destinationWormholeChainId,
+                operationId,
+                solanaProgram,
+                organization,
+                employee,
+                streamId,
+                amount,
+                startTime,
+                endTime,
+                messageNonce
+            );
     }
 }

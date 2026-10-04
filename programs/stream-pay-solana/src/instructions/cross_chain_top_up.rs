@@ -46,13 +46,14 @@ pub struct ExecuteCrossChainTopUp<'info> {
     pub cross_chain_config: Account<'info, CrossChainConfig>,
 
     #[account(
-        seeds = [
-            CONSUMED_VAA_SEED,
-            cross_chain_config.source_emitter.as_ref(),
-            &sequence.to_le_bytes(),
-        ],
-        bump = consumed_vaa.bump,
-    )]
+    mut,
+    seeds = [
+        CONSUMED_VAA_SEED,
+        cross_chain_config.source_emitter.as_ref(),
+        &sequence.to_le_bytes(),
+    ],
+    bump = consumed_vaa.bump,
+)]
     pub consumed_vaa: Account<'info, ConsumedVaa>,
 
     #[account(
@@ -276,6 +277,11 @@ pub fn handle_execute_cross_chain_top_up(
     );
 
     require!(
+        operation_id != ctx.accounts.cross_chain_stream.operation_id,
+        StreamPayError::InvalidVaaPayload
+    );
+
+    require!(
         organization_key == ctx.accounts.organization.key(),
         StreamPayError::InvalidVaaPayload
     );
@@ -361,7 +367,7 @@ pub fn handle_execute_cross_chain_top_up(
     let current_time = Clock::get()?.unix_timestamp;
 
     require!(
-        current_time < ctx.accounts.stream.end_time,
+        current_time < ctx.accounts.stream.start_time,
         StreamPayError::StreamAlreadyStarted
     );
 
@@ -403,6 +409,10 @@ pub fn handle_execute_cross_chain_top_up(
     token::transfer_checked(cpi_ctx, amount, ctx.accounts.mint.decimals)?;
 
     ctx.accounts.stream.total_amount = new_total;
+
+    ctx.accounts.cross_chain_stream.operation_id = operation_id;
+
+    ctx.accounts.consumed_vaa.operation_id = [0u8; 32];
 
     msg!("Cross-chain stream top-up completed");
     msg!("Sequence: {}", sequence);

@@ -1,12 +1,21 @@
 use anchor_lang::{AccountSerialize, InstructionData, Space};
+
 use litesvm::LiteSVM;
+
 use litesvm_token::{CreateAccount, CreateMint, MintTo, TOKEN_ID};
+
 use solana_account::Account as SolanaAccount;
+
 use solana_address::Address;
+
 use solana_instruction::{AccountMeta, Instruction};
+
 use solana_keypair::Keypair;
+
 use solana_message::Message;
+
 use solana_signer::Signer;
+
 use solana_transaction::Transaction;
 
 use stream_pay_solana::{
@@ -28,43 +37,72 @@ fn shim_program_id() -> Address {
 }
 
 const PAYLOAD_LEN: usize = 416;
+
 const VAA_HEADER_LEN: usize = 51;
 
 const VERSION_OFFSET: usize = 31;
+
 const ACTION_OFFSET: usize = 63;
+
 const SOURCE_CHAIN_OFFSET: usize = 94;
+
 const DESTINATION_CHAIN_OFFSET: usize = 126;
+
 const OPERATION_ID_OFFSET: usize = 128;
+
 const PROGRAM_OFFSET: usize = 160;
+
 const ORGANIZATION_OFFSET: usize = 192;
+
 const EMPLOYEE_OFFSET: usize = 224;
+
 const STREAM_ID_OFFSET: usize = 256;
+
 const AMOUNT_OFFSET: usize = 288;
+
 const START_TIME_OFFSET: usize = 320;
+
 const END_TIME_OFFSET: usize = 352;
+
 const MESSAGE_NONCE_OFFSET: usize = 384;
 
 const ACTION_CREATE: u8 = 0;
+
 const SEPOLIA_CHAIN: u16 = 10002;
+
 const SOLANA_CHAIN: u16 = 1;
 
 const SOURCE_EMITTER: [u8; 32] = [0x11; 32];
 
 struct TestContext {
     svm: LiteSVM,
+
     program_id: Address,
+
     company: Keypair,
+
     employee: Keypair,
+
     wrong_employee: Keypair,
+
     token_program: Address,
+
     system_program: Address,
+
     mint: Address,
+
     organization: Address,
+
     vault: Address,
+
     vault_authority: Address,
+
     cross_chain_config: Address,
+
     cross_chain_asset_config: Address,
+
     sequence: u64,
+
     native_stream_id: u64,
 }
 
@@ -80,7 +118,9 @@ fn setup() -> TestContext {
     .expect("failed to load StreamPay program");
 
     let company = Keypair::new();
+
     let employee = Keypair::new();
+
     let wrong_employee = Keypair::new();
 
     svm.airdrop(&company.pubkey(), 10_000_000_000)
@@ -166,26 +206,31 @@ fn setup() -> TestContext {
 
     let initialize_protocol_ix = Instruction {
         program_id,
+
         accounts: vec![
             AccountMeta::new(company.pubkey(), true),
             AccountMeta::new(protocol_config, false),
             AccountMeta::new_readonly(system_program, false),
         ],
+
         data: instruction::InitializeProtocol {}.data(),
     };
 
     let create_organization_ix = Instruction {
         program_id,
+
         accounts: vec![
             AccountMeta::new(company.pubkey(), true),
             AccountMeta::new(organization, false),
             AccountMeta::new_readonly(system_program, false),
         ],
+
         data: instruction::CreateOrganization {}.data(),
     };
 
     let initialize_vault_ix = Instruction {
         program_id,
+
         accounts: vec![
             AccountMeta::new(company.pubkey(), true),
             AccountMeta::new_readonly(organization, false),
@@ -195,21 +240,27 @@ fn setup() -> TestContext {
             AccountMeta::new_readonly(token_program, false),
             AccountMeta::new_readonly(system_program, false),
         ],
+
         data: instruction::InitializeVault {}.data(),
     };
 
     let initialize_organization_roles_ix = Instruction {
         program_id,
+
         accounts: vec![
             AccountMeta::new(company.pubkey(), true),
             AccountMeta::new_readonly(organization, false),
             AccountMeta::new(organization_roles, false),
             AccountMeta::new_readonly(system_program, false),
         ],
+
         data: instruction::InitializeOrganizationRoles {
             admin: company.pubkey(),
+
             finance: company.pubkey(),
+
             approver: company.pubkey(),
+
             viewer: company.pubkey(),
         }
         .data(),
@@ -219,24 +270,32 @@ fn setup() -> TestContext {
         &[b"organization_policy", organization.as_ref()],
         &ID,
     );
+
     let policy = Address::new_from_array(policy_anchor.to_bytes());
 
     let mint_anchor = anchor_lang::prelude::Pubkey::new_from_array(mint.to_bytes());
 
     let initialize_policy_ix = Instruction {
         program_id,
+
         accounts: vec![
             AccountMeta::new(company.pubkey(), true),
             AccountMeta::new_readonly(organization, false),
             AccountMeta::new(policy, false),
             AccountMeta::new_readonly(system_program, false),
         ],
+
         data: instruction::InitializeOrganizationPolicy {
             approved_mint: mint_anchor,
+
             max_transaction_amount: 10_000_000_000,
+
             max_payroll_amount: 10_000_000_000,
+
             max_employee_amount: 10_000_000_000,
+
             require_approval: false,
+
             paused: false,
         }
         .data(),
@@ -244,6 +303,7 @@ fn setup() -> TestContext {
 
     let deposit_ix = Instruction {
         program_id,
+
         accounts: vec![
             AccountMeta::new(company.pubkey(), true),
             AccountMeta::new_readonly(organization, false),
@@ -254,6 +314,7 @@ fn setup() -> TestContext {
             AccountMeta::new_readonly(organization_roles, false),
             AccountMeta::new_readonly(policy, false),
         ],
+
         data: instruction::Deposit {
             amount: 1_250_000_000,
         }
@@ -281,12 +342,14 @@ fn setup() -> TestContext {
 
     let initialize_cross_chain_ix = Instruction {
         program_id,
+
         accounts: vec![
             AccountMeta::new(company.pubkey(), true),
             AccountMeta::new_readonly(protocol_config, false),
             AccountMeta::new(cross_chain_config, false),
             AccountMeta::new_readonly(system_program, false),
         ],
+
         data: instruction::InitializeCrossChainConfig {
             source_emitter: SOURCE_EMITTER,
         }
@@ -295,6 +358,7 @@ fn setup() -> TestContext {
 
     let initialize_asset_ix = Instruction {
         program_id,
+
         accounts: vec![
             AccountMeta::new(company.pubkey(), true),
             AccountMeta::new_readonly(protocol_config, false),
@@ -302,6 +366,7 @@ fn setup() -> TestContext {
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new_readonly(system_program, false),
         ],
+
         data: instruction::InitializeCrossChainAssetConfig {}.data(),
     };
 
@@ -325,19 +390,33 @@ fn setup() -> TestContext {
 
     TestContext {
         svm,
+
         program_id,
+
         company,
+
         employee,
+
         wrong_employee,
+
         token_program,
+
         system_program,
+
         mint,
+
         organization,
+
         vault,
+
         vault_authority,
+
         cross_chain_config,
+
         cross_chain_asset_config,
+
         sequence: 7,
+
         native_stream_id: 8,
     }
 }
@@ -354,6 +433,7 @@ fn base_payload(ctx: &TestContext) -> Vec<u8> {
     let mut payload = vec![0u8; PAYLOAD_LEN];
 
     payload[VERSION_OFFSET] = 1;
+
     payload[ACTION_OFFSET] = ACTION_CREATE;
 
     write_u16_word(&mut payload, SOURCE_CHAIN_OFFSET, SEPOLIA_CHAIN);
@@ -408,28 +488,48 @@ fn consumed_pda(sequence: u64) -> Address {
 
 fn install_consumed_vaa(
     ctx: &mut TestContext,
+
     payload: &[u8],
+
     pda_sequence: u64,
+
     stored_sequence: u64,
+
     operation_id: [u8; 32],
+
     stream_id: [u8; 32],
+
     amount: u64,
+
     start_time: u64,
+
     end_time: u64,
+
     action: u8,
 ) {
     let consumed = ConsumedVaa {
         emitter_chain: WORMHOLE_SEPOLIA_CHAIN_ID,
+
         emitter_address: SOURCE_EMITTER,
+
         sequence: stored_sequence,
+
         action,
+
         operation_id,
+
         stream_id,
+
         amount,
+
         start_time,
+
         end_time,
+
         payload_hash: solana_keccak_hasher::hash(payload).to_bytes(),
+
         consumed_at: 1,
+
         bump: anchor_lang::prelude::Pubkey::find_program_address(
             &[
                 CONSUMED_VAA_SEED,
@@ -456,9 +556,13 @@ fn install_consumed_vaa(
             address,
             SolanaAccount {
                 lamports,
+
                 data,
+
                 owner: ctx.program_id,
+
                 executable: false,
+
                 rent_epoch: 0,
             },
         )
@@ -467,8 +571,11 @@ fn install_consumed_vaa(
 
 fn execute_create(
     ctx: &mut TestContext,
+
     payload: Vec<u8>,
+
     sequence: u64,
+
     native_stream_id: u64,
 ) -> Result<(), String> {
     let external_stream_id: [u8; 32] = payload[STREAM_ID_OFFSET..STREAM_ID_OFFSET + 32]
@@ -505,13 +612,16 @@ fn execute_create(
 
     let instruction_data = instruction::ExecuteCrossChainAction {
         sequence,
+
         native_stream_id,
+
         vaa_body,
     }
     .data();
 
     let ix = Instruction {
         program_id: ctx.program_id,
+
         accounts: vec![
             AccountMeta::new(ctx.company.pubkey(), true),
             AccountMeta::new_readonly(ctx.cross_chain_config, false),
@@ -528,6 +638,7 @@ fn execute_create(
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
         ],
+
         data: instruction_data,
     };
 
@@ -544,6 +655,7 @@ fn execute_create(
 }
 
 #[test]
+
 fn initialize_cross_chain_config_rejects_zero_emitter() {
     let mut ctx = setup();
 
@@ -552,6 +664,7 @@ fn initialize_cross_chain_config_rejects_zero_emitter() {
 
     let ix = Instruction {
         program_id: ctx.program_id,
+
         accounts: vec![
             AccountMeta::new(ctx.company.pubkey(), true),
             AccountMeta::new_readonly(
@@ -568,6 +681,7 @@ fn initialize_cross_chain_config_rejects_zero_emitter() {
             AccountMeta::new(Address::new_from_array(config_anchor.to_bytes()), false),
             AccountMeta::new_readonly(ctx.system_program, false),
         ],
+
         data: instruction::InitializeCrossChainConfig {
             source_emitter: [0u8; 32],
         }
@@ -587,6 +701,7 @@ fn initialize_cross_chain_config_rejects_zero_emitter() {
 }
 
 #[test]
+
 fn consume_vaa_rejects_short_body() {
     let mut ctx = setup();
 
@@ -594,6 +709,7 @@ fn consume_vaa_rejects_short_body() {
 
     let ix = Instruction {
         program_id: ctx.program_id,
+
         accounts: vec![
             AccountMeta::new(ctx.company.pubkey(), true),
             AccountMeta::new_readonly(ctx.cross_chain_config, false),
@@ -603,9 +719,12 @@ fn consume_vaa_rejects_short_body() {
             AccountMeta::new(consumed_pda(sequence), false),
             AccountMeta::new_readonly(ctx.system_program, false),
         ],
+
         data: instruction::ConsumeVaa {
             guardian_set_bump: 255,
+
             sequence,
+
             vaa_body: vec![0u8; 50],
         }
         .data(),
@@ -624,6 +743,7 @@ fn consume_vaa_rejects_short_body() {
 }
 
 #[test]
+
 fn consume_vaa_rejects_sequence_mismatch() {
     let mut ctx = setup();
 
@@ -641,6 +761,7 @@ fn consume_vaa_rejects_sequence_mismatch() {
 
     let ix = Instruction {
         program_id: ctx.program_id,
+
         accounts: vec![
             AccountMeta::new(ctx.company.pubkey(), true),
             AccountMeta::new_readonly(ctx.cross_chain_config, false),
@@ -650,9 +771,12 @@ fn consume_vaa_rejects_sequence_mismatch() {
             AccountMeta::new(consumed_pda(sequence), false),
             AccountMeta::new_readonly(ctx.system_program, false),
         ],
+
         data: instruction::ConsumeVaa {
             guardian_set_bump: 255,
+
             sequence,
+
             vaa_body: body,
         }
         .data(),
@@ -671,6 +795,7 @@ fn consume_vaa_rejects_sequence_mismatch() {
 }
 
 #[test]
+
 fn consume_vaa_rejects_wrong_source_chain() {
     let mut ctx = setup();
 
@@ -688,6 +813,7 @@ fn consume_vaa_rejects_wrong_source_chain() {
 
     let ix = Instruction {
         program_id: ctx.program_id,
+
         accounts: vec![
             AccountMeta::new(ctx.company.pubkey(), true),
             AccountMeta::new_readonly(ctx.cross_chain_config, false),
@@ -697,9 +823,12 @@ fn consume_vaa_rejects_wrong_source_chain() {
             AccountMeta::new(consumed_pda(sequence), false),
             AccountMeta::new_readonly(ctx.system_program, false),
         ],
+
         data: instruction::ConsumeVaa {
             guardian_set_bump: 255,
+
             sequence,
+
             vaa_body: body,
         }
         .data(),
@@ -718,6 +847,7 @@ fn consume_vaa_rejects_wrong_source_chain() {
 }
 
 #[test]
+
 fn consume_vaa_rejects_wrong_emitter() {
     let mut ctx = setup();
 
@@ -735,6 +865,7 @@ fn consume_vaa_rejects_wrong_emitter() {
 
     let ix = Instruction {
         program_id: ctx.program_id,
+
         accounts: vec![
             AccountMeta::new(ctx.company.pubkey(), true),
             AccountMeta::new_readonly(ctx.cross_chain_config, false),
@@ -744,9 +875,12 @@ fn consume_vaa_rejects_wrong_emitter() {
             AccountMeta::new(consumed_pda(sequence), false),
             AccountMeta::new_readonly(ctx.system_program, false),
         ],
+
         data: instruction::ConsumeVaa {
             guardian_set_bump: 255,
+
             sequence,
+
             vaa_body: body,
         }
         .data(),
@@ -765,9 +899,12 @@ fn consume_vaa_rejects_wrong_emitter() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_payload_hash_mismatch() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let payload = base_payload(&ctx);
@@ -800,9 +937,12 @@ fn execute_cross_chain_action_rejects_payload_hash_mismatch() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_invalid_version() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -829,9 +969,12 @@ fn execute_cross_chain_action_rejects_invalid_version() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_invalid_action() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -858,9 +1001,12 @@ fn execute_cross_chain_action_rejects_invalid_action() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_wrong_destination_chain() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -887,9 +1033,12 @@ fn execute_cross_chain_action_rejects_wrong_destination_chain() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_wrong_destination_program() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -916,9 +1065,12 @@ fn execute_cross_chain_action_rejects_wrong_destination_program() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_operation_id_mismatch() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let payload = base_payload(&ctx);
@@ -943,9 +1095,12 @@ fn execute_cross_chain_action_rejects_operation_id_mismatch() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_stream_id_mismatch() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let payload = base_payload(&ctx);
@@ -970,9 +1125,12 @@ fn execute_cross_chain_action_rejects_stream_id_mismatch() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_wrong_employee() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -1000,9 +1158,12 @@ fn execute_cross_chain_action_rejects_wrong_employee() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_malformed_u64_word() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -1029,9 +1190,12 @@ fn execute_cross_chain_action_rejects_malformed_u64_word() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_invalid_time_range() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -1060,9 +1224,12 @@ fn execute_cross_chain_action_rejects_invalid_time_range() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_zero_amount() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -1089,9 +1256,12 @@ fn execute_cross_chain_action_rejects_zero_amount() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_zero_message_nonce() {
     let mut ctx = setup();
+
     let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let mut payload = base_payload(&ctx);
@@ -1118,8 +1288,10 @@ fn execute_cross_chain_action_rejects_zero_message_nonce() {
 }
 
 #[test]
+
 fn execute_cross_chain_action_rejects_sequence_mismatch() {
     let mut ctx = setup();
+
     let native_stream_id = ctx.native_stream_id;
 
     let payload = base_payload(&ctx);
@@ -1143,10 +1315,206 @@ fn execute_cross_chain_action_rejects_sequence_mismatch() {
     );
 }
 
+fn execute_top_up(
+    ctx: &mut TestContext,
+
+    payload: Vec<u8>,
+
+    sequence: u64,
+
+    native_stream_id: u64,
+) -> Result<(), String> {
+    let external_stream_id: [u8; 32] = payload[STREAM_ID_OFFSET..STREAM_ID_OFFSET + 32]
+        .try_into()
+        .map_err(|_| "invalid stream id".to_string())?;
+
+    let (cross_chain_stream_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[CROSS_CHAIN_STREAM_SEED, &external_stream_id],
+        &ID,
+    );
+
+    let cross_chain_stream = Address::new_from_array(cross_chain_stream_anchor.to_bytes());
+
+    let (stream_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[
+            STREAM_SEED,
+            ctx.organization.as_ref(),
+            ctx.employee.pubkey().as_ref(),
+            &native_stream_id.to_le_bytes(),
+        ],
+        &ID,
+    );
+
+    let stream = Address::new_from_array(stream_anchor.to_bytes());
+
+    let (escrow_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[STREAM_ESCROW_SEED, stream.as_ref()],
+        &ID,
+    );
+
+    let stream_escrow = Address::new_from_array(escrow_anchor.to_bytes());
+
+    let vaa_body = build_vaa_body(&payload, sequence, SEPOLIA_CHAIN, SOURCE_EMITTER);
+
+    let instruction_data = instruction::ExecuteCrossChainTopUp {
+        sequence,
+
+        native_stream_id,
+
+        vaa_body,
+    }
+    .data();
+
+    let ix = Instruction {
+        program_id: ctx.program_id,
+
+        accounts: vec![
+            AccountMeta::new(ctx.company.pubkey(), true),
+            AccountMeta::new_readonly(ctx.cross_chain_config, false),
+            AccountMeta::new(consumed_pda(sequence), false),
+            AccountMeta::new(cross_chain_stream, false),
+            AccountMeta::new_readonly(ctx.organization, false),
+            AccountMeta::new_readonly(ctx.employee.pubkey(), false),
+            AccountMeta::new_readonly(ctx.mint, false),
+            AccountMeta::new(ctx.vault, false),
+            AccountMeta::new_readonly(ctx.vault_authority, false),
+            AccountMeta::new(stream, false),
+            AccountMeta::new(stream_escrow, false),
+            AccountMeta::new_readonly(ctx.token_program, false),
+        ],
+
+        data: instruction_data,
+    };
+
+    let tx = Transaction::new(
+        &[&ctx.company],
+        Message::new(&[ix], Some(&ctx.company.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    ctx.svm
+        .send_transaction(tx)
+        .map(|_| ())
+        .map_err(|err| format!("{err:?}"))
+}
+
 #[test]
-fn execute_cross_chain_action_replay_is_rejected() {
+fn execute_cross_chain_top_up_replay_is_rejected() {
     let mut ctx = setup();
     let sequence = ctx.sequence;
+    let native_stream_id = ctx.native_stream_id;
+
+    let create_payload = base_payload(&ctx);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &create_payload,
+        sequence,
+        sequence,
+        [0x22; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_CREATE,
+    );
+
+    execute_create(&mut ctx, create_payload, sequence, native_stream_id)
+        .expect("create stream should succeed");
+
+    let top_up_sequence = 8u64;
+
+    let mut top_up_payload = base_payload(&ctx);
+    top_up_payload[ACTION_OFFSET] = 1;
+    top_up_payload[OPERATION_ID_OFFSET..OPERATION_ID_OFFSET + 32].copy_from_slice(&[0x55; 32]);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &top_up_payload,
+        top_up_sequence,
+        top_up_sequence,
+        [0x55; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        1,
+    );
+
+    execute_top_up(
+        &mut ctx,
+        top_up_payload.clone(),
+        top_up_sequence,
+        native_stream_id,
+    )
+    .expect("first cross-chain top-up should succeed");
+
+    ctx.svm.expire_blockhash();
+
+    assert!(
+        execute_top_up(&mut ctx, top_up_payload, top_up_sequence, native_stream_id,).is_err(),
+        "replayed cross-chain top-up must fail"
+    );
+}
+
+#[test]
+fn execute_cross_chain_top_up_after_stream_started_is_rejected() {
+    let mut ctx = setup();
+    let sequence = ctx.sequence;
+    let native_stream_id = ctx.native_stream_id;
+
+    let create_payload = base_payload(&ctx);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &create_payload,
+        sequence,
+        sequence,
+        [0x22; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_CREATE,
+    );
+
+    execute_create(&mut ctx, create_payload, sequence, native_stream_id)
+        .expect("create stream should succeed");
+
+    let mut clock = ctx.svm.get_sysvar::<solana_clock::Clock>();
+    clock.unix_timestamp = 1_500;
+    ctx.svm.set_sysvar::<solana_clock::Clock>(&clock);
+    let top_up_sequence = 8u64;
+    let mut payload = base_payload(&ctx);
+    payload[ACTION_OFFSET] = 1;
+    payload[OPERATION_ID_OFFSET..OPERATION_ID_OFFSET + 32].copy_from_slice(&[0x66; 32]);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &payload,
+        top_up_sequence,
+        top_up_sequence,
+        [0x66; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        1,
+    );
+
+    assert!(
+        execute_top_up(&mut ctx, payload, top_up_sequence, native_stream_id,).is_err(),
+        "cross-chain top-up after stream start must fail"
+    );
+}
+
+#[test]
+
+fn execute_cross_chain_action_replay_is_rejected() {
+    let mut ctx = setup();
+
+    let sequence = ctx.sequence;
+
     let native_stream_id = ctx.native_stream_id;
 
     let payload = base_payload(&ctx);

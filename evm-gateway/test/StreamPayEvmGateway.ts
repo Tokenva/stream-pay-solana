@@ -303,6 +303,71 @@ describe(
 
     describe("Top-up", function () {
       it(
+  "rejects a top-up after the stream has started",
+  async function () {
+    const { gateway } =
+      await deployGateway();
+
+    const {
+      operationId,
+      streamId,
+      organization,
+      employee,
+    } = ids();
+
+    const latestBlock =
+      await ethers.provider.getBlock(
+        "latest",
+      );
+
+    const startTime =
+      BigInt(
+        latestBlock!.timestamp + 60,
+      );
+
+    const endTime =
+      startTime + 3_600n;
+
+    await gateway.createStreamIntent(
+      operationId,
+      streamId,
+      organization,
+      employee,
+      1_000n,
+      startTime,
+      endTime,
+    );
+
+    await ethers.provider.send(
+      "evm_increaseTime",
+      [120],
+    );
+
+    await ethers.provider.send(
+      "evm_mine",
+      [],
+    );
+
+    const topUpOperation =
+      ethers.keccak256(
+        ethers.toUtf8Bytes(
+          "top-up-after-start",
+        ),
+      );
+
+    await expect(
+      gateway.topUpStreamIntent(
+        topUpOperation,
+        streamId,
+        500n,
+      ),
+    ).to.be.revertedWithCustomError(
+      gateway,
+      "StreamAlreadyStarted",
+    );
+  },
+);
+      it(
         "increases the stream amount",
         async function () {
           const { gateway } =
