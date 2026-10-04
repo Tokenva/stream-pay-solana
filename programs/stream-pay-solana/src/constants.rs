@@ -5,6 +5,7 @@ pub const PROTOCOL_CONFIG_SEED: &[u8] = b"protocol";
 
 #[constant]
 pub const ORGANIZATION_SEED: &[u8] = b"organization";
+pub const ORGANIZATION_ROLES_SEED: &[u8] = b"organization_roles";
 
 #[constant]
 pub const VAULT_SEED: &[u8] = b"vault";

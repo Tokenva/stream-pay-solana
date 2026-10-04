@@ -112,3 +112,35 @@ pub struct CrossChainAssetConfig {
     pub bump: u8,
     pub created_at: i64,
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct OrganizationRoles {
+    pub organization: Pubkey,
+    pub admin: Pubkey,
+    pub finance: Pubkey,
+    pub approver: Pubkey,
+    pub viewer: Pubkey,
+    pub bump: u8,
+    pub created_at: i64,
+}
+
+impl OrganizationRoles {
+    pub fn can_create_payroll(&self, authority: &Pubkey) -> bool {
+        *authority == self.admin || *authority == self.approver
+    }
+
+    pub fn can_top_up(&self, authority: &Pubkey) -> bool {
+        *authority == self.admin
+            || *authority == self.finance
+            || *authority == self.approver
+    }
+
+    pub fn can_cancel(&self, authority: &Pubkey) -> bool {
+        *authority == self.admin || *authority == self.approver
+    }
+
+    pub fn can_deposit(&self, authority: &Pubkey) -> bool {
+        *authority == self.admin || *authority == self.finance
+    }
+}

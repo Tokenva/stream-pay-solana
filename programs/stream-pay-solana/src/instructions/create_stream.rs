@@ -6,7 +6,7 @@ use crate::{
         ORGANIZATION_SEED, STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     error::StreamPayError,
-    state::{Organization, Stream},
+    state::{Organization, OrganizationRoles, Stream},
 };
 
 #[derive(Accounts)]
@@ -16,10 +16,8 @@ pub struct CreateStream<'info> {
     pub authority: Signer<'info>,
 
     #[account(
-        seeds = [ORGANIZATION_SEED, authority.key().as_ref()],
-        bump = organization.bump,
-        constraint = organization.authority == authority.key()
-            @ StreamPayError::Unauthorized
+        seeds = [ORGANIZATION_SEED, organization.authority.as_ref()],
+        bump = organization.bump
     )]
     pub organization: Account<'info, Organization>,
 
@@ -81,6 +79,8 @@ pub struct CreateStream<'info> {
     pub system_program: Program<'info, System>,
 
     pub token_program: Program<'info, Token>,
+
+    pub roles: Option<Account<'info, OrganizationRoles>>,
 }
 
 pub fn handle_create_stream(
@@ -90,6 +90,14 @@ pub fn handle_create_stream(
     start_time: i64,
     end_time: i64,
 ) -> Result<()> {
+    let actor = ctx.accounts.authority.key();
+    let authorized = ctx.accounts.organization.authority == actor
+        || ctx.accounts.roles.as_ref().is_some_and(|roles| {
+            roles.organization == ctx.accounts.organization.key()
+                && roles.can_create_payroll(&actor)
+        });
+    require!(authorized, StreamPayError::Unauthorized);
+
     require!(total_amount > 0, StreamPayError::InvalidAmount);
     require!(end_time > start_time, StreamPayError::InvalidAmount);
 

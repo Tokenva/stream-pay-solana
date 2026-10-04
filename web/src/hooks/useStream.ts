@@ -15,6 +15,7 @@ import {
 import { getProgram } from "@/lib/anchor";
 import {
   getOrganizationPda,
+  getOrganizationRolesPda,
   getStreamEscrowPda,
   getStreamPda,
   getVaultAuthorityPda,
@@ -270,6 +271,11 @@ export function useStream(
             wallet.publicKey,
           );
 
+        const [roles] =
+          getOrganizationRolesPda(
+            organization,
+          );
+
         const [vault] =
           getVaultPda(
             organization,
@@ -335,6 +341,7 @@ export function useStream(
                 authority:
                   wallet.publicKey,
                 organization,
+                roles,
                 employee,
                 mint,
                 vault,

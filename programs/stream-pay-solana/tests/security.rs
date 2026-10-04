@@ -145,6 +145,33 @@ fn setup() -> TestContext {
         data: instruction::InitializeVault {}.data(),
     };
 
+    let (roles_anchor, _) =
+        anchor_lang::prelude::Pubkey::find_program_address(
+            &[b"organization_roles", organization.as_ref()],
+            &ID,
+        );
+    let roles = Address::new_from_array(roles_anchor.to_bytes());
+
+    let company_anchor =
+        anchor_lang::prelude::Pubkey::new_from_array(company.pubkey().to_bytes());
+
+    let initialize_roles_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
+            AccountMeta::new(roles, false),
+            AccountMeta::new_readonly(system_program, false),
+        ],
+        data: instruction::InitializeOrganizationRoles {
+            admin: company_anchor,
+            finance: company_anchor,
+            approver: company_anchor,
+            viewer: company_anchor,
+        }
+        .data(),
+    };
+
     let deposit_ix = Instruction {
         program_id,
         accounts: vec![
@@ -154,6 +181,7 @@ fn setup() -> TestContext {
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(token_program, false),
+            AccountMeta::new_readonly(roles, false),
         ],
         data: instruction::Deposit {
             amount: 1_250_000_000,
@@ -164,7 +192,7 @@ fn setup() -> TestContext {
     let setup_tx = Transaction::new(
         &[&company],
         Message::new(
-            &[create_organization_ix, initialize_vault_ix, deposit_ix],
+            &[create_organization_ix, initialize_roles_ix, initialize_vault_ix, deposit_ix],
             Some(&company.pubkey()),
         ),
         svm.latest_blockhash(),
@@ -214,6 +242,15 @@ fn setup() -> TestContext {
     }
 }
 
+fn organization_roles(ctx: &TestContext) -> Address {
+    let (roles_anchor, _) =
+        anchor_lang::prelude::Pubkey::find_program_address(
+            &[b"organization_roles", ctx.organization.as_ref()],
+            &ID,
+        );
+    Address::new_from_array(roles_anchor.to_bytes())
+}
+
 fn create_stream(ctx: &mut TestContext, amount: u64, start_time: i64, end_time: i64) {
     let ix = Instruction {
         program_id: ctx.program_id,
@@ -228,6 +265,7 @@ fn create_stream(ctx: &mut TestContext, amount: u64, start_time: i64, end_time: 
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -264,6 +302,7 @@ fn create_stream_rejects_zero_amount() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -303,6 +342,7 @@ fn create_stream_rejects_invalid_time_range() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -382,6 +422,7 @@ fn top_up_after_stream_started_fails() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::TopUpStream {
             stream_id: ctx.stream_id,
@@ -416,6 +457,7 @@ fn cancel_stream(ctx: &mut TestContext) {
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new(ctx.employee_token_account, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::CancelStream {
             stream_id: ctx.stream_id,
@@ -460,6 +502,7 @@ fn cancel_stream_cannot_be_called_twice() {
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new(ctx.employee_token_account, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::CancelStream {
             stream_id: ctx.stream_id,
@@ -551,6 +594,7 @@ fn wrong_organization_is_rejected() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -595,6 +639,7 @@ fn wrong_vault_is_rejected() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -733,6 +778,7 @@ fn create_stream_requires_authority_signer() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.system_program, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::CreateStream {
             stream_id: ctx.stream_id,
@@ -781,6 +827,7 @@ fn top_up_zero_amount_is_rejected() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::TopUpStream {
             stream_id: ctx.stream_id,
@@ -827,6 +874,7 @@ fn top_up_arithmetic_overflow_is_rejected() {
             AccountMeta::new(ctx.stream_escrow, false),
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new_readonly(ctx.token_program, false),
+            AccountMeta::new_readonly(organization_roles(&ctx), false),
         ],
         data: instruction::TopUpStream {
             stream_id: ctx.stream_id,

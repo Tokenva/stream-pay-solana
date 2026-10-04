@@ -12,7 +12,8 @@ use solana_transaction::Transaction;
 use stream_pay_solana::{
     constants::{
         CONSUMED_VAA_SEED, CROSS_CHAIN_ASSET_CONFIG_SEED, CROSS_CHAIN_CONFIG_SEED,
-        CROSS_CHAIN_STREAM_SEED, ORGANIZATION_SEED, PROTOCOL_CONFIG_SEED, STREAM_ESCROW_SEED,
+        CROSS_CHAIN_STREAM_SEED, ORGANIZATION_ROLES_SEED, ORGANIZATION_SEED, PROTOCOL_CONFIG_SEED,
+        STREAM_ESCROW_SEED,
         STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED, WORMHOLE_SEPOLIA_CHAIN_ID,
     },
     instruction,
@@ -132,6 +133,13 @@ fn setup() -> TestContext {
 
     let organization = Address::new_from_array(organization_anchor.to_bytes());
 
+    let (organization_roles_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[ORGANIZATION_ROLES_SEED, organization.as_ref()],
+        &ID,
+    );
+
+    let organization_roles = Address::new_from_array(organization_roles_anchor.to_bytes());
+
     let (vault_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
         &[VAULT_SEED, organization.as_ref(), mint.as_ref()],
         &ID,
@@ -190,6 +198,23 @@ fn setup() -> TestContext {
         data: instruction::InitializeVault {}.data(),
     };
 
+    let initialize_organization_roles_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
+            AccountMeta::new(organization_roles, false),
+            AccountMeta::new_readonly(system_program, false),
+        ],
+        data: instruction::InitializeOrganizationRoles {
+            admin: company.pubkey(),
+            finance: company.pubkey(),
+            approver: company.pubkey(),
+            viewer: company.pubkey(),
+        }
+        .data(),
+    };
+
     let deposit_ix = Instruction {
         program_id,
         accounts: vec![
@@ -199,6 +224,7 @@ fn setup() -> TestContext {
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(token_program, false),
+            AccountMeta::new_readonly(organization_roles, false),
         ],
         data: instruction::Deposit {
             amount: 1_250_000_000,
@@ -213,6 +239,7 @@ fn setup() -> TestContext {
                 initialize_protocol_ix,
                 create_organization_ix,
                 initialize_vault_ix,
+                initialize_organization_roles_ix,
                 deposit_ix,
             ],
             Some(&company.pubkey()),

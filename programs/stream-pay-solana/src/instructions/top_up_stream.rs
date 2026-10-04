@@ -6,7 +6,7 @@ use crate::{
         ORGANIZATION_SEED, STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     error::StreamPayError,
-    state::{Organization, Stream},
+    state::{Organization, OrganizationRoles, Stream},
 };
 
 #[derive(Accounts)]
@@ -16,10 +16,8 @@ pub struct TopUpStream<'info> {
     pub authority: Signer<'info>,
 
     #[account(
-        seeds = [ORGANIZATION_SEED, authority.key().as_ref()],
-        bump = organization.bump,
-        constraint = organization.authority == authority.key()
-            @ StreamPayError::Unauthorized
+        seeds = [ORGANIZATION_SEED, organization.authority.as_ref()],
+        bump = organization.bump
     )]
     pub organization: Account<'info, Organization>,
 
@@ -84,9 +82,19 @@ pub struct TopUpStream<'info> {
     pub mint: Account<'info, Mint>,
 
     pub token_program: Program<'info, Token>,
+
+    pub roles: Option<Account<'info, OrganizationRoles>>,
 }
 
 pub fn handle_top_up_stream(ctx: Context<TopUpStream>, _stream_id: u64, amount: u64) -> Result<()> {
+    let actor = ctx.accounts.authority.key();
+    let authorized = ctx.accounts.organization.authority == actor
+        || ctx.accounts.roles.as_ref().is_some_and(|roles| {
+            roles.organization == ctx.accounts.organization.key()
+                && roles.can_top_up(&actor)
+        });
+    require!(authorized, StreamPayError::Unauthorized);
+
     require!(amount > 0, StreamPayError::InvalidAmount);
     require!(
         !ctx.accounts.stream.canceled,

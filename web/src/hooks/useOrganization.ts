@@ -13,7 +13,15 @@ import {
 } from "@solana/wallet-adapter-react";
 
 import { getProgram } from "@/lib/anchor";
-import { getOrganizationPda } from "@/lib/pdas";
+import { getOrganizationPda, getOrganizationRolesPda } from "@/lib/pdas";
+
+type OrganizationRolesData = {
+  organization: PublicKey;
+  admin: PublicKey;
+  finance: PublicKey;
+  approver: PublicKey;
+  viewer: PublicKey;
+};
 
 export function useOrganization() {
   const { connection } = useConnection();
@@ -24,6 +32,15 @@ export function useOrganization() {
 
   const [organization, setOrganization] =
     useState<PublicKey | null>(null);
+
+  const [organizationRoles, setOrganizationRoles] =
+    useState<OrganizationRolesData | null>(null);
+
+  const [organizationRolesPda, setOrganizationRolesPda] =
+    useState<PublicKey | null>(null);
+
+  const [rolesExists, setRolesExists] =
+    useState(false);
 
   const [exists, setExists] =
     useState(false);
@@ -45,6 +62,9 @@ export function useOrganization() {
       if (!walletKey) {
         loadedWalletRef.current = null;
         setOrganization(null);
+        setOrganizationRoles(null);
+        setOrganizationRolesPda(null);
+        setRolesExists(false);
         setExists(false);
         setError(null);
         return;
@@ -82,6 +102,42 @@ export function useOrganization() {
         setOrganization(organizationPda);
         setExists(account !== null);
 
+        const [rolesPda] =
+          getOrganizationRolesPda(organizationPda);
+
+        setOrganizationRolesPda(rolesPda);
+
+        const rolesAccount =
+          await connection.getAccountInfo(rolesPda);
+
+        setRolesExists(rolesAccount !== null);
+
+        if (rolesAccount && wallet) {
+          try {
+            const program = getProgram(
+              connection,
+              wallet,
+            );
+
+            const roleData =
+              await program.account.organizationRoles.fetch(
+                rolesPda,
+              );
+
+            setOrganizationRoles(
+              roleData as OrganizationRolesData,
+            );
+          } catch (rolesErr) {
+            console.error(
+              "Failed to read organization roles",
+              rolesErr,
+            );
+            setOrganizationRoles(null);
+          }
+        } else {
+          setOrganizationRoles(null);
+        }
+
         loadedWalletRef.current = walletKey;
       } catch (err) {
         console.error(err);
@@ -96,12 +152,80 @@ export function useOrganization() {
         setLoading(false);
       }
     },
-    [connection, walletKey],
+    [connection, walletKey, wallet],
   );
 
   useEffect(() => {
     void loadOrganization(true);
   }, [loadOrganization, walletKey]);
+
+  const initializeOrganizationRoles = useCallback(
+    async (
+      admin: PublicKey,
+      finance: PublicKey,
+      approver: PublicKey,
+      viewer: PublicKey,
+    ) => {
+      if (!wallet) {
+        throw new Error(
+          "Connect your wallet first",
+        );
+      }
+
+      const [organizationPda] =
+        getOrganizationPda(
+          wallet.publicKey,
+        );
+
+      const [rolesPda] =
+        getOrganizationRolesPda(
+          organizationPda,
+        );
+
+      const existing =
+        await connection.getAccountInfo(
+          rolesPda,
+        );
+
+      if (existing) {
+        throw new Error(
+          "Organization roles are already initialized",
+        );
+      }
+
+      const program = getProgram(
+        connection,
+        wallet,
+      );
+
+      const signature =
+        await program.methods
+          .initializeOrganizationRoles(
+            admin,
+            finance,
+            approver,
+            viewer,
+          )
+          .accountsPartial({
+            authority: wallet.publicKey,
+            organization: organizationPda,
+            roles: rolesPda,
+          })
+          .rpc();
+
+      await loadOrganization(true);
+
+      return {
+        signature,
+        rolesPda,
+      };
+    },
+    [
+      connection,
+      wallet,
+      loadOrganization,
+    ],
+  );
 
   const createOrganization = useCallback(
     async () => {
@@ -145,11 +269,15 @@ export function useOrganization() {
 
   return {
     organization,
+    organizationRoles,
+    organizationRolesPda,
+    rolesExists,
     exists,
     loading,
     error,
     refresh: () =>
       loadOrganization(true),
     createOrganization,
+    initializeOrganizationRoles,
   };
 }

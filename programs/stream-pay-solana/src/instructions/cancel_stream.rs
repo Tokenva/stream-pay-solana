@@ -6,7 +6,7 @@ use crate::{
         ORGANIZATION_SEED, STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     error::StreamPayError,
-    state::{Organization, Stream},
+    state::{Organization, OrganizationRoles, Stream},
 };
 
 #[derive(Accounts)]
@@ -16,10 +16,8 @@ pub struct CancelStream<'info> {
     pub authority: Signer<'info>,
 
     #[account(
-        seeds = [ORGANIZATION_SEED, authority.key().as_ref()],
-        bump = organization.bump,
-        constraint = organization.authority == authority.key()
-            @ StreamPayError::Unauthorized
+        seeds = [ORGANIZATION_SEED, organization.authority.as_ref()],
+        bump = organization.bump
     )]
     pub organization: Account<'info, Organization>,
 
@@ -91,9 +89,19 @@ pub struct CancelStream<'info> {
     pub employee_token_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
+
+    pub roles: Option<Account<'info, OrganizationRoles>>,
 }
 
 pub fn handle_cancel_stream(ctx: Context<CancelStream>, _stream_id: u64) -> Result<()> {
+    let actor = ctx.accounts.authority.key();
+    let authorized = ctx.accounts.organization.authority == actor
+        || ctx.accounts.roles.as_ref().is_some_and(|roles| {
+            roles.organization == ctx.accounts.organization.key()
+                && roles.can_cancel(&actor)
+        });
+    require!(authorized, StreamPayError::Unauthorized);
+
     require!(
         !ctx.accounts.stream.canceled,
         StreamPayError::AlreadyCanceled

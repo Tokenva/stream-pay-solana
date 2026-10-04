@@ -4,7 +4,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 use crate::{
     constants::{ORGANIZATION_SEED, VAULT_SEED},
     error::StreamPayError,
-    state::Organization,
+    state::{Organization, OrganizationRoles},
 };
 
 #[derive(Accounts)]
@@ -13,10 +13,8 @@ pub struct Deposit<'info> {
     pub depositor: Signer<'info>,
 
     #[account(
-        seeds = [ORGANIZATION_SEED, depositor.key().as_ref()],
-        bump = organization.bump,
-        constraint = organization.authority == depositor.key()
-            @ StreamPayError::Unauthorized
+        seeds = [ORGANIZATION_SEED, organization.authority.as_ref()],
+        bump = organization.bump
     )]
     pub organization: Account<'info, Organization>,
 
@@ -41,9 +39,19 @@ pub struct Deposit<'info> {
     pub vault: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
+
+    pub roles: Option<Account<'info, OrganizationRoles>>,
 }
 
 pub fn handle_deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+    let actor = ctx.accounts.depositor.key();
+    let authorized = ctx.accounts.organization.authority == actor
+        || ctx.accounts.roles.as_ref().is_some_and(|roles| {
+            roles.organization == ctx.accounts.organization.key()
+                && roles.can_deposit(&actor)
+        });
+    require!(authorized, StreamPayError::Unauthorized);
+
     require!(amount > 0, StreamPayError::InvalidAmount);
 
     let cpi_accounts = TransferChecked {

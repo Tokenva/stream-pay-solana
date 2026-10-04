@@ -8,6 +8,7 @@ import BN from "bn.js";
 import { getProgram } from "@/lib/anchor";
 import {
   getOrganizationPda,
+  getOrganizationRolesPda,
   getStreamEscrowPda,
   getStreamPda,
   getVaultAuthorityPda,
@@ -40,6 +41,11 @@ export function useStreamActions(
     const [organization] =
       getOrganizationPda(wallet.publicKey);
 
+    const [roles] =
+      getOrganizationRolesPda(
+        organization,
+      );
+
     const [vault] =
       getVaultPda(
         organization,
@@ -66,6 +72,7 @@ export function useStreamActions(
       mint,
       employee,
       organization,
+      roles,
       vault,
       vaultAuthority,
       stream,
@@ -112,6 +119,8 @@ export function useStreamActions(
                 wallet!.publicKey,
               organization:
                 accounts.organization,
+              roles:
+                accounts.roles,
               employee:
                 accounts.employee,
               stream:
@@ -197,6 +206,8 @@ export function useStreamActions(
                 wallet!.publicKey,
               organization:
                 accounts.organization,
+              roles:
+                accounts.roles,
               employee:
                 accounts.employee,
               stream:

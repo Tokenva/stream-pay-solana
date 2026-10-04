@@ -124,6 +124,33 @@ fn create_stream_creates_stream_pda() {
         data: instruction::InitializeVault {}.data(),
     };
 
+    let (roles_anchor, _) =
+        anchor_lang::prelude::Pubkey::find_program_address(
+            &[b"organization_roles", organization.as_ref()],
+            &ID,
+        );
+    let roles = Address::new_from_array(roles_anchor.to_bytes());
+
+    let company_anchor =
+        anchor_lang::prelude::Pubkey::new_from_array(company.pubkey().to_bytes());
+
+    let initialize_roles_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
+            AccountMeta::new(roles, false),
+            AccountMeta::new_readonly(system_program, false),
+        ],
+        data: instruction::InitializeOrganizationRoles {
+            admin: company_anchor,
+            finance: company_anchor,
+            approver: company_anchor,
+            viewer: company_anchor,
+        }
+        .data(),
+    };
+
     let deposit_ix = Instruction {
         program_id,
         accounts: vec![
@@ -133,6 +160,7 @@ fn create_stream_creates_stream_pda() {
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(token_program, false),
+            AccountMeta::new_readonly(roles, false),
         ],
         data: instruction::Deposit {
             amount: 1_250_000_000,
@@ -143,7 +171,7 @@ fn create_stream_creates_stream_pda() {
     let setup_tx = Transaction::new(
         &[&company],
         Message::new(
-            &[create_organization_ix, initialize_vault_ix, deposit_ix],
+            &[create_organization_ix, initialize_roles_ix, initialize_vault_ix, deposit_ix],
             Some(&company.pubkey()),
         ),
         svm.latest_blockhash(),
@@ -188,6 +216,7 @@ fn create_stream_creates_stream_pda() {
             AccountMeta::new(stream_escrow, false),
             AccountMeta::new_readonly(system_program, false),
             AccountMeta::new_readonly(token_program, false),
+            AccountMeta::new_readonly(roles, false),
         ],
         data: instruction::CreateStream {
             stream_id,
@@ -248,6 +277,7 @@ fn create_stream_creates_stream_pda() {
             AccountMeta::new(stream_escrow, false),
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new_readonly(token_program, false),
+            AccountMeta::new_readonly(roles, false),
         ],
         data: instruction::TopUpStream {
             stream_id,

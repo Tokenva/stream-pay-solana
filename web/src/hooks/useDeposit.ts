@@ -6,7 +6,12 @@ import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import BN from "bn.js";
 
 import { getProgram } from "@/lib/anchor";
-import { getOrganizationPda, getVaultPda, SPL_TOKEN_PROGRAM_ID } from "@/lib/pdas";
+import {
+  getOrganizationPda,
+  getOrganizationRolesPda,
+  getVaultPda,
+  SPL_TOKEN_PROGRAM_ID,
+} from "@/lib/pdas";
 
 function toBaseUnits(value: string, decimals: number): BN {
   const normalized = value.trim();
@@ -120,6 +125,11 @@ export function useDeposit(mintAddress: string, onDeposited?: () => Promise<void
       const [organization] =
         getOrganizationPda(wallet.publicKey);
 
+      const [roles] =
+        getOrganizationRolesPda(
+          organization,
+        );
+
       const [vault] =
         getVaultPda(organization, mint);
 
@@ -145,6 +155,7 @@ export function useDeposit(mintAddress: string, onDeposited?: () => Promise<void
             .accountsPartial({
               depositor: wallet.publicKey,
               organization,
+              roles,
               depositorTokenAccount: tokenAccount,
               mint,
               vault,

@@ -1,6 +1,7 @@
 pub mod cancel_stream;
 pub mod claim;
 pub mod create_organization;
+pub mod initialize_organization_roles;
 pub mod create_stream;
 pub mod deposit;
 pub mod initialize_protocol;
@@ -14,6 +15,7 @@ pub mod cross_chain_top_up;
 pub use cancel_stream::*;
 pub use claim::*;
 pub use create_organization::*;
+pub use initialize_organization_roles::*;
 pub use create_stream::*;
 pub use deposit::*;
 pub use initialize_protocol::*;

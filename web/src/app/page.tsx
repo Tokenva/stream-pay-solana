@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import ActivityHistory from "@/components/ActivityHistory";
 import WalletButton from "@/components/WalletButton";
 import { useOrganization } from "@/hooks/useOrganization";
@@ -46,6 +47,26 @@ function toBaseUnits(
   ).toString();
 }
 
+function formatDateTimeLocal(date: Date) {
+  return `${date
+    .getFullYear()
+    .toString()
+    .padStart(4, "0")}-${(
+      date.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}-${date
+        .getDate()
+        .toString()
+        .padStart(2, "0")}T${date
+          .getHours()
+          .toString()
+          .padStart(2, "0")}:${date
+            .getMinutes()
+            .toString()
+            .padStart(2, "0")}`;
+}
+
 function formatTokenAmount(
   raw: bigint,
 ) {
@@ -77,6 +98,12 @@ export default function Home() {
   const [streamAmount, setStreamAmount] =
     useState("500");
 
+  const [payrollType, setPayrollType] =
+    useState("Salary");
+
+  const [payrollTemplate, setPayrollTemplate] =
+    useState("Monthly Salary");
+
   const [streamId, setStreamId] =
     useState(1);
 
@@ -95,6 +122,12 @@ export default function Home() {
   const [mounted, setMounted] =
     useState(false);
 
+  const [onboardingLoading, setOnboardingLoading] =
+    useState(false);
+
+  const [employeeWalletValid, setEmployeeWalletValid] =
+    useState(false);
+
   useEffect(() => {
     setMounted(true);
 
@@ -110,7 +143,7 @@ export default function Home() {
 
     const end =
       new Date(
-        (now + 23 * 3600) * 1000,
+        (now + 30 * 24 * 3600) * 1000,
       );
 
     const formatDateTime = (
@@ -145,7 +178,10 @@ export default function Home() {
 
   const {
     organization,
+    organizationRoles,
+    rolesExists,
     exists: organizationExists,
+    createOrganization,
   } = useOrganization();
 
   const {
@@ -153,6 +189,7 @@ export default function Home() {
     exists: vaultExists,
     balance: vaultBalance,
     refresh: refreshVault,
+    createVault,
   } = useVault(MINT);
 
   const {
@@ -203,19 +240,61 @@ export default function Home() {
     publicKey?.toBase58(),
   );
 
-  useEffect(() => {
-    if (
-      publicKey &&
-      !employeeAddress
-    ) {
-      setEmployeeAddress(
-        publicKey.toBase58(),
+  async function handleCompanySetup() {
+    try {
+      setMessage(null);
+      setActionError(null);
+      setOnboardingLoading(true);
+
+      if (!publicKey) {
+        throw new Error("Connect your treasury wallet first");
+      }
+
+      if (!organizationExists) {
+        await createOrganization();
+      }
+
+      if (!vaultExists) {
+        await createVault();
+      }
+
+      await refreshVault();
+
+      setMessage("Company setup complete");
+    } catch (err) {
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : "Company setup failed",
+      );
+    } finally {
+      setOnboardingLoading(false);
+    }
+  }
+
+  function handleVerifyEmployeeWallet() {
+    try {
+      const address = employeeAddress.trim();
+
+      if (!address) {
+        throw new Error("Enter the employee wallet address");
+      }
+
+      const normalized = new PublicKey(address).toBase58();
+
+      setEmployeeAddress(normalized);
+      setEmployeeWalletValid(true);
+      setMessage("Employee wallet address is valid");
+      setActionError(null);
+    } catch (err) {
+      setEmployeeWalletValid(false);
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : "Invalid employee wallet address",
       );
     }
-  }, [
-    publicKey,
-    employeeAddress,
-  ]);
+  }
 
   async function handleDeposit() {
     try {
@@ -293,6 +372,38 @@ export default function Home() {
     }
   }
 
+  function applyPayrollTemplate(template: string) {
+    if (template === "Custom") {
+      return;
+    }
+
+    const start = new Date(
+      Date.now() + 5 * 60 * 1000,
+    );
+
+    const days =
+      template === "Bonus" ? 7 : 30;
+
+    const amount =
+      template === "Bonus" ? "100" : "500";
+
+    setPayrollType(
+      template === "Monthly Salary"
+        ? "Salary"
+        : template,
+    );
+    setStreamAmount(amount);
+    setStartTime(formatDateTimeLocal(start));
+    setEndTime(
+      formatDateTimeLocal(
+        new Date(
+          start.getTime() +
+            days * 24 * 60 * 60 * 1000,
+        ),
+      ),
+    );
+  }
+
   async function handleCreateStream() {
 
     try {
@@ -323,7 +434,7 @@ export default function Home() {
       await refreshVault();
 
       setMessage(
-        `Stream created: ${shortenAddress(
+        `${payrollType} payroll created: ${shortenAddress(
           result.stream.toBase58(),
         )}`,
       );
@@ -366,6 +477,59 @@ export default function Home() {
       claimable,
     );
 
+  const activeStreamCount =
+    indexedStreams.filter((item) => !item.canceled).length;
+
+  const employeeCount =
+    new Set(indexedStreams.map((item) => item.employee)).size;
+
+  const employeeDirectory = Array.from(
+    new Set(indexedStreams.map((item) => item.employee)),
+  ).map((employee) => ({
+    address: employee,
+    totalStreams: indexedStreams.filter(
+      (item) => item.employee === employee,
+    ).length,
+    activeStreams: indexedStreams.filter(
+      (item) =>
+        item.employee === employee &&
+        !item.canceled,
+    ).length,
+  }));
+
+  const isOwner = organizationExists && !!publicKey;
+
+  const currentRole =
+    isOwner
+      ? "Owner"
+      : rolesExists && organizationRoles && publicKey
+        ? publicKey.equals(organizationRoles.admin)
+          ? "Admin"
+          : publicKey.equals(organizationRoles.finance)
+            ? "Finance"
+            : publicKey.equals(organizationRoles.approver)
+              ? "Approver"
+              : publicKey.equals(organizationRoles.viewer)
+                ? "Viewer"
+                : "Employee"
+        : "Unassigned";
+
+  const canCreatePayroll =
+    currentRole === "Owner" ||
+    currentRole === "Admin" ||
+    currentRole === "Approver";
+
+  const canManageTreasury =
+    currentRole === "Owner" ||
+    currentRole === "Admin" ||
+    currentRole === "Finance";
+
+  const canManageStreams =
+    currentRole === "Owner" ||
+    currentRole === "Admin" ||
+    currentRole === "Finance" ||
+    currentRole === "Approver";
+
   return (
     <main className="min-h-screen bg-black px-6 py-10 text-white">
       <div className="mx-auto max-w-6xl">
@@ -395,7 +559,171 @@ export default function Home() {
           </div>
         )}
 
-        <section className="mt-10 grid gap-6 md:grid-cols-3">
+        <section className="mt-10">
+          <div className="mb-4">
+            <p className="text-sm text-zinc-400">
+              Payroll Dashboard
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold">
+              Company Overview
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                label: "Treasury Balance",
+                value: vaultBalance ?? "0",
+              },
+              {
+                label: "Payroll This Month",
+                value: "—",
+              },
+              {
+                label: "Active Streams",
+                value: activeStreamCount.toString(),
+              },
+              {
+                label: "Pending Actions",
+                value: "—",
+              },
+              {
+                label: "Employees",
+                value: employeeCount.toString(),
+              },
+              {
+                label: "Recent Activity",
+                value: indexedStreams.length > 0
+                  ? "Available"
+                  : "None yet",
+              },
+              {
+                label: "Your Role",
+                value: currentRole,
+              },
+            ].map((card) => (
+              <div
+                key={card.label}
+                className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5"
+              >
+                <p className="text-sm text-zinc-500">
+                  {card.label}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {card.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-zinc-400">
+                Company Onboarding
+              </p>
+
+              <h2 className="mt-1 text-xl font-semibold">
+                {organizationExists && vaultExists
+                  ? "Company ready"
+                  : "Set up your payroll company"}
+              </h2>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Connect the treasury wallet, create the company, and initialize its payroll vault.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={
+                onboardingLoading ||
+                !publicKey ||
+                !MINT ||
+                (organizationExists && vaultExists)
+              }
+              onClick={handleCompanySetup}
+              className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black disabled:opacity-40"
+            >
+              {onboardingLoading
+                ? "Setting up..."
+                : organizationExists && vaultExists
+                  ? "Setup Complete"
+                  : "Set Up Company"}
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-zinc-800 p-4">
+              <p className="text-xs text-zinc-500">Company</p>
+              <p className="mt-1 text-sm">
+                {organizationExists ? "Created" : "Not created"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 p-4">
+              <p className="text-xs text-zinc-500">Payroll Vault</p>
+              <p className="mt-1 text-sm">
+                {vaultExists ? "Ready" : "Not initialized"}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm text-zinc-400">
+                Access Control
+              </p>
+              <h2 className="mt-1 text-xl font-semibold">
+                Your permissions
+              </h2>
+              <p className="mt-2 text-sm text-zinc-500">
+                Available actions follow your organization role.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-zinc-700 px-4 py-3 text-sm">
+              <span className="text-zinc-500">
+                Current role
+              </span>
+              <span className="ml-2 font-semibold">
+                {currentRole}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {([
+              ["Create payroll", canCreatePayroll],
+              ["Deposit treasury", canManageTreasury],
+              ["Manage streams", canManageStreams],
+              ["Claim payroll", currentRole === "Employee"],
+            ] as [string, boolean][]).map(([label, allowed]) => (
+              <div
+                key={label}
+                className="rounded-xl border border-zinc-800 p-4"
+              >
+                <p className="text-sm font-medium">
+                  {label}
+                </p>
+                <p
+                  className={`mt-2 text-sm ${
+                    allowed
+                      ? "text-green-400"
+                      : "text-zinc-600"
+                  }`}
+                >
+                  {allowed ? "Available" : "Restricted"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-6 md:grid-cols-3">
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
             <p className="text-sm text-zinc-400">
               Wallet
@@ -489,12 +817,124 @@ export default function Home() {
 
         <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
           <p className="text-sm text-zinc-400">
+            Employee Onboarding
+          </p>
+
+          <h2 className="mt-1 text-xl font-semibold">
+            Add employee wallet
+          </h2>
+
+          <p className="mt-2 text-sm text-zinc-500">
+            Enter and validate the wallet that will receive payroll.
+          </p>
+
+          <div className="mt-5 flex flex-col gap-4 sm:flex-row">
+            <input
+              value={employeeAddress}
+              onChange={(event) => {
+                setEmployeeAddress(event.target.value);
+                setEmployeeWalletValid(false);
+              }}
+              placeholder="Employee wallet address"
+              className="flex-1 rounded-xl border border-zinc-800 bg-black px-4 py-3 text-sm"
+            />
+
+            <button
+              type="button"
+              disabled={!employeeAddress.trim()}
+              onClick={handleVerifyEmployeeWallet}
+              className="rounded-xl border border-zinc-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              Verify Wallet
+            </button>
+          </div>
+
+          <p className={`mt-4 text-sm ${
+            employeeWalletValid
+              ? "text-green-400"
+              : "text-zinc-500"
+          }`}>
+            {employeeWalletValid
+              ? "Wallet address validated"
+              : "Employee wallet not validated"}
+          </p>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+          <p className="text-sm text-zinc-400">
+            Payroll
+          </p>
+
+          <h2 className="mt-1 text-xl font-semibold">
+            Employee Directory
+          </h2>
+
+          {employeeDirectory.length === 0 ? (
+            <p className="mt-5 text-sm text-zinc-500">
+              No employees found.
+            </p>
+          ) : (
+            <div className="mt-5 space-y-3">
+              {employeeDirectory.map((employee) => (
+                <div
+                  key={employee.address}
+                  className="rounded-xl border border-zinc-800 p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {shortenAddress(employee.address)}
+                      </p>
+                      <p className="mt-1 break-all text-xs text-zinc-500">
+                        {employee.address}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-3 text-sm sm:items-end">
+                      <div className="text-zinc-400">
+                        {employee.activeStreams} active / {employee.totalStreams} total streams
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmployeeAddress(employee.address);
+                          setEmployeeWalletValid(true);
+                          setMessage(
+                            `Selected employee ${shortenAddress(employee.address)}`,
+                          );
+                          setActionError(null);
+                        }}
+                        className="rounded-lg border border-zinc-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-zinc-900"
+                      >
+                        Use for Payroll
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+          <p className="text-sm text-zinc-400">
             Treasury Deposit
           </p>
 
           <h2 className="mt-1 text-xl font-semibold">
             Fund company payroll
           </h2>
+
+          <p className={`mt-2 text-sm ${
+            canManageTreasury
+              ? "text-green-400"
+              : "text-zinc-600"
+          }`}>
+            {canManageTreasury
+              ? "Your role can fund the company treasury."
+              : "Your current role cannot perform treasury deposits."}
+          </p>
 
           <div className="mt-5 flex flex-col gap-4 sm:flex-row">
             <input
@@ -513,6 +953,7 @@ export default function Home() {
               type="button"
               disabled={
                 depositLoading ||
+                !canManageTreasury ||
                 !vaultExists ||
                 !tokenAccount ||
                 !depositAmount
@@ -534,11 +975,45 @@ export default function Home() {
             </p>
 
             <h2 className="mt-1 text-xl font-semibold">
-              Create payroll stream
+              Create Payroll
             </h2>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <select
+              value={payrollTemplate}
+              onChange={(event) => {
+                const value = event.target.value;
+                setPayrollTemplate(value);
+                applyPayrollTemplate(value);
+              }}
+              className="rounded-xl border border-zinc-800 bg-black px-4 py-3 text-sm"
+            >
+              <option value="Monthly Salary">
+                Monthly Salary Template
+              </option>
+              <option value="Contractor">
+                Contractor Template
+              </option>
+              <option value="Bonus">
+                Bonus Template
+              </option>
+              <option value="Custom">
+                Custom Payroll
+              </option>
+            </select>
+
+            <select
+              value={payrollType}
+              onChange={(event) =>
+                setPayrollType(event.target.value)
+              }
+              className="rounded-xl border border-zinc-800 bg-black px-4 py-3 text-sm"
+            >
+              <option value="Salary">Salary</option>
+              <option value="Contractor">Contractor</option>
+              <option value="Bonus">Bonus</option>
+            </select>
             <input
               value={employeeAddress}
               onChange={(event) =>
@@ -606,8 +1081,9 @@ export default function Home() {
             type="button"
             disabled={
               streamLoading ||
+              !canCreatePayroll ||
               !vaultExists ||
-              !employeeAddress ||
+              !employeeWalletValid ||
               !streamAmount
             }
             onClick={
@@ -617,7 +1093,7 @@ export default function Home() {
           >
             {streamLoading
               ? "Creating..."
-              : "Create Stream"}
+              : `Create ${payrollType} Payroll` }
           </button>
         </section>
 
@@ -666,11 +1142,27 @@ export default function Home() {
                     {earnedDisplay}
                   </p>
                 </div>
+                <div className="mt-4 rounded-xl border border-zinc-800 p-4">
+                  <p className="text-xs text-zinc-500">
+                    Stream Management
+                  </p>
+                  <p className={`mt-2 text-sm ${
+                    canManageStreams
+                      ? "text-green-400"
+                      : "text-zinc-600"
+                  }`}>
+                    {canManageStreams
+                      ? `${currentRole} can top up and cancel streams.`
+                      : `${currentRole} has read-only stream access.`}
+                  </p>
+                </div>
+
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
                     type="button"
                     disabled={
                       actionLoading ||
+                      !canManageStreams ||
                       streamData.canceled
                     }
                     onClick={handleTopUp}
@@ -685,6 +1177,7 @@ export default function Home() {
                     type="button"
                     disabled={
                       actionLoading ||
+                      !canManageStreams ||
                       streamData.canceled
                     }
                     onClick={handleCancel}

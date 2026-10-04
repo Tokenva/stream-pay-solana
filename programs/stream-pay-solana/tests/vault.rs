@@ -12,7 +12,9 @@ use solana_signer::Signer;
 use solana_transaction::Transaction;
 
 use stream_pay_solana::{
-    constants::{ORGANIZATION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
+    constants::{
+        ORGANIZATION_ROLES_SEED, ORGANIZATION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
+    },
     instruction, ID,
 };
 
@@ -74,6 +76,14 @@ fn initialize_vault_and_deposit() {
 
     let organization = Address::new_from_array(organization_anchor.to_bytes());
 
+    // Organization roles PDA.
+    let (organization_roles_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[ORGANIZATION_ROLES_SEED, organization.as_ref()],
+        &ID,
+    );
+
+    let organization_roles = Address::new_from_array(organization_roles_anchor.to_bytes());
+
     // Company-specific vault PDA.
     let (vault_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
         &[VAULT_SEED, organization.as_ref(), mint.as_ref()],
@@ -116,10 +126,32 @@ fn initialize_vault_and_deposit() {
         data: instruction::InitializeVault {}.data(),
     };
 
+    // Initialize organization roles.
+    let initialize_organization_roles_ix = Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(company.pubkey(), true),
+            AccountMeta::new_readonly(organization, false),
+            AccountMeta::new(organization_roles, false),
+            AccountMeta::new_readonly(system_program, false),
+        ],
+        data: instruction::InitializeOrganizationRoles {
+            admin: company.pubkey(),
+            finance: company.pubkey(),
+            approver: company.pubkey(),
+            viewer: company.pubkey(),
+        }
+        .data(),
+    };
+
     let setup_tx = Transaction::new(
         &[&company],
         Message::new(
-            &[create_organization_ix, initialize_vault_ix],
+            &[
+                create_organization_ix,
+                initialize_vault_ix,
+                initialize_organization_roles_ix,
+            ],
             Some(&company.pubkey()),
         ),
         svm.latest_blockhash(),
@@ -138,6 +170,7 @@ fn initialize_vault_and_deposit() {
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(token_program, false),
+            AccountMeta::new_readonly(organization_roles, false),
         ],
         data: instruction::Deposit {
             amount: 1_000_000_000,

@@ -3,6 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "@/lib/anchor";
 
 export const ORGANIZATION_SEED = "organization";
+export const ORGANIZATION_ROLES_SEED = "organization_roles";
 export const VAULT_SEED = "vault";
 export const VAULT_AUTHORITY_SEED = "vault-authority";
 export const STREAM_SEED = "stream";
@@ -17,6 +18,18 @@ export function getOrganizationPda(authority: PublicKey) {
     [
       Buffer.from(ORGANIZATION_SEED),
       authority.toBuffer(),
+    ],
+    PROGRAM_ID,
+  );
+}
+
+export function getOrganizationRolesPda(
+  organization: PublicKey,
+) {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from(ORGANIZATION_ROLES_SEED),
+      organization.toBuffer(),
     ],
     PROGRAM_ID,
   );
