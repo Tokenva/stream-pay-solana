@@ -12,6 +12,7 @@ import { useStream } from "@/hooks/useStream";
 import { useStreamActions } from "@/hooks/useStreamActions";
 import { useIndexedStreams } from "@/hooks/useIndexedStreams";
 import ActivityStats from "@/components/ActivityStats";
+import OperationalDashboard from "@/components/OperationalDashboard";
 
 const MINT =
   process.env.NEXT_PUBLIC_TOKEN_MINT ?? "";
@@ -616,6 +617,8 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+        <OperationalDashboard />
 
         <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

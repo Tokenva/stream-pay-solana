@@ -64,6 +64,11 @@ const port = Number(
   process.env.PORT ?? 4000,
 );
 
+const RETRY_BASE_DELAY_SECONDS = 5;
+const RETRY_MAX_DELAY_SECONDS = 300;
+const QUEUE_WORKER_INTERVAL_MS = 5_000;
+const STALE_JOB_TIMEOUT_SECONDS = 120;
+
 app.get("/health", async (_req, res) => {
   let database = "ok";
   let rpc = "ok";
@@ -1021,12 +1026,20 @@ async function retryJob(
       [id, message],
     );
 
+    log("error", "queue_job_retry_exhausted", {
+      jobId: id,
+      attempts,
+      maxAttempts,
+      error: message,
+    });
+
     return;
   }
 
   const delaySeconds = Math.min(
-    2 ** Math.max(attempts - 1, 0) * 5,
-    300,
+    2 ** Math.max(attempts - 1, 0) *
+      RETRY_BASE_DELAY_SECONDS,
+    RETRY_MAX_DELAY_SECONDS,
   );
 
   await pool.query(
@@ -1043,6 +1056,15 @@ async function retryJob(
     `,
     [id, message, delaySeconds],
   );
+
+  log("warn", "queue_job_retry_scheduled", {
+    jobId: id,
+    attempt: attempts,
+    nextAttempt: attempts + 1,
+    maxAttempts,
+    retryDelaySeconds: delaySeconds,
+    error: message,
+  });
 }
 
 async function processJob(job: {
@@ -1159,6 +1181,69 @@ async function processJob(job: {
   }
 
   await completeJob(job.id);
+}
+
+async function recoverStaleJobs() {
+  const result = await pool.query(
+    `
+    UPDATE job_queue
+    SET
+      status = CASE
+        WHEN attempts >= max_attempts
+          THEN 'failed'
+        ELSE 'pending'
+      END,
+      locked_at = NULL,
+      run_after = CASE
+        WHEN attempts >= max_attempts
+          THEN run_after
+        ELSE NOW()
+      END,
+      last_error = CASE
+        WHEN attempts >= max_attempts
+          THEN COALESCE(
+            last_error,
+            'Worker lease expired after stale job timeout'
+          )
+        ELSE
+          'Worker lease expired; job requeued'
+      END,
+      updated_at = NOW()
+    WHERE status = 'running'
+      AND locked_at IS NOT NULL
+      AND locked_at <
+        NOW() - (
+          $1 * INTERVAL '1 second'
+        )
+    RETURNING
+      id,
+      job_type,
+      attempts,
+      max_attempts,
+      status,
+      last_error
+    `,
+    [STALE_JOB_TIMEOUT_SECONDS],
+  );
+
+  for (const job of result.rows) {
+    log(
+      job.status === "failed"
+        ? "error"
+        : "warn",
+      job.status === "failed"
+        ? "queue_job_stale_exhausted"
+        : "queue_job_stale_requeued",
+      {
+        jobId: job.id,
+        jobType: job.job_type,
+        attempts: job.attempts,
+        maxAttempts: job.max_attempts,
+        status: job.status,
+        error: job.last_error,
+      },
+    );
+  }
 }
 
 let workerRunning = false;
@@ -1788,6 +1873,7 @@ async function startServer() {
 
   startActivitySubscription();
 
+  void recoverStaleJobs();
   void runQueueWorker();
 
   void reconcileTransactionStatuses();
@@ -1812,9 +1898,11 @@ async function startServer() {
   }, 60_000);
 
   setInterval(() => {
+    void recoverStaleJobs();
+    void runQueueWorker();
     void reconcileTransactionStatuses();
     void syncTransactionWebhookEvents();
-  }, 15_000);
+  }, QUEUE_WORKER_INTERVAL_MS);
 
   setInterval(() => {
     void checkOperationalAlerts(lastSyncAt);
