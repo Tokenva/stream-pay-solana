@@ -13,6 +13,7 @@ pub mod initialize_protocol;
 pub mod initialize_vault;
 pub mod top_up_stream;
 pub mod update_organization_policy;
+pub mod cross_chain_cancel;
 
 pub use cancel_stream::*;
 pub use claim::*;
@@ -29,3 +30,4 @@ pub use initialize_protocol::*;
 pub use initialize_vault::*;
 pub use top_up_stream::*;
 pub use update_organization_policy::*;
+pub use cross_chain_cancel::*;

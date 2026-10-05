@@ -11,14 +11,10 @@ stream-pay-solana/
 ├── Anchor.toml
 ├── Cargo.lock
 ├── Cargo.toml
-├── M12_REPRODUCIBLE_DEMO.md
-├── P1_PRODUCT_DEFINITION.md
-├── StreamPay_Product_Roadmap_M0-M12.md
 ├── app/                              # empty app workspace
-├── doc.md
-├── readme.md
-├── structure.md
 ├── backend/
+│   ├── .env
+│   ├── .env.example
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
@@ -33,8 +29,17 @@ stream-pay-solana/
 │       ├── solana.ts
 │       └── webhooks.ts
 ├── deployment.json
+├── docs/
+│   ├── M12_REPRODUCIBLE_DEMO.md
+│   ├── P1_PRODUCT_DEFINITION.md
+│   ├── StreamPay_Product_Roadmap_M0-M12.md
+│   ├── doc.md
+│   ├── security/
+│   │   └── THREAT_MODEL.md
+│   └── structure.md
 ├── evm-gateway/
 │   ├── .env
+│   ├── .env.example
 │   ├── .gitignore
 │   ├── deployment.json
 │   ├── hardhat.config.ts
@@ -112,6 +117,7 @@ stream-pay-solana/
 │           ├── security.rs
 │           ├── stream.rs
 │           └── vault.rs
+├── readme.md
 ├── rust-toolchain.toml
 ├── target/
 │   ├── debug/
@@ -122,6 +128,8 @@ stream-pay-solana/
 │   ├── sbpfv3-solana-solana/
 │   └── tmp/
 ├── web/
+│   ├── .env
+│   ├── .env.example
 │   ├── AGENTS.md
 │   ├── CLAUDE.md
 │   ├── README.md

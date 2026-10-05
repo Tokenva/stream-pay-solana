@@ -152,6 +152,18 @@ pub mod stream_pay_solana {
         crate::instructions::cross_chain_asset::handle_initialize_cross_chain_asset_config(ctx)
     }
 
+    pub fn execute_cross_chain_cancel(
+    ctx: Context<ExecuteCrossChainCancel>,
+    sequence: u64,
+    vaa_body: Vec<u8>,
+) -> Result<()> {
+    instructions::handle_execute_cross_chain_cancel(
+        ctx,
+        sequence,
+        vaa_body,
+    )
+}
+
     pub fn execute_cross_chain_top_up(
         ctx: Context<ExecuteCrossChainTopUp>,
         sequence: u64,
