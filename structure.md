@@ -1,6 +1,6 @@
 # StreamPay Solana Project Structure
 
-This project contains the Solana program, the EVM gateway, backend services, and the web frontend.
+This project contains the on-chain Solana program, the EVM gateway, backend services, and the Next.js frontend.
 
 ```text
 stream-pay-solana/
@@ -14,7 +14,10 @@ stream-pay-solana/
 ├── M12_REPRODUCIBLE_DEMO.md
 ├── P1_PRODUCT_DEFINITION.md
 ├── StreamPay_Product_Roadmap_M0-M12.md
-├── app/                              # empty directory
+├── app/                              # empty app workspace
+├── doc.md
+├── readme.md
+├── structure.md
 ├── backend/
 │   ├── package.json
 │   ├── tsconfig.json
@@ -30,11 +33,13 @@ stream-pay-solana/
 │       ├── solana.ts
 │       └── webhooks.ts
 ├── deployment.json
-├── doc.md
 ├── evm-gateway/
+│   ├── .env
+│   ├── .gitignore
 │   ├── deployment.json
 │   ├── hardhat.config.ts
 │   ├── package.json
+│   ├── package-lock.json
 │   ├── remappings.txt
 │   ├── tsconfig.json
 │   ├── artifacts/
@@ -99,9 +104,15 @@ stream-pay-solana/
 │       │       ├── top_up_stream.rs
 │       │       └── update_organization_policy.rs
 │       └── tests/
-├── readme.md
+│           ├── claim.rs
+│           ├── cross_chain_asset.rs
+│           ├── cross_chain_security.rs
+│           ├── organization.rs
+│           ├── protocol_config.rs
+│           ├── security.rs
+│           ├── stream.rs
+│           └── vault.rs
 ├── rust-toolchain.toml
-├── structure.md
 ├── target/
 │   ├── debug/
 │   ├── deploy/
@@ -121,8 +132,16 @@ stream-pay-solana/
 │   ├── postcss.config.mjs
 │   ├── tsconfig.json
 │   ├── public/
+│   │   ├── file.svg
+│   │   ├── globe.svg
+│   │   ├── next.svg
+│   │   ├── vercel.svg
+│   │   └── window.svg
 │   └── src/
 │       ├── app/
+│       │   ├── api/
+│       │   │   └── backend/
+│       │   │       └── route.ts
 │       │   ├── favicon.ico
 │       │   ├── globals.css
 │       │   ├── layout.tsx
@@ -133,9 +152,23 @@ stream-pay-solana/
 │       │   ├── OperationalDashboard.tsx
 │       │   ├── WalletButton.tsx
 │       │   └── providers/
+│       │       └── SolanaProvider.tsx
 │       ├── hooks/
+│       │   ├── useActivities.ts
+│       │   ├── useDeposit.ts
+│       │   ├── useIndexedStreams.ts
+│       │   ├── useOrganization.ts
+│       │   ├── useOrganizationPolicy.ts
+│       │   ├── useStream.ts
+│       │   ├── useStreamActions.ts
+│       │   └── useVault.ts
 │       ├── idl/
+│       │   ├── stream_pay_solana.json
+│       │   └── stream_pay_solana.ts
 │       └── lib/
+│           ├── anchor.ts
+│           ├── backend.ts
+│           └── pdas.ts
 └── (generated build artifacts and caches)
 ```
 
@@ -144,6 +177,6 @@ stream-pay-solana/
 - `programs/stream-pay-solana/`: on-chain Solana program and Rust source.
 - `evm-gateway/`: Solidity contracts, scripts, and deployment tooling.
 - `backend/`: TypeScript services for indexing, alerting, DB, and webhooks.
-- `web/`: Next.js frontend application.
-- `target/`: build and generated artifacts.
-- `idls/`: cross-chain and Wormhole-related interface definitions.
+- `web/`: Next.js frontend application and client-side providers.
+- `target/`: generated build artifacts and cache output.
+- `idls/`: Wormhole and cross-chain interface definitions.

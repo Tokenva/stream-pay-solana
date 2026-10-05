@@ -23,6 +23,23 @@ function isCrossChainStatus(
   );
 }
 
+const ALLOWED_STATUS_TRANSITIONS: Record<
+  CrossChainStatus,
+  readonly CrossChainStatus[]
+> = {
+  created: ["submitted", "failed"],
+  submitted: ["source_confirmed", "failed"],
+  source_confirmed: ["message_observed", "failed"],
+  message_observed: ["vaa_available", "failed"],
+  vaa_available: ["destination_submitted", "failed"],
+  destination_submitted: [
+    "destination_confirmed",
+    "failed",
+  ],
+  destination_confirmed: [],
+  failed: [],
+};
+
 export async function registerCrossChainMessage(input: {
   gatewayTxHash: string;
   action: string;
@@ -234,6 +251,33 @@ export async function updateCrossChainMessageStatus(input: {
   if (!isCrossChainStatus(input.status)) {
     throw new Error(
       `Invalid cross-chain status: ${input.status}`,
+    );
+  }
+
+  const currentResult = await pool.query(
+    `
+    SELECT *
+    FROM cross_chain_messages
+    WHERE id = $1
+    `,
+    [input.id],
+  );
+
+  const currentRow = currentResult.rows[0];
+
+  if (!currentRow) {
+    return null;
+  }
+
+  const currentStatus =
+    currentRow.status as CrossChainStatus;
+
+  const allowedNextStatuses =
+    ALLOWED_STATUS_TRANSITIONS[currentStatus];
+
+  if (!allowedNextStatuses.includes(input.status)) {
+    throw new Error(
+      `Invalid cross-chain status transition: ${currentStatus} -> ${input.status}`,
     );
   }
 

@@ -5,13 +5,13 @@ use solana_keccak_hasher::hash;
 use crate::{
     constants::{
         CONSUMED_VAA_SEED, CROSS_CHAIN_ASSET_CONFIG_SEED, CROSS_CHAIN_CONFIG_SEED,
-        CROSS_CHAIN_STREAM_SEED, ORGANIZATION_SEED, STREAM_ESCROW_SEED, STREAM_SEED,
-        VAULT_AUTHORITY_SEED, VAULT_SEED,
+        CROSS_CHAIN_STREAM_SEED, ORGANIZATION_POLICY_SEED, ORGANIZATION_SEED, STREAM_ESCROW_SEED,
+        STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     error::StreamPayError,
     state::{
         ConsumedVaa, CrossChainAssetConfig, CrossChainConfig, CrossChainStream, Organization,
-        Stream,
+        OrganizationPolicy, Stream,
     },
 };
 
@@ -67,13 +67,24 @@ pub struct ExecuteCrossChainAction<'info> {
     pub cross_chain_asset_config: Account<'info, CrossChainAssetConfig>,
 
     #[account(
-        seeds = [
-            ORGANIZATION_SEED,
-            organization.authority.as_ref(),
-        ],
-        bump = organization.bump,
-    )]
+    seeds = [
+        ORGANIZATION_SEED,
+        organization.authority.as_ref(),
+    ],
+    bump = organization.bump,
+)]
     pub organization: Account<'info, Organization>,
+
+    #[account(
+    seeds = [
+        ORGANIZATION_POLICY_SEED,
+        organization.key().as_ref(),
+    ],
+    bump = organization_policy.bump,
+    constraint = organization_policy.organization == organization.key()
+        @ StreamPayError::Unauthorized,
+)]
+    pub organization_policy: Account<'info, OrganizationPolicy>,
 
     pub employee: SystemAccount<'info>,
 
@@ -286,12 +297,50 @@ pub fn handle_execute_cross_chain_action(
         StreamPayError::InvalidVaaPayload
     );
 
-    require!(
-        employee_key == ctx.accounts.employee.key(),
-        StreamPayError::InvalidVaaPayload
-    );
+require!(
+    employee_key == ctx.accounts.employee.key(),
+    StreamPayError::InvalidVaaPayload
+);
 
-    let amount = decode_u64_word(&payload[PAYLOAD_AMOUNT_OFFSET..PAYLOAD_AMOUNT_OFFSET + 32])?;
+require!(
+    !ctx.accounts.organization_policy.paused,
+    StreamPayError::OrganizationPaused
+);
+
+require!(
+    ctx.accounts.organization_policy.approved_mint == ctx.accounts.mint.key(),
+    StreamPayError::InvalidPolicyAsset
+);
+
+let amount = decode_u64_word(
+    &payload[PAYLOAD_AMOUNT_OFFSET..PAYLOAD_AMOUNT_OFFSET + 32]
+)?;
+
+if ctx.accounts.organization_policy.max_transaction_amount > 0 {
+    require!(
+        amount <= ctx.accounts.organization_policy.max_transaction_amount,
+        StreamPayError::TransactionLimitExceeded
+    );
+}
+
+if ctx.accounts.organization_policy.max_payroll_amount > 0 {
+    require!(
+        amount <= ctx.accounts.organization_policy.max_payroll_amount,
+        StreamPayError::PayrollLimitExceeded
+    );
+}
+
+if ctx.accounts.organization_policy.max_employee_amount > 0 {
+    require!(
+        amount <= ctx.accounts.organization_policy.max_employee_amount,
+        StreamPayError::EmployeeLimitExceeded
+    );
+}
+
+require!(
+    !ctx.accounts.organization_policy.require_approval,
+    StreamPayError::ApprovalRequired
+);
 
     let start_time_u64 =
         decode_u64_word(&payload[PAYLOAD_START_TIME_OFFSET..PAYLOAD_START_TIME_OFFSET + 32])?;

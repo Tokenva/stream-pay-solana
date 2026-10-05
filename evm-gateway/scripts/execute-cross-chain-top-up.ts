@@ -55,6 +55,9 @@ const VAULT_SEED =
 const VAULT_AUTHORITY_SEED =
   Buffer.from("vault-authority");
 
+const ORGANIZATION_POLICY_SEED =
+  Buffer.from("organization_policy");
+
 const WALLET_PATH =
   `${process.env.HOME}/.config/solana/id.json`;
 
@@ -233,6 +236,11 @@ async function main() {
       ],
       PROGRAM_ID,
     );
+
+  console.log(
+    "OrganizationPolicy:",
+    organizationPolicy.toBase58(),
+  );
 
   const [
     consumedVaa,
@@ -437,6 +445,11 @@ async function main() {
         },
         {
           pubkey: ORGANIZATION,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: organizationPolicy,
           isSigner: false,
           isWritable: false,
         },

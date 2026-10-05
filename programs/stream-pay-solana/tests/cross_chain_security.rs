@@ -21,9 +21,9 @@ use solana_transaction::Transaction;
 use stream_pay_solana::{
     constants::{
         CONSUMED_VAA_SEED, CROSS_CHAIN_ASSET_CONFIG_SEED, CROSS_CHAIN_CONFIG_SEED,
-        CROSS_CHAIN_STREAM_SEED, ORGANIZATION_ROLES_SEED, ORGANIZATION_SEED, PROTOCOL_CONFIG_SEED,
-        STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
-        WORMHOLE_SEPOLIA_CHAIN_ID,
+        CROSS_CHAIN_STREAM_SEED, ORGANIZATION_POLICY_SEED, ORGANIZATION_ROLES_SEED,
+        ORGANIZATION_SEED, PROTOCOL_CONFIG_SEED, STREAM_ESCROW_SEED, STREAM_SEED,
+        VAULT_AUTHORITY_SEED, VAULT_SEED, WORMHOLE_SEPOLIA_CHAIN_ID,
     },
     instruction,
     state::ConsumedVaa,
@@ -67,6 +67,8 @@ const END_TIME_OFFSET: usize = 352;
 const MESSAGE_NONCE_OFFSET: usize = 384;
 
 const ACTION_CREATE: u8 = 0;
+
+const ACTION_TOP_UP: u8 = 1;
 
 const SEPOLIA_CHAIN: u16 = 10002;
 
@@ -628,6 +630,7 @@ fn execute_create(
             AccountMeta::new_readonly(consumed_pda(sequence), false),
             AccountMeta::new_readonly(ctx.cross_chain_asset_config, false),
             AccountMeta::new_readonly(ctx.organization, false),
+            AccountMeta::new_readonly(organization_policy(ctx), false),
             AccountMeta::new_readonly(ctx.employee.pubkey(), false),
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new(ctx.vault, false),
@@ -652,6 +655,58 @@ fn execute_create(
         .send_transaction(tx)
         .map(|_| ())
         .map_err(|err| format!("{err:?}"))
+}
+
+fn organization_policy(ctx: &TestContext) -> Address {
+    let (policy_anchor, _) = anchor_lang::prelude::Pubkey::find_program_address(
+        &[ORGANIZATION_POLICY_SEED, ctx.organization.as_ref()],
+        &ID,
+    );
+
+    Address::new_from_array(policy_anchor.to_bytes())
+}
+
+fn update_policy(
+    ctx: &mut TestContext,
+    approved_mint: Address,
+    max_transaction_amount: u64,
+    max_payroll_amount: u64,
+    max_employee_amount: u64,
+    require_approval: bool,
+    paused: bool,
+) {
+    let mint = anchor_lang::prelude::Pubkey::new_from_array(approved_mint.to_bytes());
+    let policy = organization_policy(ctx);
+
+    let ix = Instruction {
+        program_id: ctx.program_id,
+
+        accounts: vec![
+            AccountMeta::new(ctx.company.pubkey(), true),
+            AccountMeta::new_readonly(ctx.organization, false),
+            AccountMeta::new(policy, false),
+        ],
+
+        data: instruction::UpdateOrganizationPolicy {
+            approved_mint: mint,
+            max_transaction_amount,
+            max_payroll_amount,
+            max_employee_amount,
+            require_approval,
+            paused,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new(
+        &[&ctx.company],
+        Message::new(&[ix], Some(&ctx.company.pubkey())),
+        ctx.svm.latest_blockhash(),
+    );
+
+    ctx.svm
+        .send_transaction(tx)
+        .expect("failed to update organization policy");
 }
 
 #[test]
@@ -1374,6 +1429,7 @@ fn execute_top_up(
             AccountMeta::new(consumed_pda(sequence), false),
             AccountMeta::new(cross_chain_stream, false),
             AccountMeta::new_readonly(ctx.organization, false),
+            AccountMeta::new_readonly(organization_policy(ctx), false),
             AccountMeta::new_readonly(ctx.employee.pubkey(), false),
             AccountMeta::new_readonly(ctx.mint, false),
             AccountMeta::new(ctx.vault, false),
@@ -1540,5 +1596,241 @@ fn execute_cross_chain_action_replay_is_rejected() {
     assert!(
         execute_create(&mut ctx, payload, sequence, native_stream_id,).is_err(),
         "replay must be rejected"
+    );
+}
+
+#[test]
+fn execute_cross_chain_action_rejects_paused_organization_policy() {
+    let mut ctx = setup();
+
+    let mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        false,
+        true,
+    );
+
+    let sequence = ctx.sequence;
+    let native_stream_id = ctx.native_stream_id;
+
+    let payload = base_payload(&ctx);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &payload,
+        sequence,
+        sequence,
+        [0x22; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_CREATE,
+    );
+
+    assert!(
+        execute_create(&mut ctx, payload, sequence, native_stream_id,).is_err(),
+        "cross-chain create must fail when organization policy is paused"
+    );
+}
+
+#[test]
+fn execute_cross_chain_action_rejects_transaction_limit() {
+    let mut ctx = setup();
+
+    let mint = ctx.mint;
+
+    update_policy(
+        &mut ctx, mint, 50_000_000, 50_000_000, 50_000_000, false, false,
+    );
+
+    let sequence = ctx.sequence;
+    let native_stream_id = ctx.native_stream_id;
+
+    let payload = base_payload(&ctx);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &payload,
+        sequence,
+        sequence,
+        [0x22; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_CREATE,
+    );
+
+    assert!(
+        execute_create(&mut ctx, payload, sequence, native_stream_id,).is_err(),
+        "cross-chain create must fail when transaction limit is exceeded"
+    );
+}
+
+#[test]
+fn execute_cross_chain_action_rejects_when_approval_is_required() {
+    let mut ctx = setup();
+
+    let mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        true,
+        false,
+    );
+
+    let sequence = ctx.sequence;
+    let native_stream_id = ctx.native_stream_id;
+
+    let payload = base_payload(&ctx);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &payload,
+        sequence,
+        sequence,
+        [0x22; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_CREATE,
+    );
+
+    assert!(
+        execute_create(&mut ctx, payload, sequence, native_stream_id,).is_err(),
+        "cross-chain create must fail when approval is required"
+    );
+}
+
+#[test]
+fn execute_cross_chain_top_up_rejects_paused_organization_policy() {
+    let mut ctx = setup();
+
+    let sequence = ctx.sequence;
+    let native_stream_id = ctx.native_stream_id;
+
+    let create_payload = base_payload(&ctx);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &create_payload,
+        sequence,
+        sequence,
+        [0x22; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_CREATE,
+    );
+
+    execute_create(&mut ctx, create_payload, sequence, native_stream_id)
+        .expect("create stream should succeed");
+
+    let mint = ctx.mint;
+
+    update_policy(
+        &mut ctx,
+        mint,
+        10_000_000_000,
+        10_000_000_000,
+        10_000_000_000,
+        false,
+        true,
+    );
+
+    let top_up_sequence = 8u64;
+
+    let mut payload = base_payload(&ctx);
+
+    payload[ACTION_OFFSET] = 1;
+
+    payload[OPERATION_ID_OFFSET..OPERATION_ID_OFFSET + 32].copy_from_slice(&[0x55; 32]);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &payload,
+        top_up_sequence,
+        top_up_sequence,
+        [0x55; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_TOP_UP,
+    );
+
+    assert!(
+        execute_top_up(&mut ctx, payload, top_up_sequence, native_stream_id,).is_err(),
+        "cross-chain top-up must fail when organization policy is paused"
+    );
+}
+
+#[test]
+fn execute_cross_chain_top_up_rejects_transaction_limit() {
+    let mut ctx = setup();
+
+    let sequence = ctx.sequence;
+    let native_stream_id = ctx.native_stream_id;
+
+    let create_payload = base_payload(&ctx);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &create_payload,
+        sequence,
+        sequence,
+        [0x22; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_CREATE,
+    );
+
+    execute_create(&mut ctx, create_payload, sequence, native_stream_id)
+        .expect("create stream should succeed");
+
+    let mint = ctx.mint;
+
+    update_policy(
+        &mut ctx, mint, 50_000_000, 50_000_000, 50_000_000, false, false,
+    );
+
+    let top_up_sequence = 8u64;
+
+    let mut payload = base_payload(&ctx);
+
+    payload[ACTION_OFFSET] = 1;
+
+    payload[OPERATION_ID_OFFSET..OPERATION_ID_OFFSET + 32].copy_from_slice(&[0x66; 32]);
+
+    install_consumed_vaa(
+        &mut ctx,
+        &payload,
+        top_up_sequence,
+        top_up_sequence,
+        [0x66; 32],
+        [0x33; 32],
+        100_000_000,
+        1_000,
+        2_000,
+        ACTION_TOP_UP,
+    );
+
+    assert!(
+        execute_top_up(&mut ctx, payload, top_up_sequence, native_stream_id,).is_err(),
+        "cross-chain top-up must fail when transaction limit is exceeded"
     );
 }

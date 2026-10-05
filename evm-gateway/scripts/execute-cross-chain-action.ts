@@ -33,6 +33,10 @@ const TOKEN_PROGRAM_ID = new PublicKey(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 );
 
+const ORGANIZATION_POLICY_SEED = Buffer.from(
+  "organization_policy",
+);
+
 const WALLET_PATH =
   `${process.env.HOME}/.config/solana/id.json`;
 
@@ -148,6 +152,11 @@ async function main() {
       [Buffer.from("cross-chain")],
       PROGRAM_ID,
     );
+
+  console.log(
+    "OrganizationPolicy:",
+    organizationPolicy.toBase58(),
+  );
 
   const [consumedVaa] =
     PublicKey.findProgramAddressSync(
@@ -337,6 +346,11 @@ async function main() {
         },
         {
           pubkey: ORGANIZATION,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: organizationPolicy,
           isSigner: false,
           isWritable: false,
         },

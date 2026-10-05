@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ??
-  "http://localhost:4000";
+  "/api/backend";
 
 type HealthResponse = {
   ok: boolean;

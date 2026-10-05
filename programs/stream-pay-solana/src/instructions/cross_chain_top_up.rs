@@ -4,11 +4,14 @@ use solana_keccak_hasher::hash;
 
 use crate::{
     constants::{
-        CONSUMED_VAA_SEED, CROSS_CHAIN_CONFIG_SEED, CROSS_CHAIN_STREAM_SEED, ORGANIZATION_SEED,
-        STREAM_ESCROW_SEED, STREAM_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
+        CONSUMED_VAA_SEED, CROSS_CHAIN_CONFIG_SEED, CROSS_CHAIN_STREAM_SEED,
+        ORGANIZATION_POLICY_SEED, ORGANIZATION_SEED, STREAM_ESCROW_SEED, STREAM_SEED,
+        VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     error::StreamPayError,
-    state::{ConsumedVaa, CrossChainConfig, CrossChainStream, Organization, Stream},
+    state::{
+        ConsumedVaa, CrossChainConfig, CrossChainStream, Organization, OrganizationPolicy, Stream,
+    },
 };
 
 const VAA_HEADER_LEN: usize = 51;
@@ -66,13 +69,24 @@ pub struct ExecuteCrossChainTopUp<'info> {
     pub cross_chain_stream: Account<'info, CrossChainStream>,
 
     #[account(
-        seeds = [
-            ORGANIZATION_SEED,
-            organization.authority.as_ref(),
-        ],
-        bump = organization.bump,
-    )]
+    seeds = [
+        ORGANIZATION_SEED,
+        organization.authority.as_ref(),
+    ],
+    bump = organization.bump,
+)]
     pub organization: Account<'info, Organization>,
+
+    #[account(
+    seeds = [
+        ORGANIZATION_POLICY_SEED,
+        organization.key().as_ref(),
+    ],
+    bump = organization_policy.bump,
+    constraint = organization_policy.organization == organization.key()
+        @ StreamPayError::Unauthorized,
+)]
+    pub organization_policy: Account<'info, OrganizationPolicy>,
 
     pub employee: SystemAccount<'info>,
 
@@ -311,6 +325,16 @@ pub fn handle_execute_cross_chain_top_up(
         StreamPayError::InvalidVaaPayload
     );
 
+    require!(
+        !ctx.accounts.organization_policy.paused,
+        StreamPayError::OrganizationPaused
+    );
+
+    require!(
+        ctx.accounts.organization_policy.approved_mint == ctx.accounts.mint.key(),
+        StreamPayError::InvalidPolicyAsset
+    );
+
     let amount = decode_u64_word(&payload[PAYLOAD_AMOUNT_OFFSET..PAYLOAD_AMOUNT_OFFSET + 32])?;
 
     let start_time_u64 =
@@ -358,6 +382,13 @@ pub fn handle_execute_cross_chain_top_up(
     );
 
     require!(amount > 0, StreamPayError::InvalidAmount);
+
+    if ctx.accounts.organization_policy.max_transaction_amount > 0 {
+        require!(
+            amount <= ctx.accounts.organization_policy.max_transaction_amount,
+            StreamPayError::TransactionLimitExceeded
+        );
+    }
 
     require!(
         !ctx.accounts.stream.canceled,
