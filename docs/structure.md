@@ -1,6 +1,6 @@
 # StreamPay Solana Project Structure
 
-This project contains the on-chain Solana program, the EVM gateway, backend services, and the Next.js frontend.
+This repository combines the on-chain Solana program, the EVM gateway, backend services, and the Next.js dashboard.
 
 ```text
 stream-pay-solana/
@@ -11,10 +11,13 @@ stream-pay-solana/
 ├── Anchor.toml
 ├── Cargo.lock
 ├── Cargo.toml
-├── app/                              # empty app workspace
+├── app/                              # app workspace scaffold
 ├── backend/
 │   ├── .env
 │   ├── .env.example
+│   ├── .gitignore
+│   ├── node_modules/
+│   ├── package-lock.json
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
@@ -41,26 +44,22 @@ stream-pay-solana/
 │   ├── .env
 │   ├── .env.example
 │   ├── .gitignore
-│   ├── deployment.json
-│   ├── hardhat.config.ts
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── remappings.txt
-│   ├── tsconfig.json
 │   ├── artifacts/
-│   │   └── (generated contract artifacts)
 │   ├── cache/
-│   │   └── (Hardhat build cache)
 │   ├── contracts/
 │   │   ├── StreamPayEvmGateway.sol
 │   │   ├── StreamPayM11Token.sol
 │   │   ├── interfaces/
 │   │   │   └── IWormhole.sol
 │   │   └── mocks/
-│   │       └── (mock contracts)
+│   ├── deployment.json
+│   ├── hardhat.config.ts
 │   ├── ignition/
 │   │   └── modules/
-│   │       └── (deployment modules)
+│   ├── node_modules/
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── remappings.txt
 │   ├── scripts/
 │   │   ├── check-protocol-config.ts
 │   │   ├── close-vaa-signatures.ts
@@ -79,6 +78,7 @@ stream-pay-solana/
 │   │   └── publish-top-up.ts
 │   ├── test/
 │   │   └── StreamPayEvmGateway.ts
+│   ├── tsconfig.json
 │   └── types/
 │       └── ethers-contracts/
 ├── idls/
@@ -89,25 +89,25 @@ stream-pay-solana/
 │       ├── src/
 │       │   ├── constants.rs
 │       │   ├── error.rs
+│       │   ├── instructions/
+│       │   │   ├── cancel_stream.rs
+│       │   │   ├── claim.rs
+│       │   │   ├── create_organization.rs
+│       │   │   ├── create_stream.rs
+│       │   │   ├── cross_chain.rs
+│       │   │   ├── cross_chain_action.rs
+│       │   │   ├── cross_chain_asset.rs
+│       │   │   ├── cross_chain_top_up.rs
+│       │   │   ├── deposit.rs
+│       │   │   ├── initialize_organization_policy.rs
+│       │   │   ├── initialize_organization_roles.rs
+│       │   │   ├── initialize_protocol.rs
+│       │   │   ├── initialize_vault.rs
+│       │   │   ├── top_up_stream.rs
+│       │   │   └── update_organization_policy.rs
 │       │   ├── instructions.rs
 │       │   ├── lib.rs
-│       │   ├── state.rs
-│       │   └── instructions/
-│       │       ├── cancel_stream.rs
-│       │       ├── claim.rs
-│       │       ├── create_organization.rs
-│       │       ├── create_stream.rs
-│       │       ├── cross_chain.rs
-│       │       ├── cross_chain_action.rs
-│       │       ├── cross_chain_asset.rs
-│       │       ├── cross_chain_top_up.rs
-│       │       ├── deposit.rs
-│       │       ├── initialize_organization_policy.rs
-│       │       ├── initialize_organization_roles.rs
-│       │       ├── initialize_protocol.rs
-│       │       ├── initialize_vault.rs
-│       │       ├── top_up_stream.rs
-│       │       └── update_organization_policy.rs
+│       │   └── state.rs
 │       └── tests/
 │           ├── claim.rs
 │           ├── cross_chain_asset.rs
@@ -130,61 +130,72 @@ stream-pay-solana/
 ├── web/
 │   ├── .env
 │   ├── .env.example
+│   ├── .gitignore
+│   ├── .next/
 │   ├── AGENTS.md
 │   ├── CLAUDE.md
 │   ├── README.md
 │   ├── eslint.config.mjs
 │   ├── next-env.d.ts
 │   ├── next.config.ts
+│   ├── node_modules/
+│   ├── package-lock.json
 │   ├── package.json
 │   ├── postcss.config.mjs
-│   ├── tsconfig.json
 │   ├── public/
-│   │   ├── file.svg
-│   │   ├── globe.svg
-│   │   ├── next.svg
-│   │   ├── vercel.svg
-│   │   └── window.svg
-│   └── src/
-│       ├── app/
-│       │   ├── api/
-│       │   │   └── backend/
-│       │   │       └── route.ts
-│       │   ├── favicon.ico
-│       │   ├── globals.css
-│       │   ├── layout.tsx
-│       │   └── page.tsx
-│       ├── components/
-│       │   ├── ActivityHistory.tsx
-│       │   ├── ActivityStats.tsx
-│       │   ├── OperationalDashboard.tsx
-│       │   ├── WalletButton.tsx
-│       │   └── providers/
-│       │       └── SolanaProvider.tsx
-│       ├── hooks/
-│       │   ├── useActivities.ts
-│       │   ├── useDeposit.ts
-│       │   ├── useIndexedStreams.ts
-│       │   ├── useOrganization.ts
-│       │   ├── useOrganizationPolicy.ts
-│       │   ├── useStream.ts
-│       │   ├── useStreamActions.ts
-│       │   └── useVault.ts
-│       ├── idl/
-│       │   ├── stream_pay_solana.json
-│       │   └── stream_pay_solana.ts
-│       └── lib/
-│           ├── anchor.ts
-│           ├── backend.ts
-│           └── pdas.ts
-└── (generated build artifacts and caches)
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── api/
+│   │   │   │   └── backend/
+│   │   │   │       └── route.ts
+│   │   │   ├── favicon.ico
+│   │   │   ├── globals.css
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   ├── components/
+│   │   │   ├── OperationalDashboard.tsx
+│   │   │   ├── WalletButton.tsx
+│   │   │   ├── activity/
+│   │   │   │   ├── ActivityHistory.tsx
+│   │   │   │   └── ActivityStats.tsx
+│   │   │   ├── dashboard/
+│   │   │   │   ├── CompanyOverview.tsx
+│   │   │   │   └── OperationalDashboard.tsx
+│   │   │   ├── payroll/
+│   │   │   │   ├── ActiveStream.tsx
+│   │   │   │   ├── CompanySetup.tsx
+│   │   │   │   ├── CreatePayroll.tsx
+│   │   │   │   ├── EmployeeDirectory.tsx
+│   │   │   │   ├── PayrollReports.tsx
+│   │   │   │   └── TreasuryFunding.tsx
+│   │   │   └── providers/
+│   │   │       └── SolanaProvider.tsx
+│   │   ├── hooks/
+│   │   │   ├── useActivities.ts
+│   │   │   ├── useDeposit.ts
+│   │   │   ├── useIndexedStreams.ts
+│   │   │   ├── useOrganization.ts
+│   │   │   ├── useOrganizationPolicy.ts
+│   │   │   ├── useStream.ts
+│   │   │   ├── useStreamActions.ts
+│   │   │   └── useVault.ts
+│   │   ├── idl/
+│   │   │   ├── stream_pay_solana.json
+│   │   │   └── stream_pay_solana.ts
+│   │   └── lib/
+│   │       ├── anchor.ts
+│   │       ├── backend.ts
+│   │       └── pdas.ts
+│   └── tsconfig.json
+└── (generated build artifacts, caches, and installed dependencies)
 ```
 
 ## Key folders
 
-- `programs/stream-pay-solana/`: on-chain Solana program and Rust source.
-- `evm-gateway/`: Solidity contracts, scripts, and deployment tooling.
-- `backend/`: TypeScript services for indexing, alerting, DB, and webhooks.
-- `web/`: Next.js frontend application and client-side providers.
-- `target/`: generated build artifacts and cache output.
-- `idls/`: Wormhole and cross-chain interface definitions.
+- `programs/stream-pay-solana/`: on-chain Solana program and Rust instruction tests.
+- `evm-gateway/`: Solidity contracts, scripts, and Hardhat deployment tooling.
+- `backend/`: TypeScript indexing and monitoring services.
+- `web/`: Next.js frontend, app routes, hooks, and providers.
+- `target/`: generated Rust build artifacts and compiler output.
+- `idls/`: cross-chain and Wormhole interface definitions.
+- `docs/`: product, roadmap, and architecture documentation.
