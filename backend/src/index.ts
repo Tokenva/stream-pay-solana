@@ -1,8 +1,8 @@
 import "dotenv/config";
-
+import bs58 from "bs58";
 import express from "express";
 import cors from "cors";
-
+import crypto from "node:crypto";
 import { initializeDatabase, pool } from "./db.js";
 
 import {
@@ -42,8 +42,138 @@ import {
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+const allowedCorsOrigins = (
+  process.env.STREAMPAY_CORS_ORIGINS ??
+  "http://localhost:3000"
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.disable("x-powered-by");
+
+app.use(
+  cors({
+    origin: allowedCorsOrigins,
+  }),
+);
+
+app.use(
+  express.json({
+    limit: "32kb",
+  }),
+);
+
+function requireApiKey(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
+  const configuredKey =
+    process.env.STREAMPAY_API_KEY?.trim();
+
+  if (!configuredKey) {
+    log("error", "api_auth_not_configured", {
+      path: req.path,
+    });
+
+    return res.status(503).json({
+      error: "API authentication is not configured",
+    });
+  }
+
+  const authorization =
+    req.get("authorization") ?? "";
+
+  const prefix = "Bearer ";
+
+  if (!authorization.startsWith(prefix)) {
+    return res.status(401).json({
+      error: "Authentication required",
+    });
+  }
+
+  const providedKey =
+    authorization.slice(prefix.length).trim();
+
+  const providedBuffer =
+    Buffer.from(providedKey);
+
+  const configuredBuffer =
+    Buffer.from(configuredKey);
+
+  if (
+    providedBuffer.length !==
+    configuredBuffer.length ||
+    !crypto.timingSafeEqual(
+      providedBuffer,
+      configuredBuffer,
+    )
+  ) {
+    return res.status(401).json({
+      error: "Invalid authentication credentials",
+    });
+  }
+
+  return next();
+}
+
+function isValidSolanaAddress(
+  value: unknown,
+) {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  try {
+    new PublicKey(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isValidTransactionSignature(
+  value: unknown,
+) {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  try {
+    return bs58.decode(value).length === 64;
+  } catch {
+    return false;
+  }
+}
+
+app.use(
+  "/api/transactions",
+  requireApiKey,
+);
+
+app.use(
+  "/api/webhooks",
+  requireApiKey,
+);
+
+app.use(
+  "/api/cross-chain/messages",
+  requireApiKey,
+);
+
+app.use(
+  "/api/ops",
+  requireApiKey,
+);
 
 app.use((req, res, next) => {
   const startedAt = Date.now();
@@ -583,20 +713,38 @@ app.post("/api/transactions", async (req, res) => {
     } = req.body ?? {};
 
     if (
-      typeof signature !== "string" ||
-      !signature.trim()
+      !isValidTransactionSignature(signature)
     ) {
       return res.status(400).json({
-        error: "signature is required",
+        error: "signature must be a valid Solana transaction signature",
       });
     }
 
     if (
       typeof action !== "string" ||
-      !action.trim()
+      !action.trim() ||
+      action.trim().length > 64 ||
+      /[\u0000-\u001f\u007f]/.test(
+        action.trim(),
+      )
     ) {
       return res.status(400).json({
-        error: "action is required",
+        error:
+          "action must be a non-empty string of at most 64 characters",
+      });
+    }
+
+    if (!isValidSolanaAddress(organization)) {
+      return res.status(400).json({
+        error:
+          "organization must be a valid Solana address",
+      });
+    }
+
+    if (!isValidSolanaAddress(employee)) {
+      return res.status(400).json({
+        error:
+          "employee must be a valid Solana address",
       });
     }
 
@@ -1715,12 +1863,31 @@ app.post("/api/webhooks", async (req, res) => {
 
     return res.status(201).json(webhook);
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
     log("error", "webhook_registration_failed", {
-      error:
-        error instanceof Error
-          ? error.message
-          : String(error),
+      error: message,
     });
+
+    if (
+      message ===
+      "Webhook URL must use HTTP or HTTPS" ||
+      message ===
+      "Webhook URL must not contain credentials" ||
+      message ===
+      "Webhook URL must target a public host" ||
+      message ===
+      "Webhook hostname could not be resolved" ||
+      message ===
+      "Webhook URL must not resolve to a private or reserved address"
+    ) {
+      return res.status(400).json({
+        error: message,
+      });
+    }
 
     return res.status(500).json({
       error: "Failed to register webhook",

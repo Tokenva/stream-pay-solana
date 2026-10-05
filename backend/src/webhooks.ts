@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 
 import { pool } from "./db.js";
 import { log } from "./logger.js";
@@ -18,9 +20,111 @@ function signPayload(
     .digest("hex");
 }
 
+function isBlockedIp(ip: string) {
+  if (isIP(ip) === 4) {
+    const parts = ip
+      .split(".")
+      .map((part) => Number(part));
+
+    const [a, b] = parts;
+
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && b >= 18 && b <= 19) ||
+      a >= 224
+    );
+  }
+
+  if (isIP(ip) === 6) {
+    const normalized = ip.toLowerCase();
+
+    if (
+      normalized === "::" ||
+      normalized === "::1"
+    ) {
+      return true;
+    }
+
+    const firstHextet = Number.parseInt(
+      normalized.split(":")[0] || "0",
+      16,
+    );
+
+    return (
+      (firstHextet >= 0xfc00 &&
+        firstHextet <= 0xfdff) ||
+      (firstHextet >= 0xfe80 &&
+        firstHextet <= 0xfebf)
+    );
+  }
+
+  return true;
+}
+
+async function validateWebhookUrl(url: string) {
+  const parsed = new URL(url);
+
+  if (
+    parsed.protocol !== "http:" &&
+    parsed.protocol !== "https:"
+  ) {
+    throw new Error(
+      "Webhook URL must use HTTP or HTTPS",
+    );
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new Error(
+      "Webhook URL must not contain credentials",
+    );
+  }
+
+  const hostname = parsed.hostname
+    .trim()
+    .toLowerCase();
+
+  if (
+    !hostname ||
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local")
+  ) {
+    throw new Error(
+      "Webhook URL must target a public host",
+    );
+  }
+
+  const addresses = await lookup(hostname, {
+    all: true,
+    verbatim: true,
+  });
+
+  if (addresses.length === 0) {
+    throw new Error(
+      "Webhook hostname could not be resolved",
+    );
+  }
+
+  for (const address of addresses) {
+    if (isBlockedIp(address.address)) {
+      throw new Error(
+        "Webhook URL must not resolve to a private or reserved address",
+      );
+    }
+  }
+}
+
 export async function registerWebhook(
   url: string,
 ) {
+  await validateWebhookUrl(url);
+
   const secret = createSecret();
 
   const result = await pool.query(
@@ -195,10 +299,15 @@ export async function deliverWebhook(
   );
 
   try {
+    await validateWebhookUrl(
+      delivery.url,
+    );
+
     const response = await fetch(
       delivery.url,
       {
         method: "POST",
+        redirect: "error",
         headers: {
           "content-type": "application/json",
           "x-streampay-timestamp": timestamp,
