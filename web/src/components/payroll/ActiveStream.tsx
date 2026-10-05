@@ -207,7 +207,7 @@ export default function ActiveStream({
         )}
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
+      <section className="rounded-2xl mt-6 border border-white/10 bg-white/5 p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">
@@ -272,7 +272,7 @@ export default function ActiveStream({
                 </span>
               </div>
 
-              <div className="mt-2 text-xs text-white/50">
+              <div className="mt-2 text-xs text-white/50 wrap-break-word">
                 {item.address}
               </div>
             </div>

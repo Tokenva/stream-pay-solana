@@ -57,7 +57,7 @@ export default function CompanyOverview({
   return (
     <section className="mt-10">
       <div className="mb-4">
-        <p className="text-sm text-zinc-400">
+        <p className="demo-section-label">
           Payroll Dashboard
         </p>
 
