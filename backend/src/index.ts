@@ -21,6 +21,7 @@ import {
   withRpcFailover,
   withProgramFailover,
   rpcConnections,
+  PROGRAM_ID,
 } from "./solana.js";
 
 import { log } from "./logger.js";
@@ -153,6 +154,188 @@ function isValidTransactionSignature(
   } catch {
     return false;
   }
+}
+
+type VerifiedTransactionInstruction = {
+  action: string;
+  organization: string | null;
+  employee: string | null;
+  instructionIndex: number;
+};
+
+const VERIFIED_TRANSACTION_ACTIONS = new Set([
+  "deposit",
+  "createorganization",
+  "initializevault",
+  "createstream",
+  "claim",
+  "topupstream",
+  "cancelstream",
+]);
+
+function normalizeTransactionAction(
+  value: string,
+) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[_\-\s]/g, "");
+}
+
+function deriveTransactionParticipants(
+  action: string,
+  accounts: string[],
+) {
+  let organization: string | null = null;
+  let employee: string | null = null;
+
+  switch (normalizeTransactionAction(action)) {
+    case "deposit":
+    case "createorganization":
+    case "initializevault":
+      organization = accounts[1] ?? null;
+      break;
+
+    case "createstream":
+    case "topupstream":
+      organization = accounts[1] ?? null;
+      employee = accounts[2] ?? null;
+      break;
+
+    case "claim":
+      employee = accounts[0] ?? null;
+      break;
+
+    case "cancelstream":
+      organization = accounts[1] ?? null;
+      employee = accounts[2] ?? null;
+      break;
+
+    default:
+      break;
+  }
+
+  return {
+    organization,
+    employee,
+  };
+}
+
+async function verifyTransactionOnChain(
+  signature: string,
+): Promise<{
+  slot: number;
+  instructions: VerifiedTransactionInstruction[];
+}> {
+  const transaction = await withRpcFailover(
+    (rpcConnection) =>
+      rpcConnection.getParsedTransaction(
+        signature,
+        {
+          maxSupportedTransactionVersion: 0,
+          commitment: "confirmed",
+        },
+      ),
+  );
+
+  if (!transaction) {
+    throw new Error(
+      "Transaction was not found on Solana",
+    );
+  }
+
+  if (transaction.meta?.err) {
+    throw new Error(
+      "Transaction failed on Solana",
+    );
+  }
+
+  const logs =
+    transaction.meta?.logMessages ?? [];
+
+  const instructionNames = logs
+    .filter((logMessage) =>
+      logMessage.includes(
+        "Program log: Instruction:",
+      ),
+    )
+    .map((logMessage) =>
+      logMessage
+        .split(
+          "Program log: Instruction:",
+        )[1]
+        ?.trim(),
+    )
+    .filter(
+      (instruction): instruction is string =>
+        Boolean(instruction) &&
+        VERIFIED_TRANSACTION_ACTIONS.has(
+          normalizeTransactionAction(
+            instruction,
+          ),
+        ),
+    );
+
+  const programInstructions =
+    transaction.transaction.message.instructions.filter(
+      (instruction) =>
+        "programId" in instruction &&
+        instruction.programId.equals(PROGRAM_ID) &&
+        "accounts" in instruction,
+    );
+
+  const verifiedInstructions: VerifiedTransactionInstruction[] =
+    [];
+
+  for (
+    let instructionIndex = 0;
+    instructionIndex < programInstructions.length;
+    instructionIndex++
+  ) {
+    const instruction =
+      programInstructions[instructionIndex];
+
+    if (!("accounts" in instruction)) {
+      continue;
+    }
+
+    const action =
+      instructionNames[instructionIndex];
+
+    if (!action) {
+      continue;
+    }
+
+    const accounts = instruction.accounts.map(
+      (account) => account.toBase58(),
+    );
+
+    const {
+      organization,
+      employee,
+    } = deriveTransactionParticipants(
+      action,
+      accounts,
+    );
+
+    verifiedInstructions.push({
+      action,
+      organization,
+      employee,
+      instructionIndex,
+    });
+  }
+
+  if (verifiedInstructions.length === 0) {
+    throw new Error(
+      "Transaction does not contain a recognized StreamPay instruction",
+    );
+  }
+
+  return {
+    slot: transaction.slot,
+    instructions: verifiedInstructions,
+  };
 }
 
 app.use(
@@ -716,7 +899,8 @@ app.post("/api/transactions", async (req, res) => {
       !isValidTransactionSignature(signature)
     ) {
       return res.status(400).json({
-        error: "signature must be a valid Solana transaction signature",
+        error:
+          "signature must be a valid Solana transaction signature",
       });
     }
 
@@ -748,6 +932,55 @@ app.post("/api/transactions", async (req, res) => {
       });
     }
 
+    const normalizedSignature =
+      signature.trim();
+
+    const verified =
+      await verifyTransactionOnChain(
+        normalizedSignature,
+      );
+
+    const normalizedAction =
+      normalizeTransactionAction(action);
+
+    const matchingInstructions =
+      verified.instructions.filter(
+        (instruction) =>
+          normalizeTransactionAction(
+            instruction.action,
+          ) === normalizedAction,
+      );
+
+    if (matchingInstructions.length === 0) {
+      return res.status(400).json({
+        error:
+          "action does not match the on-chain StreamPay instruction",
+      });
+    }
+
+    const matchingInstruction =
+      matchingInstructions.find(
+        (instruction) =>
+          (organization === null ||
+            instruction.organization ===
+              organization) &&
+          (employee === null ||
+            instruction.employee === employee),
+      );
+
+    if (!matchingInstruction) {
+      return res.status(400).json({
+        error:
+          "organization or employee does not match the on-chain transaction",
+      });
+    }
+
+    const verifiedOrganization =
+      matchingInstruction.organization;
+
+    const verifiedEmployee =
+      matchingInstruction.employee;
+
     const result = await pool.query(
       `
       INSERT INTO transactions (
@@ -756,14 +989,24 @@ app.post("/api/transactions", async (req, res) => {
         status,
         organization,
         employee,
+        slot,
         updated_at
       )
-      VALUES ($1, $2, 'submitted', $3, $4, NOW())
+      VALUES (
+        $1,
+        $2,
+        'submitted',
+        $3,
+        $4,
+        $5,
+        NOW()
+      )
       ON CONFLICT (signature)
       DO UPDATE SET
         action = EXCLUDED.action,
         organization = EXCLUDED.organization,
         employee = EXCLUDED.employee,
+        slot = EXCLUDED.slot,
         updated_at = NOW()
       RETURNING
         id,
@@ -779,10 +1022,11 @@ app.post("/api/transactions", async (req, res) => {
         confirmed_at
       `,
       [
-        signature.trim(),
-        action.trim(),
-        organization,
-        employee,
+        normalizedSignature,
+        matchingInstruction.action,
+        verifiedOrganization,
+        verifiedEmployee,
+        verified.slot,
       ],
     );
 
@@ -790,21 +1034,61 @@ app.post("/api/transactions", async (req, res) => {
       eventType: "transaction_registered",
       actorType: "api",
       entityType: "transaction",
-      entityId: signature.trim(),
-      organization,
-      employee,
+      entityId: normalizedSignature,
+      organization: verifiedOrganization,
+      employee: verifiedEmployee,
       metadata: {
-        action: action.trim(),
-        status: result.rows[0]?.status ?? "submitted",
+        action: matchingInstruction.action,
+        status:
+          result.rows[0]?.status ??
+          "submitted",
+        verifiedOnChain: true,
+        instructionIndex:
+          matchingInstruction.instructionIndex,
       },
     });
 
-    return res.status(201).json(result.rows[0]);
+    return res.status(201).json(
+      result.rows[0],
+    );
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    if (
+      message ===
+      "Transaction was not found on Solana"
+    ) {
+      return res.status(404).json({
+        error: message,
+      });
+    }
+
+    if (
+      message ===
+      "Transaction failed on Solana"
+    ) {
+      return res.status(400).json({
+        error: message,
+      });
+    }
+
+    if (
+      message ===
+      "Transaction does not contain a recognized StreamPay instruction"
+    ) {
+      return res.status(400).json({
+        error: message,
+      });
+    }
+
     console.error(error);
 
     return res.status(500).json({
-      error: "Failed to register transaction",
+      error:
+        "Failed to register transaction",
     });
   }
 });
