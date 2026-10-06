@@ -8,37 +8,38 @@ export type Company = {
   treasury_wallet: string | null;
   created_by: string;
   pilot_status:
-    | "pending"
-    | "approved"
-    | "active"
-    | "expired"
-    | "rejected";
+  | "pending"
+  | "approved"
+  | "active"
+  | "expired"
+  | "rejected"
+  | null;
   pilot_start: string | null;
   pilot_end: string | null;
   created_at: string;
   updated_at: string;
   role:
-    | "owner"
-    | "admin"
-    | "finance"
-    | "approver"
-    | "viewer"
-    | "employee";
+  | "owner"
+  | "admin"
+  | "finance"
+  | "approver"
+  | "viewer"
+  | "employee";
 };
 
 export type CompanyAccess = {
   company: Company | null;
   hasDashboardAccess: boolean;
   accessStatus:
-    | "pending"
-    | "approved"
-    | "active"
-    | "expired"
-    | "rejected"
-    | null;
+  | "pending"
+  | "approved"
+  | "active"
+  | "expired"
+  | "rejected"
+  | null;
   application:
-    | PilotApplication
-    | null;
+  | PilotApplication
+  | null;
 };
 
 export async function getCompany() {
@@ -77,7 +78,7 @@ export async function getCompanyAccess() {
   if (!response.ok) {
     throw new Error(
       data.error ??
-        "Unable to load company access",
+      "Unable to load company access",
     );
   }
 
@@ -108,7 +109,7 @@ export async function createCompany(
   if (!response.ok) {
     throw new Error(
       data.error ??
-        "Unable to create company",
+      "Unable to create company",
     );
   }
 

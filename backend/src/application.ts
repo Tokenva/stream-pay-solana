@@ -108,7 +108,7 @@ function validateApplicationInput(input: {
 
   if (
     typeof monthlyStablecoinPayrollVolume !==
-      "string" ||
+    "string" ||
     !PAYROLL_VOLUMES.includes(
       monthlyStablecoinPayrollVolume,
     )
@@ -287,25 +287,30 @@ export async function listApplications(
 ): Promise<PilotApplication[]> {
   const result = await pool.query(
     `
-    SELECT
-      id,
-      wallet,
-      company_name,
-      company_website,
-      work_email,
-      country,
-      team_size,
-      monthly_stablecoin_payroll_volume,
-      primary_use_case,
-      why_tokenva,
-      status,
-      rejection_reason,
-      company_id,
-      reviewed_at,
-      reviewed_by,
-      created_at,
-      updated_at
-    FROM pilot_applications
+SELECT
+  pa.id,
+  pa.wallet,
+  pa.company_name,
+  pa.company_website,
+  pa.work_email,
+  pa.country,
+  pa.team_size,
+  pa.monthly_stablecoin_payroll_volume,
+  pa.primary_use_case,
+  pa.why_tokenva,
+  pa.status,
+  pa.rejection_reason,
+  pa.company_id,
+  pa.reviewed_at,
+  pa.reviewed_by,
+  pa.created_at,
+  pa.updated_at,
+  c.pilot_status
+FROM pilot_applications pa
+LEFT JOIN companies c
+  ON c.id = pa.company_id
+${status ? "WHERE pa.status = $1" : ""}
+ORDER BY pa.created_at DESC
     ${status ? "WHERE status = $1" : ""}
     ORDER BY created_at DESC
     `,

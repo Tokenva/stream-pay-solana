@@ -20,6 +20,7 @@ import {
 import {
   loginWithWallet,
   getSession,
+  logout
 } from "@/lib/auth";
 
 export default function LoginPage() {
@@ -53,11 +54,22 @@ export default function LoginPage() {
       const session =
         await getSession();
 
-      if (session?.authenticated) {
-        router.push("/");
+      if (!session?.authenticated) {
+        return;
       }
+
+      if (
+        publicKey &&
+        session.wallet ===
+        publicKey.toBase58()
+      ) {
+        router.push("/");
+        return;
+      }
+
+      await logout();
     })();
-  }, [router]);
+  }, [router, publicKey]);
 
   async function authenticate() {
     if (!publicKey) {
@@ -106,8 +118,7 @@ export default function LoginPage() {
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-white/55">
-              Connect your Solana wallet to
-              authenticate with Tokenva.
+              Connect your Solana wallet to authenticate with Tokenva.
             </p>
           </div>
 

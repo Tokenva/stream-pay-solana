@@ -219,7 +219,7 @@ export default function CompanyOnboarding({
             type="button"
             onClick={submit}
             disabled={loading}
-            className="mt-6 w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-6 w-full cursor-pointer rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading
               ? "Submitting application..."

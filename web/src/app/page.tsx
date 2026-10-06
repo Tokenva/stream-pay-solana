@@ -451,6 +451,7 @@ function ProtectedHome() {
             const response = await fetch(
                 "http://localhost:4000/api/reports/reconciliation",
                 {
+                    credentials: "include",
                     cache: "no-store",
                 },
             );
@@ -1309,6 +1310,7 @@ export default function Home() {
     const {
         connected,
         connecting,
+        publicKey,
     } = useWallet();
 
     const [
@@ -1320,6 +1322,11 @@ export default function Home() {
         authenticated,
         setAuthenticated,
     ] = useState(false);
+
+    const [
+        sessionWallet,
+        setSessionWallet,
+    ] = useState<string | null>(null);
 
     const [
         companyAccess,
@@ -1341,22 +1348,24 @@ export default function Home() {
                 return;
             }
 
-            setAuthenticated(true);
+            if (
+                !publicKey ||
+                session.wallet !==
+                publicKey.toBase58()
+            ) {
+                await logout();
 
-            try {
-                const access =
-                    await getCompanyAccess();
+                setAuthenticated(false);
+                setAuthChecked(true);
 
-                setCompanyAccess(access);
-            } catch {
                 router.replace("/login");
                 return;
             }
 
+            setAuthenticated(true);
             setAuthChecked(true);
-            setCompanyChecked(true);
         })();
-    }, [router]);
+    }, [router, publicKey]);
 
     useEffect(() => {
         if (
@@ -1366,14 +1375,40 @@ export default function Home() {
             return;
         }
 
-        if (!connected) {
+        if (!connected || !publicKey) {
             void logout();
+            setAuthenticated(false);
+            setSessionWallet(null);
+            setCompanyAccess(null);
+            setCompanyChecked(false);
             router.replace("/login");
+            return;
+        }
+
+        const currentWallet =
+            publicKey.toBase58();
+
+        if (
+            sessionWallet &&
+            sessionWallet !== currentWallet
+        ) {
+            void (async () => {
+                await logout();
+
+                setAuthenticated(false);
+                setSessionWallet(null);
+                setCompanyAccess(null);
+                setCompanyChecked(false);
+
+                router.replace("/login");
+            })();
         }
     }, [
         authChecked,
         connecting,
         connected,
+        publicKey,
+        sessionWallet,
         router,
     ]);
 

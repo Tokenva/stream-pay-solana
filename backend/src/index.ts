@@ -496,8 +496,11 @@ app.get("/api/streams", async (req, res) => {
         rpcProgram.account.stream.all(),
       );
 
-    const { organization, employee, canceled } =
-      req.query;
+    const {
+      organization,
+      employee,
+      canceled,
+    } = req.query;
 
     const streams = accounts
       .map(({ publicKey, account }) => ({
@@ -616,9 +619,25 @@ app.get(
   },
 );
 
-app.get("/api/db/streams", async (_req, res) => {
-  try {
-    const result = await pool.query(`
+app.get(
+  "/api/db/streams",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
+
+    const organization =
+      await getCustomerOrganization(wallet);
+
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
+    }
+
+    try {
+      const result = await pool.query(
+        `
       SELECT
         address,
         organization,
@@ -635,51 +654,79 @@ app.get("/api/db/streams", async (_req, res) => {
         cancel_time,
         updated_at
       FROM streams
+      WHERE organization = $1
       ORDER BY stream_id ASC
-    `);
+      `,
+        [organization],
+      );
 
-    res.json({
-      count: result.rows.length,
-      streams: result.rows,
-    });
-  } catch (error) {
-    console.error(error);
+      res.json({
+        count: result.rows.length,
+        streams: result.rows,
+      });
+    } catch (error) {
+      console.error(error);
 
-    res.status(500).json({
-      error: "Failed to read indexed streams",
-    });
-  }
-});
+      res.status(500).json({
+        error: "Failed to read indexed streams",
+      });
+    }
+  },
+);
 
-app.get("/api/indexed/streams", async (req, res) => {
-  try {
-    const { organization, employee, canceled } = req.query;
+app.get(
+  "/api/indexed/streams",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-    const conditions: string[] = [];
-    const values: string[] = [];
+    const organization =
+      await getCustomerOrganization(
+        wallet,
+      );
 
-    if (typeof organization === "string") {
-      values.push(organization);
-      conditions.push(`organization = $${values.length}`);
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
     }
 
-    if (typeof employee === "string") {
-      values.push(employee);
-      conditions.push(`employee = $${values.length}`);
-    }
+    try {
+      const {
+        employee,
+        canceled,
+      } = req.query;
 
-    if (typeof canceled === "string") {
-      values.push(canceled === "true" ? "true" : "false");
-      conditions.push(`canceled = $${values.length}`);
-    }
+      const conditions: string[] = [
+        "organization = $1",
+      ];
 
-    const whereClause =
-      conditions.length > 0
-        ? `WHERE ${conditions.join(" AND ")}`
-        : "";
+      const values: Array<string | number> = [
+        organization,
+      ];
 
-    const result = await pool.query(
-      `
+      if (typeof employee === "string") {
+        values.push(employee);
+        conditions.push(
+          `employee = $${values.length}`,
+        );
+      }
+
+      if (typeof canceled === "string") {
+        values.push(
+          canceled === "true" ? "true" : "false",
+        );
+        conditions.push(
+          `canceled = $${values.length}`,
+        );
+      }
+
+      const whereClause =
+        `WHERE ${conditions.join(" AND ")}`;
+
+      const result = await pool.query(
+        `
       SELECT
         address,
         organization,
@@ -699,26 +746,42 @@ app.get("/api/indexed/streams", async (req, res) => {
       ${whereClause}
       ORDER BY stream_id ASC
       `,
-      values,
-    );
+        values,
+      );
 
-    res.json({
-      count: result.rows.length,
-      streams: result.rows,
-    });
-  } catch (error) {
-    console.error(error);
+      res.json({
+        count: result.rows.length,
+        streams: result.rows,
+      });
+    } catch (error) {
+      console.error(error);
 
-    res.status(500).json({
-      error: "Failed to fetch indexed streams",
-    });
-  }
-});
+      res.status(500).json({
+        error: "Failed to fetch indexed streams",
+      });
+    }
+  },
+);
 
-app.get("/api/indexed/streams/:address", async (req, res) => {
-  try {
-    const result = await pool.query(
-      `
+app.get(
+  "/api/indexed/streams/:address",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
+
+    const organization =
+      await getCustomerOrganization(wallet);
+
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
+    }
+
+    try {
+      const result = await pool.query(
+        `
       SELECT
         address,
         organization,
@@ -736,27 +799,29 @@ app.get("/api/indexed/streams/:address", async (req, res) => {
         updated_at
       FROM streams
       WHERE address = $1
+        AND organization = $2
       `,
-      [req.params.address],
-    );
+        [req.params.address, organization],
+      );
 
-    if (result.rows.length === 0) {
-      res.status(404).json({
-        error: "Indexed stream not found",
+      if (result.rows.length === 0) {
+        res.status(404).json({
+          error: "Indexed stream not found",
+        });
+
+        return;
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error: "Failed to fetch indexed stream",
       });
-
-      return;
     }
-
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Failed to fetch indexed stream",
-    });
-  }
-});
+  },
+);
 
 
 app.get("/api/indexer/status", (_req, res) => {
@@ -767,69 +832,81 @@ app.get("/api/indexer/status", (_req, res) => {
   });
 });
 
-app.get("/api/activities", async (req, res) => {
-  try {
-    const {
-      stream,
-      employee,
-      organization,
-    } = req.query;
+app.get(
+  "/api/activities",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-    const limitRaw =
-      typeof req.query.limit === "string"
-        ? Number(req.query.limit)
+    const customerOrganization =
+      await getCustomerOrganization(
+        wallet,
+      );
+
+    if (!customerOrganization) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
+    }
+
+    try {
+      const {
+        stream,
+        employee,
+      } = req.query;
+
+      const conditions: string[] = [
+        "organization = $1",
+      ];
+
+      const values: Array<string | number> = [
+        customerOrganization,
+      ];
+
+      const limitRaw =
+        typeof req.query.limit === "string"
+          ? Number(req.query.limit)
+          : 20;
+
+      const offsetRaw =
+        typeof req.query.offset === "string"
+          ? Number(req.query.offset)
+          : 0;
+
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(Math.floor(limitRaw), 1), 100)
         : 20;
 
-    const offsetRaw =
-      typeof req.query.offset === "string"
-        ? Number(req.query.offset)
+      const offset = Number.isFinite(offsetRaw)
+        ? Math.max(Math.floor(offsetRaw), 0)
         : 0;
 
-    const limit = Number.isFinite(limitRaw)
-      ? Math.min(Math.max(Math.floor(limitRaw), 1), 100)
-      : 20;
+      if (typeof stream === "string") {
+        values.push(stream);
+        conditions.push(
+          `stream_address = $${values.length}`,
+        );
+      }
 
-    const offset = Number.isFinite(offsetRaw)
-      ? Math.max(Math.floor(offsetRaw), 0)
-      : 0;
+      if (typeof employee === "string") {
+        values.push(employee);
+        conditions.push(
+          `employee = $${values.length}`,
+        );
+      }
 
-    const conditions: string[] = [];
-    const values: Array<string | number> = [];
+      const whereClause =
+        `WHERE ${conditions.join(" AND ")}`;
 
-    if (typeof stream === "string") {
-      values.push(stream);
-      conditions.push(
-        `stream_address = $${values.length}`,
-      );
-    }
+      const limitIndex = values.length + 1;
+      const offsetIndex = values.length + 2;
 
-    if (typeof employee === "string") {
-      values.push(employee);
-      conditions.push(
-        `employee = $${values.length}`,
-      );
-    }
+      values.push(limit);
+      values.push(offset);
 
-    if (typeof organization === "string") {
-      values.push(organization);
-      conditions.push(
-        `organization = $${values.length}`,
-      );
-    }
-
-    const whereClause =
-      conditions.length > 0
-        ? `WHERE ${conditions.join(" AND ")}`
-        : "";
-
-    const limitIndex = values.length + 1;
-    const offsetIndex = values.length + 2;
-
-    values.push(limit);
-    values.push(offset);
-
-    const result = await pool.query(
-      `
+      const result = await pool.query(
+        `
       SELECT
         id,
         signature,
@@ -848,35 +925,36 @@ app.get("/api/activities", async (req, res) => {
       LIMIT $${limitIndex}
       OFFSET $${offsetIndex}
       `,
-      values,
-    );
+        values,
+      );
 
-    const total =
-      result.rows.length > 0
-        ? Number(result.rows[0].total_count)
-        : 0;
+      const total =
+        result.rows.length > 0
+          ? Number(result.rows[0].total_count)
+          : 0;
 
-    const activities = result.rows.map(
-      ({ total_count, ...activity }) =>
-        activity,
-    );
+      const activities = result.rows.map(
+        ({ total_count, ...activity }) =>
+          activity,
+      );
 
-    res.json({
-      count: activities.length,
-      total,
-      limit,
-      offset,
-      hasMore: offset + activities.length < total,
-      activities,
-    });
-  } catch (error) {
-    console.error(error);
+      res.json({
+        count: activities.length,
+        total,
+        limit,
+        offset,
+        hasMore: offset + activities.length < total,
+        activities,
+      });
+    } catch (error) {
+      console.error(error);
 
-    res.status(500).json({
-      error: "Failed to fetch activities",
-    });
-  }
-});
+      res.status(500).json({
+        error: "Failed to fetch activities",
+      });
+    }
+  },
+);
 
 app.get("/api/activities/stats", async (_req, res) => {
   try {
@@ -2593,57 +2671,72 @@ app.patch(
   },
 );
 
-app.get("/api/reports/employees", async (req, res) => {
-  try {
-    const month =
-      typeof req.query.month === "string"
-        ? req.query.month.trim()
-        : "";
+app.get(
+  "/api/reports/employees",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-    const targetMonth =
-      /^\d{4}-\d{2}$/.test(month)
-        ? month
-        : new Date().toISOString().slice(0, 7);
+    const organization =
+      await getCustomerOrganization(wallet);
 
-    const [yearRaw, monthRaw] =
-      targetMonth.split("-");
-
-    const year = Number(yearRaw);
-    const monthNumber = Number(monthRaw);
-
-    if (
-      !Number.isInteger(year) ||
-      !Number.isInteger(monthNumber) ||
-      monthNumber < 1 ||
-      monthNumber > 12
-    ) {
-      return res.status(400).json({
-        error: "month must use YYYY-MM format",
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
       });
     }
 
-    const monthStart = Math.floor(
-      Date.UTC(
-        year,
-        monthNumber - 1,
-        1,
-      ) / 1000,
-    );
+    try {
+      const month =
+        typeof req.query.month === "string"
+          ? req.query.month.trim()
+          : "";
 
-    const nextMonthStart = Math.floor(
-      Date.UTC(
-        monthNumber === 12
-          ? year + 1
-          : year,
-        monthNumber === 12
-          ? 0
-          : monthNumber,
-        1,
-      ) / 1000,
-    );
+      const targetMonth =
+        /^\d{4}-\d{2}$/.test(month)
+          ? month
+          : new Date().toISOString().slice(0, 7);
 
-    const result = await pool.query(
-      `
+      const [yearRaw, monthRaw] =
+        targetMonth.split("-");
+
+      const year = Number(yearRaw);
+      const monthNumber = Number(monthRaw);
+
+      if (
+        !Number.isInteger(year) ||
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12
+      ) {
+        return res.status(400).json({
+          error: "month must use YYYY-MM format",
+        });
+      }
+
+      const monthStart = Math.floor(
+        Date.UTC(
+          year,
+          monthNumber - 1,
+          1,
+        ) / 1000,
+      );
+
+      const nextMonthStart = Math.floor(
+        Date.UTC(
+          monthNumber === 12
+            ? year + 1
+            : year,
+          monthNumber === 12
+            ? 0
+            : monthNumber,
+          1,
+        ) / 1000,
+      );
+
+      const result = await pool.query(
+        `
       SELECT
         employee,
         total_amount,
@@ -2652,188 +2745,205 @@ app.get("/api/reports/employees", async (req, res) => {
         end_time,
         canceled
       FROM streams
-      WHERE start_time >= $1
-        AND start_time < $2
+      WHERE organization = $1
+        AND start_time >= $2
+        AND start_time < $3
       ORDER BY start_time ASC
       `,
-      [
-        monthStart,
-        nextMonthStart,
-      ],
-    );
+        [
+          organization,
+          monthStart,
+          nextMonthStart,
+        ],
+      );
 
-    const nowSeconds = Math.floor(
-      Date.now() / 1000,
-    );
+      const nowSeconds = Math.floor(
+        Date.now() / 1000,
+      );
 
-    const employeeMap = new Map<
-      string,
-      {
-        streamCount: number;
-        grossPayout: bigint;
-        totalClaimed: bigint;
-        completed: number;
-        pending: number;
-        canceled: number;
+      const employeeMap = new Map<
+        string,
+        {
+          streamCount: number;
+          grossPayout: bigint;
+          totalClaimed: bigint;
+          completed: number;
+          pending: number;
+          canceled: number;
+        }
+      >();
+
+      for (const stream of result.rows) {
+        const employee = stream.employee;
+
+        const totalAmount = BigInt(
+          stream.total_amount.toString(),
+        );
+
+        const claimedAmount = BigInt(
+          stream.claimed_amount.toString(),
+        );
+
+        let report = employeeMap.get(employee);
+
+        if (!report) {
+          report = {
+            streamCount: 0,
+            grossPayout: BigInt(0),
+            totalClaimed: BigInt(0),
+            completed: 0,
+            pending: 0,
+            canceled: 0,
+          };
+
+          employeeMap.set(
+            employee,
+            report,
+          );
+        }
+
+        report.streamCount += 1;
+        report.grossPayout += totalAmount;
+        report.totalClaimed += claimedAmount;
+
+        if (stream.canceled) {
+          report.canceled += 1;
+        } else if (
+          Number(stream.end_time) <=
+          nowSeconds
+        ) {
+          report.completed += 1;
+        } else {
+          report.pending += 1;
+        }
       }
-    >();
 
-    for (const stream of result.rows) {
-      const employee = stream.employee;
-
-      const totalAmount = BigInt(
-        stream.total_amount.toString(),
-      );
-
-      const claimedAmount = BigInt(
-        stream.claimed_amount.toString(),
-      );
-
-      let report = employeeMap.get(employee);
-
-      if (!report) {
-        report = {
-          streamCount: 0,
-          grossPayout: BigInt(0),
-          totalClaimed: BigInt(0),
-          completed: 0,
-          pending: 0,
-          canceled: 0,
-        };
-
-        employeeMap.set(
+      const employees = Array.from(
+        employeeMap.entries(),
+      ).map(
+        ([
           employee,
           report,
-        );
-      }
+        ]) => {
+          const remaining =
+            report.grossPayout -
+            report.totalClaimed;
 
-      report.streamCount += 1;
-      report.grossPayout += totalAmount;
-      report.totalClaimed += claimedAmount;
+          return {
+            employee,
+            streamCount:
+              report.streamCount,
+            grossPayout:
+              report.grossPayout.toString(),
+            totalClaimed:
+              report.totalClaimed.toString(),
+            remaining:
+              remaining.toString(),
+            completed:
+              report.completed,
+            pending:
+              report.pending,
+            canceled:
+              report.canceled,
+          };
+        },
+      );
 
-      if (stream.canceled) {
-        report.canceled += 1;
-      } else if (
-        Number(stream.end_time) <=
-        nowSeconds
-      ) {
-        report.completed += 1;
-      } else {
-        report.pending += 1;
-      }
-    }
+      return res.json({
+        month: targetMonth,
+        employeeCount:
+          employees.length,
+        employees,
+      });
+    } catch (error) {
+      log(
+        "error",
+        "employee_report_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
 
-    const employees = Array.from(
-      employeeMap.entries(),
-    ).map(
-      ([
-        employee,
-        report,
-      ]) => {
-        const remaining =
-          report.grossPayout -
-          report.totalClaimed;
-
-        return {
-          employee,
-          streamCount:
-            report.streamCount,
-          grossPayout:
-            report.grossPayout.toString(),
-          totalClaimed:
-            report.totalClaimed.toString(),
-          remaining:
-            remaining.toString(),
-          completed:
-            report.completed,
-          pending:
-            report.pending,
-          canceled:
-            report.canceled,
-        };
-      },
-    );
-
-    return res.json({
-      month: targetMonth,
-      employeeCount:
-        employees.length,
-      employees,
-    });
-  } catch (error) {
-    log(
-      "error",
-      "employee_report_failed",
-      {
+      return res.status(500).json({
         error:
-          error instanceof Error
-            ? error.message
-            : String(error),
-      },
-    );
+          "Failed to generate employee report",
+      });
+    }
+  });
 
-    return res.status(500).json({
-      error:
-        "Failed to generate employee report",
-    });
-  }
-});
+app.get(
+  "/api/reports/treasury",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-app.get("/api/reports/treasury", async (req, res) => {
-  try {
-    const month =
-      typeof req.query.month === "string"
-        ? req.query.month.trim()
-        : "";
+    const organization =
+      await getCustomerOrganization(wallet);
 
-    const targetMonth =
-      /^\d{4}-\d{2}$/.test(month)
-        ? month
-        : new Date().toISOString().slice(0, 7);
-
-    const [yearRaw, monthRaw] =
-      targetMonth.split("-");
-
-    const year = Number(yearRaw);
-    const monthNumber = Number(monthRaw);
-
-    if (
-      !Number.isInteger(year) ||
-      !Number.isInteger(monthNumber) ||
-      monthNumber < 1 ||
-      monthNumber > 12
-    ) {
-      return res.status(400).json({
-        error: "month must use YYYY-MM format",
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
       });
     }
 
-    const monthStart = Math.floor(
-      Date.UTC(
-        year,
-        monthNumber - 1,
-        1,
-      ) / 1000,
-    );
+    try {
+      const month =
+        typeof req.query.month === "string"
+          ? req.query.month.trim()
+          : "";
 
-    const nextMonthStart = Math.floor(
-      Date.UTC(
-        monthNumber === 12
-          ? year + 1
-          : year,
-        monthNumber === 12
-          ? 0
-          : monthNumber,
-        1,
-      ) / 1000,
-    );
+      const targetMonth =
+        /^\d{4}-\d{2}$/.test(month)
+          ? month
+          : new Date().toISOString().slice(0, 7);
 
-    const nowSeconds = Math.floor(
-      Date.now() / 1000,
-    );
+      const [yearRaw, monthRaw] =
+        targetMonth.split("-");
 
-    const result = await pool.query(
-      `
+      const year = Number(yearRaw);
+      const monthNumber = Number(monthRaw);
+
+      if (
+        !Number.isInteger(year) ||
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12
+      ) {
+        return res.status(400).json({
+          error: "month must use YYYY-MM format",
+        });
+      }
+
+      const monthStart = Math.floor(
+        Date.UTC(
+          year,
+          monthNumber - 1,
+          1,
+        ) / 1000,
+      );
+
+      const nextMonthStart = Math.floor(
+        Date.UTC(
+          monthNumber === 12
+            ? year + 1
+            : year,
+          monthNumber === 12
+            ? 0
+            : monthNumber,
+          1,
+        ) / 1000,
+      );
+
+      const nowSeconds = Math.floor(
+        Date.now() / 1000,
+      );
+
+      const result = await pool.query(
+        `
       SELECT
         COUNT(*)::integer AS stream_count,
         COALESCE(
@@ -2849,156 +2959,175 @@ app.get("/api/reports/treasury", async (req, res) => {
         )::integer AS canceled,
         COUNT(*) FILTER (
           WHERE canceled = FALSE
-            AND end_time <= $3
+            AND end_time <= $4
         )::integer AS completed,
         COUNT(*) FILTER (
           WHERE canceled = FALSE
-            AND end_time > $3
+            AND end_time > $4
         )::integer AS active
       FROM streams
-      WHERE start_time >= $1
-        AND start_time < $2
+      WHERE organization = $1
+        AND start_time >= $2
+        AND start_time < $3
       `,
-      [
-        monthStart,
-        nextMonthStart,
-        nowSeconds,
-      ],
-    );
+        [
+          organization,
+          monthStart,
+          nextMonthStart,
+          nowSeconds,
+        ],
+      );
 
-    const row = result.rows[0];
+      const row = result.rows[0];
 
-    const grossPayout = BigInt(
-      row?.gross_payout?.toString() ?? "0",
-    );
+      const grossPayout = BigInt(
+        row?.gross_payout?.toString() ?? "0",
+      );
 
-    const totalClaimed = BigInt(
-      row?.total_claimed?.toString() ?? "0",
-    );
+      const totalClaimed = BigInt(
+        row?.total_claimed?.toString() ?? "0",
+      );
 
-    const outstanding =
-      grossPayout - totalClaimed;
+      const outstanding =
+        grossPayout - totalClaimed;
 
-    const transactionResult =
-      await pool.query(
-        `
+      const transactionResult =
+        await pool.query(
+          `
         SELECT
           status,
           COUNT(*)::integer AS count
         FROM transactions
-        WHERE created_at >= to_timestamp($1)
-          AND created_at < to_timestamp($2)
+        WHERE organization = $1
+          AND created_at >= to_timestamp($2)
+          AND created_at < to_timestamp($3)
         GROUP BY status
         ORDER BY status
         `,
-        [
-          monthStart,
-          nextMonthStart,
-        ],
+          [
+            organization,
+            monthStart,
+            nextMonthStart,
+          ],
+        );
+
+      const transactions: Record<
+        string,
+        number
+      > = {};
+
+      for (
+        const transaction
+        of transactionResult.rows
+      ) {
+        transactions[
+          transaction.status
+        ] = transaction.count;
+      }
+
+      return res.json({
+        month: targetMonth,
+        streamCount:
+          row?.stream_count ?? 0,
+        grossPayout:
+          grossPayout.toString(),
+        totalClaimed:
+          totalClaimed.toString(),
+        outstanding:
+          outstanding.toString(),
+        active:
+          row?.active ?? 0,
+        completed:
+          row?.completed ?? 0,
+        canceled:
+          row?.canceled ?? 0,
+        transactions,
+      });
+    } catch (error) {
+      log(
+        "error",
+        "treasury_report_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
       );
 
-    const transactions: Record<
-      string,
-      number
-    > = {};
-
-    for (
-      const transaction
-      of transactionResult.rows
-    ) {
-      transactions[
-        transaction.status
-      ] = transaction.count;
-    }
-
-    return res.json({
-      month: targetMonth,
-      streamCount:
-        row?.stream_count ?? 0,
-      grossPayout:
-        grossPayout.toString(),
-      totalClaimed:
-        totalClaimed.toString(),
-      outstanding:
-        outstanding.toString(),
-      active:
-        row?.active ?? 0,
-      completed:
-        row?.completed ?? 0,
-      canceled:
-        row?.canceled ?? 0,
-      transactions,
-    });
-  } catch (error) {
-    log(
-      "error",
-      "treasury_report_failed",
-      {
+      return res.status(500).json({
         error:
-          error instanceof Error
-            ? error.message
-            : String(error),
-      },
-    );
+          "Failed to generate treasury report",
+      });
+    }
+  });
 
-    return res.status(500).json({
-      error:
-        "Failed to generate treasury report",
-    });
-  }
-});
+app.get(
+  "/api/reports/payroll.csv",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-app.get("/api/reports/payroll.csv", async (req, res) => {
-  try {
-    const month =
-      typeof req.query.month === "string"
-        ? req.query.month.trim()
-        : "";
+    const organization =
+      await getCustomerOrganization(wallet);
 
-    const targetMonth =
-      /^\d{4}-\d{2}$/.test(month)
-        ? month
-        : new Date().toISOString().slice(0, 7);
-
-    const [yearRaw, monthRaw] =
-      targetMonth.split("-");
-
-    const year = Number(yearRaw);
-    const monthNumber = Number(monthRaw);
-
-    if (
-      !Number.isInteger(year) ||
-      !Number.isInteger(monthNumber) ||
-      monthNumber < 1 ||
-      monthNumber > 12
-    ) {
-      return res.status(400).json({
-        error: "month must use YYYY-MM format",
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
       });
     }
 
-    const monthStart = Math.floor(
-      Date.UTC(
-        year,
-        monthNumber - 1,
-        1,
-      ) / 1000,
-    );
+    try {
+      const month =
+        typeof req.query.month === "string"
+          ? req.query.month.trim()
+          : "";
 
-    const nextMonthStart = Math.floor(
-      Date.UTC(
-        monthNumber === 12
-          ? year + 1
-          : year,
-        monthNumber === 12
-          ? 0
-          : monthNumber,
-        1,
-      ) / 1000,
-    );
+      const targetMonth =
+        /^\d{4}-\d{2}$/.test(month)
+          ? month
+          : new Date().toISOString().slice(0, 7);
 
-    const result = await pool.query(
-      `
+      const [yearRaw, monthRaw] =
+        targetMonth.split("-");
+
+      const year = Number(yearRaw);
+      const monthNumber = Number(monthRaw);
+
+      if (
+        !Number.isInteger(year) ||
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12
+      ) {
+        return res.status(400).json({
+          error: "month must use YYYY-MM format",
+        });
+      }
+
+      const monthStart = Math.floor(
+        Date.UTC(
+          year,
+          monthNumber - 1,
+          1,
+        ) / 1000,
+      );
+
+      const nextMonthStart = Math.floor(
+        Date.UTC(
+          monthNumber === 12
+            ? year + 1
+            : year,
+          monthNumber === 12
+            ? 0
+            : monthNumber,
+          1,
+        ) / 1000,
+      );
+
+      const result = await pool.query(
+        `
       SELECT
         address,
         organization,
@@ -3011,164 +3140,181 @@ app.get("/api/reports/payroll.csv", async (req, res) => {
         canceled,
         cancel_time
       FROM streams
-      WHERE start_time >= $1
-        AND start_time < $2
+      WHERE organization = $1
+        AND start_time >= $2
+        AND start_time < $3
       ORDER BY start_time ASC
       `,
-      [
-        monthStart,
-        nextMonthStart,
-      ],
-    );
+        [
+          organization,
+          monthStart,
+          nextMonthStart,
+        ],
+      );
 
-    const nowSeconds = Math.floor(
-      Date.now() / 1000,
-    );
+      const nowSeconds = Math.floor(
+        Date.now() / 1000,
+      );
 
-    const rows = result.rows.map(
-      (stream) => {
-        const totalAmount =
-          BigInt(
-            stream.total_amount.toString(),
-          );
+      const rows = result.rows.map(
+        (stream) => {
+          const totalAmount =
+            BigInt(
+              stream.total_amount.toString(),
+            );
 
-        const claimedAmount =
-          BigInt(
-            stream.claimed_amount.toString(),
-          );
+          const claimedAmount =
+            BigInt(
+              stream.claimed_amount.toString(),
+            );
 
-        let status = "pending";
+          let status = "pending";
 
-        if (stream.canceled) {
-          status = "canceled";
-        } else if (
-          Number(stream.end_time) <=
-          nowSeconds
-        ) {
-          status = "completed";
-        }
+          if (stream.canceled) {
+            status = "canceled";
+          } else if (
+            Number(stream.end_time) <=
+            nowSeconds
+          ) {
+            status = "completed";
+          }
 
-        return [
-          stream.address,
-          stream.organization,
-          stream.employee,
-          stream.stream_id,
-          totalAmount.toString(),
-          claimedAmount.toString(),
-          (
-            totalAmount -
-            claimedAmount
-          ).toString(),
-          stream.start_time,
-          stream.end_time,
-          status,
-          stream.cancel_time,
-        ];
-      },
-    );
+          return [
+            stream.address,
+            stream.organization,
+            stream.employee,
+            stream.stream_id,
+            totalAmount.toString(),
+            claimedAmount.toString(),
+            (
+              totalAmount -
+              claimedAmount
+            ).toString(),
+            stream.start_time,
+            stream.end_time,
+            status,
+            stream.cancel_time,
+          ];
+        },
+      );
 
-    const csv = buildCsv(
-      [
-        "address",
-        "organization",
-        "employee",
-        "stream_id",
-        "total_amount_base_units",
-        "claimed_amount_base_units",
-        "remaining_amount_base_units",
-        "start_time",
-        "end_time",
-        "status",
-        "cancel_time",
-      ],
-      rows,
-    );
+      const csv = buildCsv(
+        [
+          "address",
+          "organization",
+          "employee",
+          "stream_id",
+          "total_amount_base_units",
+          "claimed_amount_base_units",
+          "remaining_amount_base_units",
+          "start_time",
+          "end_time",
+          "status",
+          "cancel_time",
+        ],
+        rows,
+      );
 
-    res.setHeader(
-      "Content-Type",
-      "text/csv; charset=utf-8",
-    );
+      res.setHeader(
+        "Content-Type",
+        "text/csv; charset=utf-8",
+      );
 
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="streampay-payroll-${targetMonth}.csv"`,
-    );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="streampay-payroll-${targetMonth}.csv"`,
+      );
 
-    return res.send(csv);
-  } catch (error) {
-    log(
-      "error",
-      "payroll_csv_export_failed",
-      {
+      return res.send(csv);
+    } catch (error) {
+      log(
+        "error",
+        "payroll_csv_export_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
+
+      return res.status(500).json({
         error:
-          error instanceof Error
-            ? error.message
-            : String(error),
-      },
-    );
+          "Failed to export payroll CSV",
+      });
+    }
+  });
 
-    return res.status(500).json({
-      error:
-        "Failed to export payroll CSV",
-    });
-  }
-});
+app.get(
+  "/api/reports/employees.csv",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-app.get("/api/reports/employees.csv", async (req, res) => {
-  try {
-    const month =
-      typeof req.query.month === "string"
-        ? req.query.month.trim()
-        : "";
+    const organization =
+      await getCustomerOrganization(wallet);
 
-    const targetMonth =
-      /^\d{4}-\d{2}$/.test(month)
-        ? month
-        : new Date().toISOString().slice(0, 7);
-
-    const [yearRaw, monthRaw] =
-      targetMonth.split("-");
-
-    const year = Number(yearRaw);
-    const monthNumber = Number(monthRaw);
-
-    if (
-      !Number.isInteger(year) ||
-      !Number.isInteger(monthNumber) ||
-      monthNumber < 1 ||
-      monthNumber > 12
-    ) {
-      return res.status(400).json({
-        error: "month must use YYYY-MM format",
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
       });
     }
 
-    const monthStart = Math.floor(
-      Date.UTC(
-        year,
-        monthNumber - 1,
-        1,
-      ) / 1000,
-    );
+    try {
+      const month =
+        typeof req.query.month === "string"
+          ? req.query.month.trim()
+          : "";
 
-    const nextMonthStart = Math.floor(
-      Date.UTC(
-        monthNumber === 12
-          ? year + 1
-          : year,
-        monthNumber === 12
-          ? 0
-          : monthNumber,
-        1,
-      ) / 1000,
-    );
+      const targetMonth =
+        /^\d{4}-\d{2}$/.test(month)
+          ? month
+          : new Date().toISOString().slice(0, 7);
 
-    const nowSeconds = Math.floor(
-      Date.now() / 1000,
-    );
+      const [yearRaw, monthRaw] =
+        targetMonth.split("-");
 
-    const result = await pool.query(
-      `
+      const year = Number(yearRaw);
+      const monthNumber = Number(monthRaw);
+
+      if (
+        !Number.isInteger(year) ||
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12
+      ) {
+        return res.status(400).json({
+          error: "month must use YYYY-MM format",
+        });
+      }
+
+      const monthStart = Math.floor(
+        Date.UTC(
+          year,
+          monthNumber - 1,
+          1,
+        ) / 1000,
+      );
+
+      const nextMonthStart = Math.floor(
+        Date.UTC(
+          monthNumber === 12
+            ? year + 1
+            : year,
+          monthNumber === 12
+            ? 0
+            : monthNumber,
+          1,
+        ) / 1000,
+      );
+
+      const nowSeconds = Math.floor(
+        Date.now() / 1000,
+      );
+
+      const result = await pool.query(
+        `
       SELECT
         employee,
         COUNT(*)::integer AS stream_count,
@@ -3185,146 +3331,155 @@ app.get("/api/reports/employees.csv", async (req, res) => {
         )::integer AS canceled,
         COUNT(*) FILTER (
           WHERE canceled = FALSE
-            AND end_time <= $3
+            AND end_time <= $4
         )::integer AS completed,
         COUNT(*) FILTER (
           WHERE canceled = FALSE
-            AND end_time > $3
+            AND end_time > $4
         )::integer AS pending
       FROM streams
-      WHERE start_time >= $1
-        AND start_time < $2
+      WHERE organization = $1
+        AND start_time >= $2
+        AND start_time < $3
       GROUP BY employee
       ORDER BY employee ASC
       `,
-      [
-        monthStart,
-        nextMonthStart,
-        nowSeconds,
-      ],
-    );
+        [
+          organization,
+          monthStart,
+          nextMonthStart,
+          nowSeconds,
+        ],
+      );
 
-    const rows = result.rows.map(
-      (employee) => {
-        const grossPayout =
-          BigInt(
-            employee.gross_payout.toString(),
-          );
+      const rows = result.rows.map(
+        (employee) => {
+          const grossPayout =
+            BigInt(
+              employee.gross_payout.toString(),
+            );
 
-        const totalClaimed =
-          BigInt(
-            employee.total_claimed.toString(),
-          );
+          const totalClaimed =
+            BigInt(
+              employee.total_claimed.toString(),
+            );
 
-        return [
-          employee.employee,
-          employee.stream_count,
-          grossPayout.toString(),
-          totalClaimed.toString(),
-          (
-            grossPayout -
-            totalClaimed
-          ).toString(),
-          employee.completed,
-          employee.pending,
-          employee.canceled,
-        ];
-      },
-    );
+          return [
+            employee.employee,
+            employee.stream_count,
+            grossPayout.toString(),
+            totalClaimed.toString(),
+            (
+              grossPayout -
+              totalClaimed
+            ).toString(),
+            employee.completed,
+            employee.pending,
+            employee.canceled,
+          ];
+        },
+      );
 
-    const csv = buildCsv(
-      [
-        "employee",
-        "stream_count",
-        "gross_payout_base_units",
-        "total_claimed_base_units",
-        "remaining_base_units",
-        "completed",
-        "pending",
-        "canceled",
-      ],
-      rows,
-    );
+      const csv = buildCsv(
+        [
+          "employee",
+          "stream_count",
+          "gross_payout_base_units",
+          "total_claimed_base_units",
+          "remaining_base_units",
+          "completed",
+          "pending",
+          "canceled",
+        ],
+        rows,
+      );
 
-    res.setHeader(
-      "Content-Type",
-      "text/csv; charset=utf-8",
-    );
+      res.setHeader(
+        "Content-Type",
+        "text/csv; charset=utf-8",
+      );
 
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="streampay-employees-${targetMonth}.csv"`,
-    );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="streampay-employees-${targetMonth}.csv"`,
+      );
 
-    return res.send(csv);
-  } catch (error) {
-    log(
-      "error",
-      "employee_csv_export_failed",
-      {
+      return res.send(csv);
+    } catch (error) {
+      log(
+        "error",
+        "employee_csv_export_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
+
+      return res.status(500).json({
         error:
-          error instanceof Error
-            ? error.message
-            : String(error),
-      },
-    );
-
-    return res.status(500).json({
-      error:
-        "Failed to export employee CSV",
-    });
-  }
-});
+          "Failed to export employee CSV",
+      });
+    }
+  });
 
 
-app.get("/api/reports/transactions.csv", async (req, res) => {
-  try {
-    const {
-      organization,
-      employee,
-      status,
-    } = req.query;
+app.get(
+  "/api/reports/transactions.csv",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-    const conditions: string[] = [];
-    const values: string[] = [];
+    const organization =
+      await getCustomerOrganization(wallet);
 
-    if (typeof organization === "string") {
-      values.push(
-        organization.trim(),
-      );
-
-      conditions.push(
-        `organization = $${values.length}`,
-      );
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
     }
 
-    if (typeof employee === "string") {
-      values.push(
-        employee.trim(),
-      );
+    try {
+      const {
+        employee,
+        status,
+      } = req.query;
 
-      conditions.push(
-        `employee = $${values.length}`,
-      );
-    }
+      const conditions: string[] = [
+        "organization = $1",
+      ];
 
-    if (typeof status === "string") {
-      values.push(
-        status.trim(),
-      );
+      const values: string[] = [
+        organization,
+      ];
 
-      conditions.push(
-        `status = $${values.length}`,
-      );
-    }
+      if (typeof employee === "string") {
+        values.push(
+          employee.trim(),
+        );
 
-    const whereClause =
-      conditions.length > 0
-        ? `WHERE ${conditions.join(" AND ")}`
-        : "";
+        conditions.push(
+          `employee = $${values.length}`,
+        );
+      }
 
-    const result = await pool.query(
-      `
+      if (typeof status === "string") {
+        values.push(
+          status.trim(),
+        );
+
+        conditions.push(
+          `status = $${values.length}`,
+        );
+      }
+
+      const whereClause =
+        `WHERE ${conditions.join(" AND ")}`;
+
+      const result = await pool.query(
+        `
       SELECT
         id,
         signature,
@@ -3341,76 +3496,89 @@ app.get("/api/reports/transactions.csv", async (req, res) => {
       ${whereClause}
       ORDER BY created_at DESC
       `,
-      values,
-    );
+        values,
+      );
 
-    const rows = result.rows.map(
-      (transaction) => [
-        transaction.id,
-        transaction.signature,
-        transaction.action,
-        transaction.status,
-        transaction.organization,
-        transaction.employee,
-        transaction.slot,
-        transaction.error,
-        transaction.created_at,
-        transaction.updated_at,
-        transaction.confirmed_at,
-      ],
-    );
+      const rows = result.rows.map(
+        (transaction) => [
+          transaction.id,
+          transaction.signature,
+          transaction.action,
+          transaction.status,
+          transaction.organization,
+          transaction.employee,
+          transaction.slot,
+          transaction.error,
+          transaction.created_at,
+          transaction.updated_at,
+          transaction.confirmed_at,
+        ],
+      );
 
-    const csv = buildCsv(
-      [
-        "id",
-        "signature",
-        "action",
-        "status",
-        "organization",
-        "employee",
-        "slot",
+      const csv = buildCsv(
+        [
+          "id",
+          "signature",
+          "action",
+          "status",
+          "organization",
+          "employee",
+          "slot",
+          "error",
+          "created_at",
+          "updated_at",
+          "confirmed_at",
+        ],
+        rows,
+      );
+
+      res.setHeader(
+        "Content-Type",
+        "text/csv; charset=utf-8",
+      );
+
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="streampay-transactions.csv"',
+      );
+
+      return res.send(csv);
+    } catch (error) {
+      log(
         "error",
-        "created_at",
-        "updated_at",
-        "confirmed_at",
-      ],
-      rows,
-    );
+        "transaction_csv_export_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
 
-    res.setHeader(
-      "Content-Type",
-      "text/csv; charset=utf-8",
-    );
-
-    res.setHeader(
-      "Content-Disposition",
-      'attachment; filename="streampay-transactions.csv"',
-    );
-
-    return res.send(csv);
-  } catch (error) {
-    log(
-      "error",
-      "transaction_csv_export_failed",
-      {
+      return res.status(500).json({
         error:
-          error instanceof Error
-            ? error.message
-            : String(error),
-      },
-    );
-
-    return res.status(500).json({
-      error:
-        "Failed to export transaction CSV",
-    });
-  }
-});
+          "Failed to export transaction CSV",
+      });
+    }
+  });
 
 
 app.get(
   "/api/reports/reconciliation",
-  async (_req, res) => {
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
+
+    const organization =
+      await getCustomerOrganization(wallet);
+
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
+    }
+
     try {
       const [
         chainAccounts,
@@ -3419,7 +3587,8 @@ app.get(
         withProgramFailover((rpcProgram) =>
           rpcProgram.account.stream.all(),
         ),
-        pool.query(`
+        pool.query(
+          `
           SELECT
             address,
             organization,
@@ -3435,7 +3604,10 @@ app.get(
             canceled,
             cancel_time
           FROM streams
-        `),
+          WHERE organization = $1
+          `,
+          [organization],
+        ),
       ]);
 
       const dbMap = new Map(
@@ -3448,39 +3620,45 @@ app.get(
       );
 
       const chainMap = new Map(
-        chainAccounts.map(
-          ({ publicKey, account }) => [
-            publicKey.toBase58(),
-            {
-              address:
-                publicKey.toBase58(),
-              organization:
-                account.organization.toBase58(),
-              employee:
-                account.employee.toBase58(),
-              vault:
-                account.vault.toBase58(),
-              escrow:
-                account.escrow.toBase58(),
-              mint:
-                account.mint.toBase58(),
-              stream_id:
-                account.streamId.toString(),
-              total_amount:
-                account.totalAmount.toString(),
-              start_time:
-                account.startTime.toString(),
-              end_time:
-                account.endTime.toString(),
-              claimed_amount:
-                account.claimedAmount.toString(),
-              canceled:
-                account.canceled,
-              cancel_time:
-                account.cancelTime.toString(),
-            },
-          ],
-        ),
+        chainAccounts
+          .filter(
+            ({ account }) =>
+              account.organization.toBase58() ===
+              organization,
+          )
+          .map(
+            ({ publicKey, account }) => [
+              publicKey.toBase58(),
+              {
+                address:
+                  publicKey.toBase58(),
+                organization:
+                  account.organization.toBase58(),
+                employee:
+                  account.employee.toBase58(),
+                vault:
+                  account.vault.toBase58(),
+                escrow:
+                  account.escrow.toBase58(),
+                mint:
+                  account.mint.toBase58(),
+                stream_id:
+                  account.streamId.toString(),
+                total_amount:
+                  account.totalAmount.toString(),
+                start_time:
+                  account.startTime.toString(),
+                end_time:
+                  account.endTime.toString(),
+                claimed_amount:
+                  account.claimedAmount.toString(),
+                canceled:
+                  account.canceled,
+                cancel_time:
+                  account.cancelTime.toString(),
+              },
+            ],
+          ),
       );
 
       let matched = 0;
@@ -3609,53 +3787,68 @@ app.get(
   },
 );
 
-app.get("/api/reports/payroll", async (req, res) => {
-  try {
-    const month =
-      typeof req.query.month === "string"
-        ? req.query.month.trim()
-        : "";
+app.get(
+  "/api/reports/payroll",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-    const targetMonth =
-      /^\d{4}-\d{2}$/.test(month)
-        ? month
-        : new Date().toISOString().slice(0, 7);
+    const organization =
+      await getCustomerOrganization(wallet);
 
-    const [yearRaw, monthRaw] =
-      targetMonth.split("-");
-
-    const year = Number(yearRaw);
-    const monthNumber = Number(monthRaw);
-
-    if (
-      !Number.isInteger(year) ||
-      !Number.isInteger(monthNumber) ||
-      monthNumber < 1 ||
-      monthNumber > 12
-    ) {
-      return res.status(400).json({
-        error: "month must use YYYY-MM format",
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
       });
     }
 
-    const monthStart = Math.floor(
-      Date.UTC(year, monthNumber - 1, 1) / 1000,
-    );
+    try {
+      const month =
+        typeof req.query.month === "string"
+          ? req.query.month.trim()
+          : "";
 
-    const nextMonthStart = Math.floor(
-      Date.UTC(
-        monthNumber === 12
-          ? year + 1
-          : year,
-        monthNumber === 12
-          ? 0
-          : monthNumber,
-        1,
-      ) / 1000,
-    );
+      const targetMonth =
+        /^\d{4}-\d{2}$/.test(month)
+          ? month
+          : new Date().toISOString().slice(0, 7);
 
-    const result = await pool.query(
-      `
+      const [yearRaw, monthRaw] =
+        targetMonth.split("-");
+
+      const year = Number(yearRaw);
+      const monthNumber = Number(monthRaw);
+
+      if (
+        !Number.isInteger(year) ||
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12
+      ) {
+        return res.status(400).json({
+          error: "month must use YYYY-MM format",
+        });
+      }
+
+      const monthStart = Math.floor(
+        Date.UTC(year, monthNumber - 1, 1) / 1000,
+      );
+
+      const nextMonthStart = Math.floor(
+        Date.UTC(
+          monthNumber === 12
+            ? year + 1
+            : year,
+          monthNumber === 12
+            ? 0
+            : monthNumber,
+          1,
+        ) / 1000,
+      );
+
+      const result = await pool.query(
+        `
       SELECT
         address,
         employee,
@@ -3665,112 +3858,114 @@ app.get("/api/reports/payroll", async (req, res) => {
         end_time,
         canceled
       FROM streams
-      WHERE start_time >= $1
-        AND start_time < $2
+      WHERE organization = $1
+        AND start_time >= $2
+        AND start_time < $3
       ORDER BY start_time ASC
       `,
-      [
-        monthStart,
-        nextMonthStart,
-      ],
-    );
+        [
+          organization,
+          monthStart,
+          nextMonthStart,
+        ],
+      );
 
-    const nowSeconds = Math.floor(
-      Date.now() / 1000,
-    );
+      const nowSeconds = Math.floor(
+        Date.now() / 1000,
+      );
 
-    let grossPayout = BigInt(0);
-    let totalClaimed = BigInt(0);
-    let completed = 0;
-    let pending = 0;
-    let canceled = 0;
+      let grossPayout = BigInt(0);
+      let totalClaimed = BigInt(0);
+      let completed = 0;
+      let pending = 0;
+      let canceled = 0;
 
-    const employees = new Set<string>();
+      const employees = new Set<string>();
 
-    const reportStreams = result.rows.map(
-      (stream) => {
-        const totalAmount = BigInt(
-          stream.total_amount.toString(),
-        );
+      const reportStreams = result.rows.map(
+        (stream) => {
+          const totalAmount = BigInt(
+            stream.total_amount.toString(),
+          );
 
-        const claimedAmount = BigInt(
-          stream.claimed_amount.toString(),
-        );
+          const claimedAmount = BigInt(
+            stream.claimed_amount.toString(),
+          );
 
-        grossPayout += totalAmount;
-        totalClaimed += claimedAmount;
+          grossPayout += totalAmount;
+          totalClaimed += claimedAmount;
 
-        employees.add(stream.employee);
+          employees.add(stream.employee);
 
-        let status:
-          | "completed"
-          | "pending"
-          | "canceled";
+          let status:
+            | "completed"
+            | "pending"
+            | "canceled";
 
-        if (stream.canceled) {
-          status = "canceled";
-          canceled += 1;
-        } else if (
-          Number(stream.end_time) <=
-          nowSeconds
-        ) {
-          status = "completed";
-          completed += 1;
-        } else {
-          status = "pending";
-          pending += 1;
-        }
+          if (stream.canceled) {
+            status = "canceled";
+            canceled += 1;
+          } else if (
+            Number(stream.end_time) <=
+            nowSeconds
+          ) {
+            status = "completed";
+            completed += 1;
+          } else {
+            status = "pending";
+            pending += 1;
+          }
 
-        return {
-          address: stream.address,
-          employee: stream.employee,
-          totalAmount:
-            totalAmount.toString(),
-          claimedAmount:
-            claimedAmount.toString(),
-          startTime:
-            Number(stream.start_time),
-          endTime:
-            Number(stream.end_time),
-          canceled:
-            stream.canceled,
-          status,
-        };
-      },
-    );
+          return {
+            address: stream.address,
+            employee: stream.employee,
+            totalAmount:
+              totalAmount.toString(),
+            claimedAmount:
+              claimedAmount.toString(),
+            startTime:
+              Number(stream.start_time),
+            endTime:
+              Number(stream.end_time),
+            canceled:
+              stream.canceled,
+            status,
+          };
+        },
+      );
 
-    return res.json({
-      month: targetMonth,
-      employees: employees.size,
-      grossPayout:
-        grossPayout.toString(),
-      totalClaimed:
-        totalClaimed.toString(),
-      completed,
-      pending,
-      canceled,
-      streamCount:
-        reportStreams.length,
-      streams:
-        reportStreams,
-    });
-  } catch (error) {
-    log(
-      "error",
-      "payroll_report_failed",
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : String(error),
-      },
-    );
+      return res.json({
+        month: targetMonth,
+        employees: employees.size,
+        grossPayout:
+          grossPayout.toString(),
+        totalClaimed:
+          totalClaimed.toString(),
+        completed,
+        pending,
+        canceled,
+        streamCount:
+          reportStreams.length,
+        streams:
+          reportStreams,
+      });
+    } catch (error) {
+      log(
+        "error",
+        "payroll_report_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
 
-    return res.status(500).json({
-      error: "Failed to generate payroll report",
-    });
-  }
-});
+      return res.status(500).json({
+        error: "Failed to generate payroll report",
+      });
+    }
+  });
 
 
 app.get("/api/ops/audit-logs", async (req, res) => {
@@ -3863,6 +4058,33 @@ async function requireCustomerSession(
   res.locals.wallet = session.wallet;
 
   return next();
+}
+
+async function getCustomerOrganization(
+  wallet: string,
+) {
+  const company =
+    await getCompanyForWallet(wallet);
+
+  if (!company) {
+    return null;
+  }
+
+  const authority =
+    new PublicKey(
+      company.created_by,
+    );
+
+  const [organization] =
+    PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("organization"),
+        authority.toBuffer(),
+      ],
+      PROGRAM_ID,
+    );
+
+  return organization.toBase58();
 }
 
 app.post(
@@ -4328,10 +4550,10 @@ app.get(
       const applications =
         await listApplications(
           status as
-            | "pending"
-            | "approved"
-            | "rejected"
-            | undefined,
+          | "pending"
+          | "approved"
+          | "rejected"
+          | undefined,
         );
 
       return res.json({
@@ -4471,10 +4693,10 @@ app.get(
       const applications =
         await listApplications(
           status as
-            | "pending"
-            | "approved"
-            | "rejected"
-            | undefined,
+          | "pending"
+          | "approved"
+          | "rejected"
+          | undefined,
         );
 
       return res.json({
