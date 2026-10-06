@@ -6,6 +6,20 @@ import crypto from "node:crypto";
 import { initializeDatabase, pool } from "./db.js";
 
 import {
+  getCompanyForWallet,
+  getCompanyAccessForWallet,
+  createCompany,
+  updatePilotStatus,
+} from "./company.js";
+
+import {
+  createAuthNonce,
+  authenticateWallet,
+  getSession,
+  deleteSession,
+} from "./auth.js";
+
+import {
   syncStreams,
   lastSyncAt,
   lastSyncCount,
@@ -963,7 +977,7 @@ app.post("/api/transactions", async (req, res) => {
         (instruction) =>
           (organization === null ||
             instruction.organization ===
-              organization) &&
+            organization) &&
           (employee === null ||
             instruction.employee === employee),
       );
@@ -3798,6 +3812,402 @@ app.get("/api/ops/audit-logs", async (req, res) => {
   }
 });
 
+function getSessionToken(
+  req: express.Request,
+) {
+  const cookie = req.get("cookie") ?? "";
+
+  const match = cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) =>
+      item.startsWith("tokenva_session="),
+    );
+
+  return match
+    ? decodeURIComponent(
+      match.slice("tokenva_session=".length),
+    )
+    : null;
+}
+
+async function requireCustomerSession(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  const token = getSessionToken(req);
+
+  if (!token) {
+    return res.status(401).json({
+      error: "Authentication required",
+    });
+  }
+
+  const session = await getSession(token);
+
+  if (!session) {
+    return res.status(401).json({
+      error: "Session expired",
+    });
+  }
+
+  res.locals.wallet = session.wallet;
+
+  return next();
+}
+
+app.post(
+  "/api/auth/nonce",
+  async (req, res) => {
+    try {
+      const wallet = req.body?.wallet;
+
+      if (
+        typeof wallet !== "string" ||
+        wallet.length === 0
+      ) {
+        return res.status(400).json({
+          error: "Wallet is required",
+        });
+      }
+
+      const result =
+        await createAuthNonce(wallet);
+
+      return res.json(result);
+    } catch {
+      return res.status(400).json({
+        error: "Invalid wallet",
+      });
+    }
+  },
+);
+
+app.post(
+  "/api/auth/login",
+  async (req, res) => {
+    try {
+      const {
+        wallet,
+        nonce,
+        signature,
+      } = req.body ?? {};
+
+      if (
+        typeof wallet !== "string" ||
+        typeof nonce !== "string" ||
+        typeof signature !== "string"
+      ) {
+        return res.status(400).json({
+          error:
+            "Wallet, nonce and signature are required",
+        });
+      }
+
+      const result =
+        await authenticateWallet({
+          wallet,
+          nonce,
+          signature,
+        });
+
+      res.setHeader(
+        "Set-Cookie",
+        [
+          `tokenva_session=${encodeURIComponent(
+            result.sessionToken,
+          )}`,
+          "HttpOnly",
+          "Path=/",
+          "SameSite=Lax",
+          "Max-Age=2592000",
+          process.env.NODE_ENV === "production"
+            ? "Secure"
+            : "",
+        ]
+          .filter(Boolean)
+          .join("; "),
+      );
+
+      return res.json({
+        authenticated: true,
+        wallet: result.wallet,
+      });
+    } catch (error) {
+      return res.status(401).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Authentication failed",
+      });
+    }
+  },
+);
+
+app.get(
+  "/api/auth/session",
+  requireCustomerSession,
+  async (_req, res) => {
+    return res.json({
+      authenticated: true,
+      wallet: res.locals.wallet,
+    });
+  },
+);
+
+app.post(
+  "/api/auth/logout",
+  async (req, res) => {
+    const token = getSessionToken(req);
+
+    if (token) {
+      await deleteSession(token);
+    }
+
+    res.setHeader(
+      "Set-Cookie",
+      [
+        "tokenva_session=",
+        "HttpOnly",
+        "Path=/",
+        "SameSite=Lax",
+        "Max-Age=0",
+        process.env.NODE_ENV === "production"
+          ? "Secure"
+          : "",
+      ]
+        .filter(Boolean)
+        .join("; "),
+    );
+
+    return res.json({
+      authenticated: false,
+    });
+  },
+);
+
+app.get(
+  "/api/company",
+  requireCustomerSession,
+  async (_req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const company =
+        await getCompanyForWallet(wallet);
+
+      return res.json({
+        company,
+      });
+    } catch (error) {
+      log(
+        "error",
+        "company_fetch_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
+
+      return res.status(500).json({
+        error: "Failed to fetch company",
+      });
+    }
+  },
+);
+
+app.get(
+  "/api/company",
+  requireCustomerSession,
+  async (_req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const company =
+        await getCompanyForWallet(wallet);
+
+      return res.json({
+        company,
+      });
+    } catch (error) {
+      log(
+        "error",
+        "company_fetch_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
+
+      return res.status(500).json({
+        error: "Failed to fetch company",
+      });
+    }
+  },
+);
+
+app.get(
+  "/api/company/access",
+  requireCustomerSession,
+  async (_req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const access =
+        await getCompanyAccessForWallet(wallet);
+
+      return res.json(access);
+    } catch (error) {
+      log(
+        "error",
+        "company_access_fetch_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
+
+      return res.status(500).json({
+        error: "Failed to fetch company access",
+      });
+    }
+  },
+);
+
+app.post(
+  "/api/company",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const {
+        name,
+        treasuryWallet,
+      } = req.body ?? {};
+
+      if (
+        typeof name !== "string" ||
+        !name.trim()
+      ) {
+        return res.status(400).json({
+          error: "Company name is required",
+        });
+      }
+
+      if (
+        treasuryWallet !== undefined &&
+        typeof treasuryWallet !== "string"
+      ) {
+        return res.status(400).json({
+          error: "Invalid treasury wallet",
+        });
+      }
+
+      const company =
+        await createCompany(
+          wallet,
+          name,
+          treasuryWallet,
+        );
+
+      return res.status(201).json({
+        company,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to create company";
+
+      return res.status(400).json({
+        error: message,
+      });
+    }
+  },
+);
+
+app.patch(
+  "/api/ops/companies/:companyId/pilot",
+  async (req, res) => {
+    try {
+      const {
+        status,
+        pilotStart,
+        pilotEnd,
+      } = req.body ?? {};
+
+      const pilotStatus =
+        typeof status === "string"
+          ? status as import("./company.js").PilotStatus
+          : null;
+
+      if (
+        typeof status !== "string"
+      ) {
+        return res.status(400).json({
+          error: "status is required",
+        });
+      }
+
+      const company =
+        await updatePilotStatus({
+          companyId: req.params.companyId,
+          status: pilotStatus!,
+          pilotStart:
+            typeof pilotStart === "string"
+              ? pilotStart
+              : null,
+          pilotEnd:
+            typeof pilotEnd === "string"
+              ? pilotEnd
+              : null,
+        });
+
+      if (!company) {
+        return res.status(404).json({
+          error: "Company not found",
+        });
+      }
+
+      await auditLog({
+        eventType: "company_pilot_status_updated",
+        actorType: "api",
+        entityType: "company",
+        entityId: company.id,
+        metadata: {
+          status: company.pilot_status,
+          pilotStart: company.pilot_start,
+          pilotEnd: company.pilot_end,
+        },
+      });
+
+      return res.json({
+        company,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update pilot status";
+
+      return res.status(400).json({
+        error: message,
+      });
+    }
+  },
+);
 async function startServer() {
   await initializeDatabase();
 

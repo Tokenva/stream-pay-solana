@@ -15,9 +15,17 @@ const ALLOWED_PATHS = new Set([
   "/health",
   "/api/ops/metrics",
   "/api/cross-chain/messages",
+
+  "/api/auth/nonce",
+  "/api/auth/login",
+  "/api/auth/session",
+  "/api/auth/logout",
+
+  "/api/company",
+  "/api/company/access",
 ]);
 
-export async function GET(
+async function proxy(
   request: NextRequest,
 ) {
   const backendPath =
@@ -30,16 +38,6 @@ export async function GET(
     return Response.json(
       { error: "Not found" },
       { status: 404 },
-    );
-  }
-
-  if (!API_KEY) {
-    return Response.json(
-      {
-        error:
-          "Backend proxy authentication is not configured",
-      },
-      { status: 503 },
     );
   }
 
@@ -58,12 +56,46 @@ export async function GET(
   }
 
   try {
+    const headers = new Headers();
+
+    headers.set(
+      "content-type",
+      request.headers.get(
+        "content-type",
+      ) ?? "application/json",
+    );
+
+    const cookie =
+      request.headers.get("cookie");
+
+    if (cookie) {
+      headers.set("cookie", cookie);
+    }
+
+    if (
+      API_KEY &&
+      backendPath !== "/api/auth/nonce" &&
+      backendPath !== "/api/auth/login" &&
+      backendPath !== "/api/auth/session" &&
+      backendPath !== "/api/auth/logout"
+    ) {
+      headers.set(
+        "authorization",
+        `Bearer ${API_KEY}`,
+      );
+    }
+
+    const body =
+      request.method === "GET" ||
+        request.method === "HEAD"
+        ? undefined
+        : await request.text();
+
     const response =
       await fetch(targetUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-        },
+        method: request.method,
+        headers,
+        body,
         cache: "no-store",
       });
 
@@ -82,18 +114,33 @@ export async function GET(
       );
     }
 
+    const setCookie =
+      response.headers.get(
+        "set-cookie",
+      );
+
+    if (setCookie) {
+      responseHeaders.set(
+        "set-cookie",
+        setCookie,
+      );
+    }
+
     responseHeaders.set(
       "cache-control",
       "no-store",
     );
 
-    const body =
+    const responseBody =
       await response.text();
 
-    return new Response(body, {
-      status: response.status,
-      headers: responseHeaders,
-    });
+    return new Response(
+      responseBody,
+      {
+        status: response.status,
+        headers: responseHeaders,
+      },
+    );
   } catch {
     return Response.json(
       {
@@ -104,3 +151,6 @@ export async function GET(
     );
   }
 }
+
+export const GET = proxy;
+export const POST = proxy;

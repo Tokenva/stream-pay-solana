@@ -1,8 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
+import {
+    getSession,
+    logout,
+} from "@/lib/auth";
 import { PublicKey } from "@solana/web3.js";
+
+import PilotStatus from "@/components/company/PilotStatus";
+import {
+    getCompanyAccess,
+    type CompanyAccess,
+} from "@/lib/company";
+
+import CompanyOnboarding from "@/components/company/CompanyOnboarding";
 
 import WalletButton from "@/components/WalletButton";
 import OperationalDashboard from "@/components/OperationalDashboard";
@@ -89,7 +102,7 @@ function formatTokenAmount(raw: bigint) {
         .replace(/0+$/, "")}`;
 }
 
-export default function Home() {
+function ProtectedHome() {
     const { publicKey } = useWallet();
 
     const [depositAmount, setDepositAmount] =
@@ -1288,4 +1301,117 @@ export default function Home() {
             </div>
         </main>
     );
+}
+
+export default function Home() {
+    const router = useRouter();
+
+    const {
+        connected,
+        connecting,
+    } = useWallet();
+
+    const [
+        authChecked,
+        setAuthChecked,
+    ] = useState(false);
+
+    const [
+        authenticated,
+        setAuthenticated,
+    ] = useState(false);
+
+    const [
+        companyAccess,
+        setCompanyAccess,
+    ] = useState<CompanyAccess | null>(null);
+
+    const [
+        companyChecked,
+        setCompanyChecked,
+    ] = useState(false);
+
+    useEffect(() => {
+        void (async () => {
+            const session =
+                await getSession();
+
+            if (!session?.authenticated) {
+                router.replace("/login");
+                return;
+            }
+
+            setAuthenticated(true);
+
+            try {
+                const access =
+                    await getCompanyAccess();
+
+                setCompanyAccess(access);
+            } catch {
+                router.replace("/login");
+                return;
+            }
+
+            setAuthChecked(true);
+            setCompanyChecked(true);
+        })();
+    }, [router]);
+
+    useEffect(() => {
+        if (
+            !authChecked ||
+            connecting
+        ) {
+            return;
+        }
+
+        if (!connected) {
+            void logout();
+            router.replace("/login");
+        }
+    }, [
+        authChecked,
+        connecting,
+        connected,
+        router,
+    ]);
+
+    if (
+        !authChecked ||
+        !authenticated ||
+        !companyChecked
+    ) {
+        return (
+            <main className="flex min-h-screen items-center justify-center bg-black text-white">
+                <p className="text-sm text-white/50">
+                    Checking authentication...
+                </p>
+            </main>
+        );
+    }
+
+    if (!companyAccess?.company) {
+        return (
+            <CompanyOnboarding
+                onCreated={(createdCompany) => {
+                    setCompanyAccess({
+                        company: createdCompany,
+                        hasDashboardAccess: false,
+                        accessStatus: "pending",
+                    });
+                }}
+            />
+        );
+    }
+
+    if (!companyAccess.hasDashboardAccess) {
+        return (
+            <PilotStatus
+                access={companyAccess}
+            />
+        );
+    }
+
+    return <ProtectedHome />;
 }

@@ -264,4 +264,104 @@ export async function initializeDatabase() {
   `);
 }
 
+  // Wallet authentication nonces
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS auth_nonces (
+      id BIGSERIAL PRIMARY KEY,
+      wallet TEXT NOT NULL,
+      nonce TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
 
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_auth_nonces_wallet
+    ON auth_nonces (wallet);
+
+    CREATE INDEX IF NOT EXISTS idx_auth_nonces_expires
+    ON auth_nonces (expires_at);
+  `);
+
+  // Wallet authentication sessions
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      id BIGSERIAL PRIMARY KEY,
+      wallet TEXT NOT NULL,
+      session_token TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_wallet
+    ON auth_sessions (wallet);
+
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires
+    ON auth_sessions (expires_at);
+  `);
+
+  // Tokenva companies
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS companies (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      treasury_wallet TEXT,
+      created_by TEXT NOT NULL,
+      pilot_status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (
+          pilot_status IN (
+            'pending',
+            'approved',
+            'active',
+            'expired',
+            'rejected'
+          )
+        ),
+      pilot_start TIMESTAMPTZ,
+      pilot_end TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_companies_created_by
+    ON companies (created_by);
+
+    CREATE INDEX IF NOT EXISTS idx_companies_pilot_status
+    ON companies (pilot_status);
+  `);
+
+  // Tokenva company members
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company_members (
+      id BIGSERIAL PRIMARY KEY,
+      company_id UUID NOT NULL
+        REFERENCES companies(id)
+        ON DELETE CASCADE,
+      wallet TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'owner'
+        CHECK (
+          role IN (
+            'owner',
+            'admin',
+            'finance',
+            'approver',
+            'viewer',
+            'employee'
+          )
+        ),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (company_id, wallet)
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_company_members_wallet
+    ON company_members (wallet);
+
+    CREATE INDEX IF NOT EXISTS idx_company_members_company
+    ON company_members (company_id);
+  `);
