@@ -23,6 +23,8 @@ const ALLOWED_PATHS = new Set([
 
   "/api/company",
   "/api/company/access",
+
+  "/api/application",
 ]);
 
 async function proxy(

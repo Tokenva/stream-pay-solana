@@ -8,14 +8,14 @@ import {
     logout,
 } from "@/lib/auth";
 import { PublicKey } from "@solana/web3.js";
-
-import PilotStatus from "@/components/company/PilotStatus";
 import {
     getCompanyAccess,
     type CompanyAccess,
 } from "@/lib/company";
 
 import CompanyOnboarding from "@/components/company/CompanyOnboarding";
+import ApplicationStatus from "@/components/company/ApplicationStatus";
+import PilotStatus from "@/components/company/PilotStatus";
 
 import WalletButton from "@/components/WalletButton";
 import OperationalDashboard from "@/components/OperationalDashboard";
@@ -1392,14 +1392,29 @@ export default function Home() {
     }
 
     if (!companyAccess?.company) {
+        if (!companyAccess?.application) {
+            return (
+                <CompanyOnboarding
+                    onSubmitted={(application) => {
+                        setCompanyAccess({
+                            company: null,
+                            application,
+                            hasDashboardAccess: false,
+                            accessStatus: null,
+                        });
+                    }}
+                />
+            );
+        }
+
         return (
-            <CompanyOnboarding
-                onCreated={(createdCompany) => {
-                    setCompanyAccess({
-                        company: createdCompany,
-                        hasDashboardAccess: false,
-                        accessStatus: "pending",
-                    });
+            <ApplicationStatus
+                application={companyAccess.application}
+                onRefresh={async () => {
+                    const access =
+                        await getCompanyAccess();
+
+                    setCompanyAccess(access);
                 }}
             />
         );
@@ -1409,9 +1424,16 @@ export default function Home() {
         return (
             <PilotStatus
                 access={companyAccess}
+                onRefresh={async () => {
+                    const access =
+                        await getCompanyAccess();
+
+                    setCompanyAccess(access);
+                }}
             />
         );
     }
 
     return <ProtectedHome />;
+
 }

@@ -1,5 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
 import { pool } from "./db.js";
+import {
+  getApplicationForWallet,
+  type PilotApplication,
+} from "./application.js";
 
 export type PilotStatus =
   | "pending"
@@ -33,6 +37,7 @@ export type CompanyAccess = {
   company: Company | null;
   hasDashboardAccess: boolean;
   accessStatus: PilotStatus | null;
+  application: PilotApplication | null;
 };
 
 export async function getCompanyForWallet(
@@ -74,6 +79,8 @@ export async function getCompanyAccessForWallet(
       company: null,
       hasDashboardAccess: false,
       accessStatus: null,
+      application:
+        await getApplicationForWallet(wallet),
     };
   }
 
@@ -98,6 +105,7 @@ export async function getCompanyAccessForWallet(
     company,
     hasDashboardAccess,
     accessStatus,
+    application: null,
   };
 }
 

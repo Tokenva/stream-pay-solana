@@ -6,6 +6,14 @@ import crypto from "node:crypto";
 import { initializeDatabase, pool } from "./db.js";
 
 import {
+  createApplication,
+  getApplicationForWallet,
+  listApplications,
+  approveApplication,
+  rejectApplication,
+} from "./application.js";
+
+import {
   getCompanyForWallet,
   getCompanyAccessForWallet,
   createCompany,
@@ -4208,6 +4216,379 @@ app.patch(
     }
   },
 );
+
+
+app.get(
+  "/api/application",
+  requireCustomerSession,
+  async (_req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const application =
+        await getApplicationForWallet(wallet);
+
+      return res.json({
+        application,
+      });
+    } catch (error) {
+      log(
+        "error",
+        "pilot_application_fetch_failed",
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      );
+
+      return res.status(500).json({
+        error:
+          "Failed to fetch pilot application",
+      });
+    }
+  },
+);
+
+app.post(
+  "/api/application",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const application =
+        await createApplication(
+          wallet,
+          {
+            companyName:
+              req.body?.companyName,
+            companyWebsite:
+              req.body?.companyWebsite,
+            workEmail:
+              req.body?.workEmail,
+            country:
+              req.body?.country,
+            teamSize:
+              req.body?.teamSize,
+            monthlyStablecoinPayrollVolume:
+              req.body
+                ?.monthlyStablecoinPayrollVolume,
+            primaryUseCase:
+              req.body?.primaryUseCase,
+            whyTokenva:
+              req.body?.whyTokenva,
+          },
+        );
+
+      return res.status(201).json({
+        application,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to submit pilot application";
+
+      return res.status(400).json({
+        error: message,
+      });
+    }
+  },
+);
+
+
+
+
+app.get(
+  "/api/ops/applications",
+  async (req, res) => {
+    try {
+      const status =
+        typeof req.query.status === "string"
+          ? req.query.status
+          : undefined;
+
+      if (
+        status &&
+        ![
+          "pending",
+          "approved",
+          "rejected",
+        ].includes(status)
+      ) {
+        return res.status(400).json({
+          error: "Invalid application status",
+        });
+      }
+
+      const applications =
+        await listApplications(
+          status as
+            | "pending"
+            | "approved"
+            | "rejected"
+            | undefined,
+        );
+
+      return res.json({
+        applications,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        error:
+          "Failed to list applications",
+      });
+    }
+  },
+);
+
+app.patch(
+  "/api/ops/applications/:applicationId",
+  async (req, res) => {
+    try {
+      const {
+        status,
+        rejectionReason,
+      } = req.body ?? {};
+
+      if (
+        status !== "approved" &&
+        status !== "rejected"
+      ) {
+        return res.status(400).json({
+          error:
+            "status must be approved or rejected",
+        });
+      }
+
+      const reviewer =
+        res.locals.wallet ??
+        req.get("x-operator") ??
+        "tokenva-ops";
+
+      if (status === "approved") {
+        const application =
+          await approveApplication(
+            req.params.applicationId,
+            String(reviewer),
+          );
+
+        await auditLog({
+          eventType:
+            "pilot_application_approved",
+          actorType: "api",
+          entityType:
+            "pilot_application",
+          entityId: application.id,
+          metadata: {
+            companyId:
+              application.company_id,
+            wallet:
+              application.wallet,
+          },
+        });
+
+        return res.json({
+          application,
+        });
+      }
+
+      if (
+        typeof rejectionReason !== "string" ||
+        !rejectionReason.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            "rejectionReason is required",
+        });
+      }
+
+      const application =
+        await rejectApplication(
+          req.params.applicationId,
+          String(reviewer),
+          rejectionReason,
+        );
+
+      await auditLog({
+        eventType:
+          "pilot_application_rejected",
+        actorType: "api",
+        entityType:
+          "pilot_application",
+        entityId: application.id,
+        metadata: {
+          wallet:
+            application.wallet,
+          rejectionReason:
+            application.rejection_reason,
+        },
+      });
+
+      return res.json({
+        application,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update application";
+
+      return res.status(400).json({
+        error: message,
+      });
+    }
+  },
+);
+
+
+app.get(
+  "/api/ops/applications",
+  async (req, res) => {
+    try {
+      const status =
+        typeof req.query.status === "string"
+          ? req.query.status
+          : undefined;
+
+      if (
+        status &&
+        ![
+          "pending",
+          "approved",
+          "rejected",
+        ].includes(status)
+      ) {
+        return res.status(400).json({
+          error: "Invalid application status",
+        });
+      }
+
+      const applications =
+        await listApplications(
+          status as
+            | "pending"
+            | "approved"
+            | "rejected"
+            | undefined,
+        );
+
+      return res.json({
+        applications,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        error:
+          "Failed to list applications",
+      });
+    }
+  },
+);
+
+app.patch(
+  "/api/ops/applications/:applicationId",
+  async (req, res) => {
+    try {
+      const {
+        status,
+        rejectionReason,
+      } = req.body ?? {};
+
+      if (
+        status !== "approved" &&
+        status !== "rejected"
+      ) {
+        return res.status(400).json({
+          error:
+            "status must be approved or rejected",
+        });
+      }
+
+      const reviewer =
+        res.locals.wallet ??
+        req.get("x-operator") ??
+        "tokenva-ops";
+
+      if (status === "approved") {
+        const application =
+          await approveApplication(
+            req.params.applicationId,
+            String(reviewer),
+          );
+
+        await auditLog({
+          eventType:
+            "pilot_application_approved",
+          actorType: "api",
+          entityType:
+            "pilot_application",
+          entityId: application.id,
+          metadata: {
+            companyId:
+              application.company_id,
+            wallet:
+              application.wallet,
+          },
+        });
+
+        return res.json({
+          application,
+        });
+      }
+
+      if (
+        typeof rejectionReason !== "string" ||
+        !rejectionReason.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            "rejectionReason is required",
+        });
+      }
+
+      const application =
+        await rejectApplication(
+          req.params.applicationId,
+          String(reviewer),
+          rejectionReason,
+        );
+
+      await auditLog({
+        eventType:
+          "pilot_application_rejected",
+        actorType: "api",
+        entityType:
+          "pilot_application",
+        entityId: application.id,
+        metadata: {
+          wallet:
+            application.wallet,
+          rejectionReason:
+            application.rejection_reason,
+        },
+      });
+
+      return res.json({
+        application,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update application";
+
+      return res.status(400).json({
+        error: message,
+      });
+    }
+  },
+);
+
+
 async function startServer() {
   await initializeDatabase();
 

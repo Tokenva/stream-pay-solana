@@ -1,3 +1,7 @@
+import type {
+  PilotApplication,
+} from "@/lib/application";
+
 export type Company = {
   id: string;
   name: string;
@@ -31,6 +35,9 @@ export type CompanyAccess = {
     | "active"
     | "expired"
     | "rejected"
+    | null;
+  application:
+    | PilotApplication
     | null;
 };
 

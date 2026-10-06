@@ -264,8 +264,8 @@ export async function initializeDatabase() {
   `);
 }
 
-  // Wallet authentication nonces
-  await pool.query(`
+// Wallet authentication nonces
+await pool.query(`
     CREATE TABLE IF NOT EXISTS auth_nonces (
       id BIGSERIAL PRIMARY KEY,
       wallet TEXT NOT NULL,
@@ -275,7 +275,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  await pool.query(`
+await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_auth_nonces_wallet
     ON auth_nonces (wallet);
 
@@ -283,8 +283,8 @@ export async function initializeDatabase() {
     ON auth_nonces (expires_at);
   `);
 
-  // Wallet authentication sessions
-  await pool.query(`
+// Wallet authentication sessions
+await pool.query(`
     CREATE TABLE IF NOT EXISTS auth_sessions (
       id BIGSERIAL PRIMARY KEY,
       wallet TEXT NOT NULL,
@@ -294,7 +294,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  await pool.query(`
+await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_auth_sessions_wallet
     ON auth_sessions (wallet);
 
@@ -302,8 +302,8 @@ export async function initializeDatabase() {
     ON auth_sessions (expires_at);
   `);
 
-  // Tokenva companies
-  await pool.query(`
+// Tokenva companies
+await pool.query(`
     CREATE TABLE IF NOT EXISTS companies (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       name TEXT NOT NULL,
@@ -326,7 +326,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  await pool.query(`
+await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_companies_created_by
     ON companies (created_by);
 
@@ -334,8 +334,8 @@ export async function initializeDatabase() {
     ON companies (pilot_status);
   `);
 
-  // Tokenva company members
-  await pool.query(`
+// Tokenva company members
+await pool.query(`
     CREATE TABLE IF NOT EXISTS company_members (
       id BIGSERIAL PRIMARY KEY,
       company_id UUID NOT NULL
@@ -358,10 +358,59 @@ export async function initializeDatabase() {
     );
   `);
 
-  await pool.query(`
+await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_company_members_wallet
     ON company_members (wallet);
 
     CREATE INDEX IF NOT EXISTS idx_company_members_company
     ON company_members (company_id);
+  `);
+
+// Tokenva pilot applications
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS pilot_applications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+      wallet TEXT NOT NULL UNIQUE,
+
+      company_name TEXT NOT NULL,
+      company_website TEXT NOT NULL,
+      work_email TEXT NOT NULL,
+      country TEXT NOT NULL,
+      team_size INTEGER NOT NULL CHECK (team_size > 0),
+
+      monthly_stablecoin_payroll_volume TEXT NOT NULL,
+
+      primary_use_case TEXT NOT NULL,
+      why_tokenva TEXT NOT NULL,
+
+      status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (
+          status IN (
+            'pending',
+            'approved',
+            'rejected'
+          )
+        ),
+
+      rejection_reason TEXT,
+
+      company_id UUID
+        REFERENCES companies(id)
+        ON DELETE SET NULL,
+
+      reviewed_at TIMESTAMPTZ,
+      reviewed_by TEXT,
+
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_pilot_applications_status
+    ON pilot_applications (status);
+
+    CREATE INDEX IF NOT EXISTS idx_pilot_applications_created
+    ON pilot_applications (created_at DESC);
   `);
