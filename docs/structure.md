@@ -1,17 +1,18 @@
 # StreamPay Solana Project Structure
 
-This repository combines the Solana program, the EVM gateway, the backend indexing services, and the Next.js dashboard.
+This repository combines a Solana Anchor program, an EVM gateway, a TypeScript backend, and a Next.js frontend. The tree below is intentionally source-focused: it includes the project-relevant application and infrastructure files, while excluding generated dependency/build artifacts such as `node_modules`, `.next`, `target`, and cache output.
 
 ```text
 stream-pay-solana/
-├── .anchor/
-├── .git/
 ├── .gitignore
 ├── .prettierignore
 ├── Anchor.toml
 ├── Cargo.lock
 ├── Cargo.toml
-├── app/                              # workspace scaffold
+├── deployment.json
+├── readme.md
+├── rust-toolchain.toml
+├── app/                                  # workspace scaffold / empty wrapper
 ├── backend/
 │   ├── .env
 │   ├── .env.example
@@ -33,11 +34,11 @@ stream-pay-solana/
 │       ├── logger.ts
 │       ├── solana.ts
 │       └── webhooks.ts
-├── deployment.json
 ├── docs/
 │   ├── M12_REPRODUCIBLE_DEMO.md
 │   ├── P1_PRODUCT_DEFINITION.md
 │   ├── StreamPay_Product_Roadmap_M0-M12.md
+│   ├── TOKENVA_COMPLETE_PROJECT_CONTEXT.md
 │   ├── doc.md
 │   ├── security/
 │   │   └── THREAT_MODEL.md
@@ -46,21 +47,19 @@ stream-pay-solana/
 │   ├── .env
 │   ├── .env.example
 │   ├── .gitignore
-│   ├── artifacts/
-│   ├── cache/
+│   ├── deployment.json
+│   ├── hardhat.config.ts
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── remappings.txt
+│   ├── tsconfig.json
 │   ├── contracts/
 │   │   ├── StreamPayEvmGateway.sol
 │   │   ├── StreamPayM11Token.sol
 │   │   ├── interfaces/
 │   │   │   └── IWormhole.sol
 │   │   └── mocks/
-│   ├── deployment.json
-│   ├── hardhat.config.ts
-│   ├── ignition/
-│   │   └── modules/
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── remappings.txt
+│   │       └── MockWormhole.sol
 │   ├── scripts/
 │   │   ├── check-protocol-config.ts
 │   │   ├── close-vaa-signatures.ts
@@ -79,9 +78,29 @@ stream-pay-solana/
 │   │   └── publish-top-up.ts
 │   ├── test/
 │   │   └── StreamPayEvmGateway.ts
-│   ├── tsconfig.json
 │   └── types/
 │       └── ethers-contracts/
+│           ├── StreamPayEvmGateway.ts
+│           ├── StreamPayM11Token.ts
+│           ├── common.ts
+│           ├── hardhat.d.ts
+│           ├── index.ts
+│           ├── factories/
+│           │   ├── StreamPayEvmGateway__factory.ts
+│           │   ├── StreamPayM11Token__factory.ts
+│           │   ├── index.ts
+│           │   ├── interfaces/
+│           │   │   ├── IWormhole__factory.ts
+│           │   │   └── index.ts
+│           │   └── mocks/
+│           │       ├── MockWormhole__factory.ts
+│           │       └── index.ts
+│           ├── interfaces/
+│           │   ├── IWormhole.ts
+│           │   └── index.ts
+│           └── mocks/
+│               ├── MockWormhole.ts
+│               └── index.ts
 ├── idls/
 │   └── wormhole_verify_vaa_shim.json
 ├── programs/
@@ -90,25 +109,26 @@ stream-pay-solana/
 │       ├── src/
 │       │   ├── constants.rs
 │       │   ├── error.rs
-│       │   ├── instructions/
-│       │   │   ├── cancel_stream.rs
-│       │   │   ├── claim.rs
-│       │   │   ├── create_organization.rs
-│       │   │   ├── create_stream.rs
-│       │   │   ├── cross_chain.rs
-│       │   │   ├── cross_chain_action.rs
-│       │   │   ├── cross_chain_asset.rs
-│       │   │   ├── cross_chain_top_up.rs
-│       │   │   ├── deposit.rs
-│       │   │   ├── initialize_organization_policy.rs
-│       │   │   ├── initialize_organization_roles.rs
-│       │   │   ├── initialize_protocol.rs
-│       │   │   ├── initialize_vault.rs
-│       │   │   ├── top_up_stream.rs
-│       │   │   └── update_organization_policy.rs
 │       │   ├── instructions.rs
 │       │   ├── lib.rs
-│       │   └── state.rs
+│       │   ├── state.rs
+│       │   └── instructions/
+│       │       ├── cancel_stream.rs
+│       │       ├── claim.rs
+│       │       ├── create_organization.rs
+│       │       ├── create_stream.rs
+│       │       ├── cross_chain.rs
+│       │       ├── cross_chain_action.rs
+│       │       ├── cross_chain_asset.rs
+│       │       ├── cross_chain_cancel.rs
+│       │       ├── cross_chain_top_up.rs
+│       │       ├── deposit.rs
+│       │       ├── initialize_organization_policy.rs
+│       │       ├── initialize_organization_roles.rs
+│       │       ├── initialize_protocol.rs
+│       │       ├── initialize_vault.rs
+│       │       ├── top_up_stream.rs
+│       │       └── update_organization_policy.rs
 │       └── tests/
 │           ├── claim.rs
 │           ├── cross_chain_asset.rs
@@ -118,20 +138,12 @@ stream-pay-solana/
 │           ├── security.rs
 │           ├── stream.rs
 │           └── vault.rs
-├── readme.md
-├── rust-toolchain.toml
-├── target/
-│   ├── debug/
-│   ├── deploy/
-│   ├── flycheck0/
-│   ├── idl/
-│   ├── release/
-│   ├── sbpfv3-solana-solana/
-│   └── tmp/
 ├── web/
 │   ├── .env
 │   ├── .env.example
 │   ├── .gitignore
+│   ├── AGENTS.md
+│   ├── CLAUDE.md
 │   ├── README.md
 │   ├── eslint.config.mjs
 │   ├── next-env.d.ts
@@ -141,23 +153,53 @@ stream-pay-solana/
 │   ├── postcss.config.mjs
 │   ├── tsconfig.json
 │   ├── public/
+│   │   ├── file.svg
+│   │   ├── globe.svg
+│   │   ├── next.svg
+│   │   ├── vercel.svg
+│   │   └── window.svg
 │   └── src/
 │       ├── app/
 │       │   ├── api/
-│       │   │   └── backend/
-│       │   │       └── route.ts
+│       │   │   ├── backend/
+│       │   │   │   └── [...path]/route.ts
+│       │   │   └── ops/
+│       │   │       ├── applications/
+│       │   │       │   ├── route.ts
+│       │   │       │   └── [applicationId]/route.ts
+│       │   │       ├── companies/
+│       │   │       │   └── [companyId]/
+│       │   │       │       └── pilot/route.ts
+│       │   │       ├── login/route.ts
+│       │   │       └── logout/route.ts
 │       │   ├── favicon.ico
 │       │   ├── globals.css
 │       │   ├── layout.tsx
 │       │   ├── login/
+│       │   │   └── page.tsx
+│       │   ├── ops/
+│       │   │   └── page.tsx
 │       │   └── page.tsx
 │       ├── components/
 │       │   ├── OperationalDashboard.tsx
 │       │   ├── WalletButton.tsx
 │       │   ├── activity/
+│       │   │   ├── ActivityHistory.tsx
+│       │   │   └── ActivityStats.tsx
 │       │   ├── company/
+│       │   │   ├── ApplicationStatus.tsx
+│       │   │   ├── CompanyOnboarding.tsx
+│       │   │   └── PilotStatus.tsx
 │       │   ├── dashboard/
+│       │   │   ├── CompanyOverview.tsx
+│       │   │   └── OperationalDashboard.tsx
 │       │   ├── payroll/
+│       │   │   ├── ActiveStream.tsx
+│       │   │   ├── CompanySetup.tsx
+│       │   │   ├── CreatePayroll.tsx
+│       │   │   ├── EmployeeDirectory.tsx
+│       │   │   ├── PayrollReports.tsx
+│       │   │   └── TreasuryFunding.tsx
 │       │   └── providers/
 │       │       └── SolanaProvider.tsx
 │       ├── hooks/
@@ -174,17 +216,23 @@ stream-pay-solana/
 │       │   └── stream_pay_solana.ts
 │       └── lib/
 │           ├── anchor.ts
+│           ├── application.ts
+│           ├── auth.ts
 │           ├── backend.ts
-│           └── pdas.ts
-└── (generated build artifacts, caches, and installed dependencies)
+│           ├── company.ts
+│           ├── ops-server.ts
+│           ├── pdas.ts
+│           └── ...
+└── ...
 ```
 
-## Key folders
+## Project areas
 
-- `programs/stream-pay-solana/`: on-chain Solana program and Rust test suite for stream, vault, organization, and security flows.
-- `evm-gateway/`: Solidity contracts, Hardhat deployment scripts, and cross-chain integration tooling.
-- `backend/`: TypeScript services for indexing, auth, company data, and cross-chain processing.
-- `web/`: Next.js app with routes, dashboard components, hooks, and Solana wallet integrations.
-- `target/`: generated Rust build artifacts and compiler output.
-- `idls/`: interface and Wormhole shim definitions used across the bridge flow.
-- `docs/`: product, roadmap, and architecture documentation.
+- `programs/stream-pay-solana/`: Solana Anchor program and Rust test suite.
+- `evm-gateway/`: Solidity smart contracts, deployment config, and Hardhat scripts.
+- `backend/`: TypeScript services for indexing, auth, company logic, and cross-chain processing.
+- `web/`: Next.js app with pages, API routes, dashboard components, hooks, IDL bindings, and wallet logic.
+- `docs/`: product, roadmap, threat-model, and project context documentation.
+- `idls/`: Wormhole verification interface definitions used across stacks.
+
+This structure intentionally excludes generated output such as `target/`, `node_modules/`, `.next/`, build caches, and other transient artifacts, while keeping all source-relevant project files visible.

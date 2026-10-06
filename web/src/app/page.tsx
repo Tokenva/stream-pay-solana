@@ -1306,11 +1306,9 @@ function ProtectedHome() {
 
 export default function Home() {
     const router = useRouter();
-
     const {
         connected,
         connecting,
-        publicKey,
     } = useWallet();
 
     const [
@@ -1324,11 +1322,6 @@ export default function Home() {
     ] = useState(false);
 
     const [
-        sessionWallet,
-        setSessionWallet,
-    ] = useState<string | null>(null);
-
-    const [
         companyAccess,
         setCompanyAccess,
     ] = useState<CompanyAccess | null>(null);
@@ -1339,76 +1332,165 @@ export default function Home() {
     ] = useState(false);
 
     useEffect(() => {
-        void (async () => {
-            const session =
-                await getSession();
+        let cancelled = false;
 
-            if (!session?.authenticated) {
-                router.replace("/login");
+        async function checkAuthentication() {
+            const session = await getSession();
+
+            if (cancelled) {
                 return;
             }
 
-            if (
-                !publicKey ||
-                session.wallet !==
-                publicKey.toBase58()
-            ) {
-                await logout();
-
+            if (!session?.authenticated) {
                 setAuthenticated(false);
                 setAuthChecked(true);
-
+                setCompanyAccess(null);
+                setCompanyChecked(false);
                 router.replace("/login");
                 return;
             }
 
             setAuthenticated(true);
             setAuthChecked(true);
-        })();
-    }, [router, publicKey]);
+        }
+
+        void checkAuthentication();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [router]);
+
+    useEffect(() => {
+        if (!authChecked || !authenticated) {
+            return;
+        }
+
+        let cancelled = false;
+
+        async function verifySession() {
+            const session = await getSession();
+
+            if (cancelled) {
+                return;
+            }
+
+            if (!session?.authenticated) {
+                setAuthenticated(false);
+                setAuthChecked(true);
+                setCompanyAccess(null);
+                setCompanyChecked(false);
+                router.replace("/login");
+            }
+        }
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                void verifySession();
+            }
+        };
+
+        document.addEventListener(
+            "visibilitychange",
+            handleVisibilityChange,
+        );
+
+        const interval = window.setInterval(
+            () => {
+                void verifySession();
+            },
+            30_000,
+        );
+
+        return () => {
+            cancelled = true;
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibilityChange,
+            );
+            window.clearInterval(interval);
+        };
+    }, [
+        authChecked,
+        authenticated,
+        router,
+    ]);
 
     useEffect(() => {
         if (
             !authChecked ||
+            !authenticated ||
             connecting
         ) {
             return;
         }
 
-        if (!connected || !publicKey) {
-            void logout();
-            setAuthenticated(false);
-            setSessionWallet(null);
-            setCompanyAccess(null);
-            setCompanyChecked(false);
-            router.replace("/login");
-            return;
-        }
-
-        const currentWallet =
-            publicKey.toBase58();
-
-        if (
-            sessionWallet &&
-            sessionWallet !== currentWallet
-        ) {
+        if (!connected) {
             void (async () => {
                 await logout();
 
                 setAuthenticated(false);
-                setSessionWallet(null);
                 setCompanyAccess(null);
                 setCompanyChecked(false);
-
                 router.replace("/login");
             })();
         }
     }, [
         authChecked,
-        connecting,
+        authenticated,
         connected,
-        publicKey,
-        sessionWallet,
+        connecting,
+        router,
+    ]);
+
+    useEffect(() => {
+        if (!authChecked || !authenticated) {
+            return;
+        }
+
+        let cancelled = false;
+
+        async function loadCompanyAccess() {
+            try {
+                const access =
+                    await getCompanyAccess();
+
+                if (cancelled) {
+                    return;
+                }
+
+                setCompanyAccess(access);
+                setCompanyChecked(true);
+            } catch (err) {
+                if (cancelled) {
+                    return;
+                }
+
+                console.error(
+                    "COMPANY ACCESS ERROR:",
+                    err,
+                );
+
+                if (cancelled) {
+                    return;
+                }
+
+                setAuthenticated(false);
+                setCompanyAccess(null);
+                setCompanyChecked(false);
+
+                router.replace("/login");
+            }
+        }
+
+        void loadCompanyAccess();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        authChecked,
+        authenticated,
         router,
     ]);
 
@@ -1470,5 +1552,4 @@ export default function Home() {
     }
 
     return <ProtectedHome />;
-
 }

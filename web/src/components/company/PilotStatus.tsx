@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
+
 import {
   getCompanyAccess,
   type CompanyAccess,
 } from "@/lib/company";
+import { logout } from "@/lib/auth";
 
 type Props = {
   access: CompanyAccess;
@@ -17,8 +21,19 @@ export default function PilotStatus({
   access,
   onRefresh,
 }: Props) {
+  const router = useRouter();
+
+  const {
+    disconnect,
+  } = useWallet();
+
   const [loading, setLoading] =
     useState(false);
+
+  const [
+    switchingWallet,
+    setSwitchingWallet,
+  ] = useState(false);
 
   async function refresh() {
     setLoading(true);
@@ -30,6 +45,20 @@ export default function PilotStatus({
       onRefresh(result);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function switchWallet() {
+    setSwitchingWallet(true);
+
+    try {
+      await logout();
+    } finally {
+      try {
+        await disconnect();
+      } finally {
+        router.replace("/login");
+      }
     }
   }
 
@@ -94,12 +123,29 @@ export default function PilotStatus({
         <button
           type="button"
           onClick={refresh}
-          disabled={loading}
-          className="mt-6 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium transition hover:bg-white/10 disabled:opacity-50"
+          disabled={
+            loading ||
+            switchingWallet
+          }
+          className="mt-6 w-full cursor-pointer rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium transition hover:bg-white/10 disabled:opacity-50"
         >
           {loading
             ? "Refreshing..."
             : "Refresh pilot status"}
+        </button>
+
+        <button
+          type="button"
+          onClick={switchWallet}
+          disabled={
+            loading ||
+            switchingWallet
+          }
+          className="mt-3 w-full cursor-pointer rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+        >
+          {switchingWallet
+            ? "Switching wallet..."
+            : "Use another wallet"}
         </button>
       </section>
     </main>
