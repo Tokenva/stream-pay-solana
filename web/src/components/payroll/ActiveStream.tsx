@@ -56,228 +56,385 @@ export default function ActiveStream({
   shortenAddress,
   formatTokenAmount,
 }: ActiveStreamProps) {
+  const activeIndexedStreams =
+    indexedStreams.filter(
+      (item) => !item.canceled,
+    ).length;
+
+  const canceledIndexedStreams =
+    indexedStreams.filter(
+      (item) => item.canceled,
+    ).length;
+
   return (
     <>
-      <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
-        <p className="text-sm text-zinc-400">
-          Active Stream
-        </p>
+      <section
+        id="live-payroll"
+        className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6"
+      >
+        <div className="flex items-start gap-4">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-sm font-bold">
+            04
+          </span>
+
+          <div>
+            <p className="text-sm text-zinc-400">
+              Live Payroll
+            </p>
+
+            <h2 className="mt-1 text-xl font-semibold">
+              Active payment stream
+            </h2>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
+              Monitor the current payment stream, claim
+              available funds, and manage the stream when your
+              role allows it.
+            </p>
+          </div>
+        </div>
 
         {streamData ? (
-          <>
-            <div className="mt-5 grid gap-5 md:grid-cols-4">
-              <div>
-                <p className="text-xs text-zinc-500">
+          <div className="mt-6 space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-zinc-800 bg-black/20 p-5">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">
                   Stream
                 </p>
 
-                <p className="mt-2 break-all text-sm">
+                <p className="mt-3 break-all text-sm">
                   {stream
-                    ? shortenAddress(stream.toBase58())
+                    ? shortenAddress(
+                        stream.toBase58(),
+                      )
                     : "—"}
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs text-zinc-500">
-                  Total
+              <div className="rounded-xl border border-zinc-800 bg-black/20 p-5">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">
+                  Total amount
                 </p>
 
-                <p className="mt-2 text-2xl font-semibold">
+                <p className="mt-3 text-2xl font-semibold">
                   {formatTokenAmount(
-                    BigInt(streamData.totalAmount.toString()),
+                    BigInt(
+                      streamData.totalAmount.toString(),
+                    ),
                   )}
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs text-zinc-500">
+              <div className="rounded-xl border border-zinc-800 bg-black/20 p-5">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">
                   Claimable
                 </p>
 
-                <p className="mt-2 text-2xl font-semibold text-green-400">
+                <p className="mt-3 text-2xl font-semibold text-green-400">
                   {earnedDisplay}
                 </p>
               </div>
 
-              <div className="mt-4 rounded-xl border border-zinc-800 p-4">
-                <p className="text-xs text-zinc-500">
-                  Stream Management
-                </p>
-
-                <p
-                  className={`mt-2 text-sm ${
-                    canManageStreams
-                      ? "text-green-400"
-                      : "text-zinc-600"
-                  }`}
-                >
-                  {canManageStreams
-                    ? `${currentRole} can top up and cancel streams.`
-                    : `${currentRole} has read-only stream access.`}
-                </p>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  disabled={
-                    actionLoading ||
-                    !canManageStreams ||
-                    streamData.canceled
-                  }
-                  onClick={onTopUp}
-                  className="rounded-xl cursor-pointer border border-zinc-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-900 disabled:opacity-40"
-                >
-                  {actionLoading
-                    ? "Processing..."
-                    : "Top Up 100"}
-                </button>
-
-                <button
-                  type="button"
-                  disabled={
-                    actionLoading ||
-                    !canManageStreams ||
-                    streamData.canceled
-                  }
-                  onClick={onCancel}
-                  className="rounded-xl cursor-pointer border border-red-900 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-950/40 disabled:opacity-40"
-                >
-                  {actionLoading
-                    ? "Processing..."
-                    : "Cancel Stream"}
-                </button>
-              </div>
-
-              {actionErrorStream && (
-                <p className="mt-4 text-sm text-red-400">
-                  {actionErrorStream}
-                </p>
-              )}
-
-              <div>
-                <p className="text-xs text-zinc-500">
+              <div className="rounded-xl border border-zinc-800 bg-black/20 p-5">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">
                   Status
                 </p>
 
-                <p className="mt-2">
-                  {streamData.canceled
-                    ? "Canceled"
-                    : "Active"}
+                <div className="mt-3 flex items-center gap-2">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      streamData.canceled
+                        ? "bg-red-400"
+                        : "bg-green-400"
+                    }`}
+                  />
+
+                  <span
+                    className={
+                      streamData.canceled
+                        ? "text-red-400"
+                        : "text-green-400"
+                    }
+                  >
+                    {streamData.canceled
+                      ? "Canceled"
+                      : "Active"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-black/20 p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm font-medium">
+                    Stream management
+                  </p>
+
+                  <p
+                    className={`mt-1 text-sm ${
+                      canManageStreams
+                        ? "text-green-400"
+                        : "text-zinc-600"
+                    }`}
+                  >
+                    {canManageStreams
+                      ? `${currentRole} can top up and cancel this stream.`
+                      : `${currentRole} has read-only stream access.`}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={
+                      actionLoading ||
+                      !canManageStreams ||
+                      streamData.canceled
+                    }
+                    onClick={onTopUp}
+                    className="rounded-xl border border-zinc-700 px-5 py-3 text-sm font-semibold transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {actionLoading
+                      ? "Processing..."
+                      : "Top Up 100"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      actionLoading ||
+                      !canManageStreams ||
+                      streamData.canceled
+                    }
+                    onClick={onCancel}
+                    className="rounded-xl border border-red-900 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {actionLoading
+                      ? "Processing..."
+                      : "Cancel Stream"}
+                  </button>
+                </div>
+              </div>
+
+              {actionErrorStream && (
+                <p className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-sm text-red-400">
+                  {actionErrorStream}
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-zinc-800 p-5">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">
+                  Stream escrow
+                </p>
+
+                <p className="mt-3 break-all text-sm">
+                  {streamEscrow
+                    ? shortenAddress(
+                        streamEscrow.toBase58(),
+                      )
+                    : "—"}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 p-5">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">
+                  Available to claim
+                </p>
+
+                <p className="mt-3 text-2xl font-semibold">
+                  {earnedDisplay}
                 </p>
               </div>
             </div>
 
-            {streamEscrow && (
-              <p className="mt-5 break-all text-xs text-zinc-500">
-                Escrow:{" "}
-                {shortenAddress(streamEscrow.toBase58())}
-              </p>
-            )}
-
             {streamError && (
-              <p className="mt-4 text-sm text-red-400">
+              <p className="rounded-xl border border-red-900/50 bg-red-950/20 p-4 text-sm text-red-400">
                 {streamError}
               </p>
             )}
 
-            <button
-              type="button"
-              disabled={
-                streamLoading ||
-                claimable === BigInt(0) ||
-                streamData.canceled
-              }
-              onClick={onClaim}
-              className="mt-6 cursor-pointer rounded-xl bg-white px-6 py-3 font-semibold text-black disabled:opacity-40"
-            >
-              {streamLoading
-                ? "Processing..."
-                : claimable > BigInt(0)
-                  ? `Claim ${earnedDisplay}`
-                  : "Nothing to claim yet"}
-            </button>
-          </>
+            <div className="rounded-xl border border-zinc-800 p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium">
+                    Employee claim
+                  </p>
+
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Claim funds that have become available
+                    under the current stream.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={
+                    streamLoading ||
+                    claimable === BigInt(0) ||
+                    streamData.canceled
+                  }
+                  onClick={onClaim}
+                  className="rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {streamLoading
+                    ? "Processing..."
+                    : claimable > BigInt(0)
+                      ? `Claim ${earnedDisplay}`
+                      : "Nothing to claim yet"}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
-          <p className="mt-5 text-sm text-zinc-500">
-            No Stream found for the current
-            wallet and Stream ID.
-          </p>
+          <div className="mt-6 rounded-xl border border-dashed border-zinc-800 p-8 text-center">
+            <p className="text-sm font-medium">
+              No active stream found
+            </p>
+
+            <p className="mt-2 text-sm text-zinc-500">
+              No stream was found for the current wallet and
+              Stream ID.
+            </p>
+          </div>
         )}
       </section>
 
-      <section className="rounded-2xl mt-6 border border-white/10 bg-white/5 p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">
-              Indexed Streams
-            </h2>
+      <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div>
+              <p className="text-sm text-zinc-400">
+                Stream Registry
+              </p>
 
-            <p className="text-sm text-white/50">
-              Data served by StreamPay backend
-            </p>
+              <h2 className="mt-1 text-xl font-semibold">
+                Indexed Streams
+              </h2>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Streams indexed by the StreamPay backend.
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onRefreshIndexedStreams}
-            className="rounded cursor-pointer lg border border-white/10 px-3 py-2 text-sm"
+            disabled={indexedStreamsLoading}
+            className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Refresh
+            {indexedStreamsLoading
+              ? "Refreshing..."
+              : "Refresh"}
           </button>
         </div>
 
+        {!indexedStreamsLoading &&
+          !indexedStreamsError &&
+          indexedStreams.length > 0 && (
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-xs text-zinc-500">
+                  Total streams
+                </p>
+
+                <p className="mt-1 text-2xl font-semibold">
+                  {indexedStreams.length}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-xs text-zinc-500">
+                  Active
+                </p>
+
+                <p className="mt-1 text-2xl font-semibold text-green-400">
+                  {activeIndexedStreams}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800 p-4">
+                <p className="text-xs text-zinc-500">
+                  Canceled
+                </p>
+
+                <p className="mt-1 text-2xl font-semibold text-red-400">
+                  {canceledIndexedStreams}
+                </p>
+              </div>
+            </div>
+          )}
+
         {indexedStreamsLoading && (
-          <p className="text-sm text-white/50">
-            Loading indexed streams...
-          </p>
+          <div className="mt-6 rounded-xl border border-zinc-800 p-6">
+            <p className="text-sm text-zinc-500">
+              Loading indexed streams...
+            </p>
+          </div>
         )}
 
         {indexedStreamsError && (
-          <p className="text-sm text-red-400">
-            {indexedStreamsError}
-          </p>
+          <div className="mt-6 rounded-xl border border-red-900/50 bg-red-950/20 p-4">
+            <p className="text-sm text-red-400">
+              {indexedStreamsError}
+            </p>
+          </div>
         )}
 
         {!indexedStreamsLoading &&
           !indexedStreamsError &&
           indexedStreams.length === 0 && (
-            <p className="text-sm text-white/50">
-              No indexed streams found.
-            </p>
+            <div className="mt-6 rounded-xl border border-dashed border-zinc-800 p-8 text-center">
+              <p className="text-sm font-medium">
+                No indexed streams found
+              </p>
+
+              <p className="mt-2 text-xs text-zinc-600">
+                Refresh the registry after creating a payment
+                stream.
+              </p>
+            </div>
           )}
 
-        <div className="space-y-3">
-          {indexedStreams.map((item) => (
-            <div
-              key={item.address}
-              className="rounded-xl border border-white/10 p-4"
-            >
-              <div className="flex items-center justify-between">
-                <span>
-                  Stream #{item.stream_id}
-                </span>
-
-                <span
-                  className={
-                    item.canceled
-                      ? "text-red-400"
-                      : "text-green-400"
-                  }
+        {!indexedStreamsLoading &&
+          !indexedStreamsError &&
+          indexedStreams.length > 0 && (
+            <div className="mt-6 space-y-3">
+              {indexedStreams.map((item) => (
+                <div
+                  key={item.address}
+                  className="rounded-xl border border-zinc-800 bg-black/20 p-4"
                 >
-                  {item.canceled
-                    ? "Canceled"
-                    : "Active"}
-                </span>
-              </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium">
+                        Stream #{item.stream_id}
+                      </p>
 
-              <div className="mt-2 text-xs text-white/50 wrap-break-word">
-                {item.address}
-              </div>
+                      <p className="mt-1 break-all text-xs text-zinc-600">
+                        {item.address}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${
+                        item.canceled
+                          ? "bg-red-500/10 text-red-400"
+                          : "bg-green-500/10 text-green-400"
+                      }`}
+                    >
+                      {item.canceled
+                        ? "Canceled"
+                        : "Active"}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
       </section>
     </>
   );

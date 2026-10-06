@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  WalletMultiButton,
+} from "@solana/wallet-adapter-react-ui";
 
 export default function WalletButton() {
   const [mounted, setMounted] = useState(false);
@@ -15,12 +21,17 @@ export default function WalletButton() {
       <button
         type="button"
         disabled
-        className="rounded-lg bg-purple-600 px-6 py-3 text-sm font-semibold text-white opacity-80"
+        className="tokenva-wallet-button tokenva-wallet-button-disabled"
       >
+        <span className="tokenva-wallet-dot" />
         Select Wallet
       </button>
     );
   }
 
-  return <WalletMultiButton />;
+  return (
+    <div className="tokenva-wallet-button-wrapper">
+      <WalletMultiButton className="tokenva-wallet-button" />
+    </div>
+  );
 }

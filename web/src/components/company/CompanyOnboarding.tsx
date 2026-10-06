@@ -59,6 +59,22 @@ export default function CompanyOnboarding({
   async function submit() {
     setError("");
 
+    if (
+      !companyName.trim() ||
+      !companyWebsite.trim() ||
+      !workEmail.trim() ||
+      !country.trim() ||
+      !teamSize.trim() ||
+      !monthlyStablecoinPayrollVolume ||
+      !primaryUseCase.trim() ||
+      !whyTokenva.trim()
+    ) {
+      setError(
+        "Please complete all application fields.",
+      );
+      return;
+    }
+
     const numericTeamSize =
       Number(teamSize);
 
@@ -100,24 +116,62 @@ export default function CompanyOnboarding({
   }
 
   return (
-    <main className="min-h-screen bg-black px-6 py-16 text-white">
-      <div className="mx-auto max-w-2xl">
-        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
-          <p className="text-sm font-medium text-white/50">
+    <main className="min-h-screen bg-black px-5 py-10 text-white sm:px-6 sm:py-16">
+      <div className="mx-auto max-w-3xl">
+
+        <div className="mb-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">
             TOKENVA
           </p>
 
-          <h1 className="mt-3 text-3xl font-semibold">
-            Join the Tokenva Design Partner Program
-          </h1>
+          <div className="mt-6 flex items-center gap-3 text-xs text-white/40">
+            <span className="flex items-center gap-2 text-white">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-black">
+                1
+              </span>
+              Application
+            </span>
 
-          <p className="mt-3 text-sm leading-6 text-white/55">
-            Tell us about your team and how you
-            plan to use programmable stablecoin
-            payroll.
-          </p>
+            <span className="h-px w-8 bg-white/10" />
+
+            <span className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10">
+                2
+              </span>
+              Review
+            </span>
+
+            <span className="h-px w-8 bg-white/10" />
+
+            <span className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10">
+                3
+              </span>
+              Pilot
+            </span>
+          </div>
+        </div>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl shadow-black/20 sm:p-8">
+
+          <div className="max-w-2xl">
+            <p className="text-sm font-medium text-white/50">
+              Design Partner Program
+            </p>
+
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+              Bring your payroll workflow to Tokenva.
+            </h1>
+
+            <p className="mt-4 text-sm leading-6 text-white/50 sm:text-base">
+              Tell us about your company, payroll needs,
+              and the problem you want to solve with
+              programmable stablecoin payroll.
+            </p>
+          </div>
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
+
             <Field
               label="Company name"
               value={companyName}
@@ -157,6 +211,7 @@ export default function CompanyOnboarding({
 
             <label className="block text-sm text-white/70">
               Monthly stablecoin payroll volume
+
               <select
                 value={
                   monthlyStablecoinPayrollVolume
@@ -166,7 +221,7 @@ export default function CompanyOnboarding({
                     event.target.value,
                   )
                 }
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-white/30"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-white/30"
               >
                 <option value="">
                   Select volume
@@ -187,6 +242,7 @@ export default function CompanyOnboarding({
 
           <label className="mt-5 block text-sm text-white/70">
             Primary use case
+
             <textarea
               value={primaryUseCase}
               onChange={(event) =>
@@ -196,12 +252,13 @@ export default function CompanyOnboarding({
               }
               placeholder="Global contractor and employee payroll..."
               rows={4}
-              className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-white/30"
+              className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-white/25 transition focus:border-white/30"
             />
           </label>
 
           <label className="mt-5 block text-sm text-white/70">
             Why Tokenva?
+
             <textarea
               value={whyTokenva}
               onChange={(event) =>
@@ -211,26 +268,33 @@ export default function CompanyOnboarding({
               }
               placeholder="What problem are you trying to solve?"
               rows={5}
-              className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-white/30"
+              className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-white/25 transition focus:border-white/30"
             />
           </label>
+
+          {error && (
+            <div className="mt-5 rounded-xl border border-red-400/20 bg-red-400/10 p-4">
+              <p className="text-sm text-red-300">
+                {error}
+              </p>
+            </div>
+          )}
 
           <button
             type="button"
             onClick={submit}
             disabled={loading}
-            className="mt-6 w-full cursor-pointer rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-6 w-full rounded-xl bg-white px-4 py-3.5 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading
               ? "Submitting application..."
-              : "Apply for design partner pilot"}
+              : "Submit design partner application"}
           </button>
 
-          {error && (
-            <p className="mt-5 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-300">
-              {error}
-            </p>
-          )}
+          <p className="mt-4 text-center text-xs leading-5 text-white/30">
+            Tokenva will review your application before
+            granting pilot access.
+          </p>
         </section>
       </div>
     </main>
@@ -261,7 +325,7 @@ function Field({
           onChange(event.target.value)
         }
         placeholder={placeholder}
-        className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-white/25 focus:border-white/30"
+        className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-white/25 transition focus:border-white/30"
       />
     </label>
   );
