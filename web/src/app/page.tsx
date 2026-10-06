@@ -328,8 +328,9 @@ function ProtectedHome() {
                 .slice(0, 7);
 
             const response = await fetch(
-                `http://localhost:4000/api/reports/payroll?month=${month}`,
+                `/api/backend/api/reports/payroll?month=${month}`,
                 {
+                    credentials: "include",
                     cache: "no-store",
                 },
             );
@@ -368,8 +369,9 @@ function ProtectedHome() {
                 .slice(0, 7);
 
             const response = await fetch(
-                `http://localhost:4000/api/reports/employees?month=${month}`,
+                `/api/backend/api/reports/employees?month=${month}`,
                 {
+                    credentials: "include",
                     cache: "no-store",
                 },
             );
@@ -412,8 +414,9 @@ function ProtectedHome() {
                 .slice(0, 7);
 
             const response = await fetch(
-                `http://localhost:4000/api/reports/treasury?month=${month}`,
+                `/api/backend/api/reports/treasury?month=${month}`,
                 {
+                    credentials: "include",
                     cache: "no-store",
                 },
             );
@@ -449,7 +452,7 @@ function ProtectedHome() {
             setReconciliationError(null);
 
             const response = await fetch(
-                "http://localhost:4000/api/reports/reconciliation",
+                "/api/backend/api/reports/reconciliation",
                 {
                     credentials: "include",
                     cache: "no-store",
@@ -496,11 +499,13 @@ function ProtectedHome() {
 
             const url =
                 type === "transactions"
-                    ? "http://localhost:4000/api/reports/transactions.csv"
-                    : `http://localhost:4000/api/reports/${type}.csv?month=${month}`;
+                    ? "/api/backend/api/reports/transactions.csv"
+                    : `/api/backend/api/reports/${type}.csv?month=${month}`;
 
             const response =
-                await fetch(url);
+                await fetch(url, {
+                    credentials: "include",
+                });
 
             if (!response.ok) {
                 throw new Error(

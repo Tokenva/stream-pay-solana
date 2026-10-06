@@ -2,10 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ??
-  "http://localhost:4000";
-
 type ActivityStatsResponse = {
   total: number;
   byInstruction: {
@@ -31,8 +27,9 @@ export default function ActivityStats() {
         setError(null);
 
         const response = await fetch(
-          `${API_BASE_URL}/api/activities/stats`,
+          "/api/backend/api/activities/stats",
           {
+            credentials: "include",
             cache: "no-store",
           },
         );

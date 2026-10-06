@@ -956,34 +956,61 @@ app.get(
   },
 );
 
-app.get("/api/activities/stats", async (_req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        instruction,
-        COUNT(*)::integer AS count
-      FROM activities
-      GROUP BY instruction
-      ORDER BY count DESC
-    `);
+app.get(
+  "/api/activities/stats",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet =
+      res.locals.wallet as string;
 
-    const totalResult = await pool.query(`
-      SELECT COUNT(*)::integer AS count
-      FROM activities
-    `);
+    const organization =
+      await getCustomerOrganization(wallet);
 
-    res.json({
-      total: totalResult.rows[0]?.count ?? 0,
-      byInstruction: result.rows,
-    });
-  } catch (error) {
-    console.error(error);
+    if (!organization) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
+    }
 
-    res.status(500).json({
-      error: "Failed to fetch activity stats",
-    });
-  }
-});
+    try {
+      const result = await pool.query(
+        `
+        SELECT
+          instruction,
+          COUNT(*)::integer AS count
+        FROM activities
+        WHERE organization = $1
+        GROUP BY instruction
+        ORDER BY count DESC
+        `,
+        [organization],
+      );
+
+      const totalResult =
+        await pool.query(
+          `
+          SELECT COUNT(*)::integer AS count
+          FROM activities
+          WHERE organization = $1
+          `,
+          [organization],
+        );
+
+      return res.json({
+        total:
+          totalResult.rows[0]?.count ?? 0,
+        byInstruction: result.rows,
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        error:
+          "Failed to fetch activity stats",
+      });
+    }
+  },
+);
 
 
 app.post("/api/transactions", async (req, res) => {
@@ -4056,6 +4083,47 @@ async function requireCustomerSession(
   }
 
   res.locals.wallet = session.wallet;
+
+  return next();
+}
+
+const CUSTOMER_REPORT_ROLES = new Set([
+  "owner",
+  "admin",
+  "finance",
+  "approver",
+  "viewer",
+]);
+
+async function requireCustomerReportAccess(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  const wallet =
+    res.locals.wallet as string;
+
+  const company =
+    await getCompanyForWallet(wallet);
+
+  if (!company) {
+    return res.status(403).json({
+      error: "Company access required",
+    });
+  }
+
+  if (
+    !CUSTOMER_REPORT_ROLES.has(
+      company.role,
+    )
+  ) {
+    return res.status(403).json({
+      error:
+        "Insufficient company permissions",
+    });
+  }
+
+  res.locals.company = company;
 
   return next();
 }

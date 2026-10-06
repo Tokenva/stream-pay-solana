@@ -25,6 +25,18 @@ const ALLOWED_PATHS = new Set([
   "/api/company/access",
 
   "/api/application",
+
+  "/api/activities",
+  "/api/activities/stats",
+
+  "/api/reports/payroll",
+  "/api/reports/employees",
+  "/api/reports/treasury",
+  "/api/reports/reconciliation",
+
+  "/api/reports/payroll.csv",
+  "/api/reports/employees.csv",
+  "/api/reports/transactions.csv",
 ]);
 
 async function proxy(

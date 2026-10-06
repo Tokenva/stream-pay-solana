@@ -138,10 +138,11 @@ export async function fetchActivities(
     searchParams.toString();
 
   const response = await fetch(
-    `${API_BASE_URL}/api/activities${
+    `/api/backend/api/activities${
       query ? `?${query}` : ""
     }`,
     {
+      credentials: "include",
       cache: "no-store",
     },
   );
