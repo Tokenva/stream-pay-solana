@@ -3,6 +3,17 @@ import pg from "pg";
 
 const { Pool } = pg;
 
+if (process.env.DEBUG_DATABASE_URL === "true") {
+  const databaseUrl = new URL(process.env.DATABASE_URL ?? "");
+  console.log("DATABASE CONFIG", {
+    user: databaseUrl.username,
+    host: databaseUrl.hostname,
+    port: databaseUrl.port,
+    database: databaseUrl.pathname,
+    hasPassword: Boolean(databaseUrl.password),
+  });
+}
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
