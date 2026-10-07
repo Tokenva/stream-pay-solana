@@ -40,7 +40,7 @@ import { useStreamActions } from "@/hooks/useStreamActions";
 import { useIndexedStreams } from "@/hooks/useIndexedStreams";
 
 const MINT =
-    process.env.NEXT_PUBLIC_TOKEN_MINT ?? "";
+    process.env.TOKEN_MINT ?? "";
 
 const DECIMALS = 6;
 const BASE_UNITS = BigInt(1_000_000);
