@@ -154,17 +154,16 @@ export default function CompanySetup({
             </h2>
 
             <p className="mt-2 text-sm text-zinc-500">
-              Available payroll actions are determined by your
-              organization role.
+              Available payroll actions are determined by your organization role.
             </p>
           </div>
 
-          <div className="rounded-xl border border-zinc-700 bg-black/30 px-4 py-3">
+          <div className="rounded-xl flex items-start justify-center gap-3 flex-nowrap border border-zinc-700 bg-black/30 px-4 py-3">
             <p className="text-xs text-zinc-500">
               Current role
             </p>
 
-            <p className="mt-1 font-semibold">
+            <p className="text-xs font-semibold">
               {currentRole}
             </p>
           </div>

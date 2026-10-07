@@ -105,8 +105,8 @@ export default function ActiveStream({
                 <p className="mt-3 break-all text-sm">
                   {stream
                     ? shortenAddress(
-                        stream.toBase58(),
-                      )
+                      stream.toBase58(),
+                    )
                     : "—"}
                 </p>
               </div>
@@ -142,11 +142,10 @@ export default function ActiveStream({
 
                 <div className="mt-3 flex items-center gap-2">
                   <span
-                    className={`h-2 w-2 rounded-full ${
-                      streamData.canceled
-                        ? "bg-red-400"
-                        : "bg-green-400"
-                    }`}
+                    className={`h-2 w-2 rounded-full ${streamData.canceled
+                      ? "bg-red-400"
+                      : "bg-green-400"
+                      }`}
                   />
 
                   <span
@@ -172,11 +171,10 @@ export default function ActiveStream({
                   </p>
 
                   <p
-                    className={`mt-1 text-sm ${
-                      canManageStreams
-                        ? "text-green-400"
-                        : "text-zinc-600"
-                    }`}
+                    className={`mt-1 text-sm ${canManageStreams
+                      ? "text-green-400"
+                      : "text-zinc-600"
+                      }`}
                   >
                     {canManageStreams
                       ? `${currentRole} can top up and cancel this stream.`
@@ -218,9 +216,14 @@ export default function ActiveStream({
               </div>
 
               {actionErrorStream && (
-                <p className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-sm text-red-400">
-                  {actionErrorStream}
-                </p>
+                <div className="mt-4 rounded-xl border border-red-900/40 bg-red-950/10 p-3">
+                  <p className="text-sm text-red-300">
+                    We couldn&apos;t complete that action.
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Please try again.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -233,8 +236,8 @@ export default function ActiveStream({
                 <p className="mt-3 break-all text-sm">
                   {streamEscrow
                     ? shortenAddress(
-                        streamEscrow.toBase58(),
-                      )
+                      streamEscrow.toBase58(),
+                    )
                     : "—"}
                 </p>
               </div>
@@ -251,9 +254,14 @@ export default function ActiveStream({
             </div>
 
             {streamError && (
-              <p className="rounded-xl border border-red-900/50 bg-red-950/20 p-4 text-sm text-red-400">
-                {streamError}
-              </p>
+              <div className="rounded-xl border border-red-900/40 bg-red-950/10 p-4">
+                <p className="text-sm text-red-300">
+                  We couldn&apos;t load this payment stream.
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Please refresh and try again.
+                </p>
+              </div>
             )}
 
             <div className="rounded-xl border border-zinc-800 p-5">
@@ -377,9 +385,12 @@ export default function ActiveStream({
         )}
 
         {indexedStreamsError && (
-          <div className="mt-6 rounded-xl border border-red-900/50 bg-red-950/20 p-4">
-            <p className="text-sm text-red-400">
-              {indexedStreamsError}
+          <div className="mt-6 rounded-xl border border-red-900/40 bg-red-950/10 p-4">
+            <p className="text-sm text-red-300">
+              We couldn&apos;t refresh the stream registry.
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Try refreshing again in a moment.
             </p>
           </div>
         )}
@@ -420,11 +431,10 @@ export default function ActiveStream({
                     </div>
 
                     <span
-                      className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${
-                        item.canceled
-                          ? "bg-red-500/10 text-red-400"
-                          : "bg-green-500/10 text-green-400"
-                      }`}
+                      className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${item.canceled
+                        ? "bg-red-500/10 text-red-400"
+                        : "bg-green-500/10 text-green-400"
+                        }`}
                     >
                       {item.canceled
                         ? "Canceled"

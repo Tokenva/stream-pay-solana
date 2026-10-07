@@ -46,17 +46,13 @@ body {
 .dashboard-shell {
   min-height: 100vh;
   background:
-    radial-gradient(
-      circle at 85% 0%,
+    radial-gradient(circle at 85% 0%,
       rgba(143, 245, 170, 0.055),
-      transparent 28rem
-    ),
-    linear-gradient(
-      180deg,
+      transparent 28rem),
+    linear-gradient(180deg,
       #050505 0%,
       #070707 45%,
-      #050505 100%
-    );
+      #050505 100%);
 }
 
 .dashboard-container {
@@ -176,11 +172,9 @@ body {
 
 .dashboard-container .bg-zinc-950 {
   background:
-    linear-gradient(
-      145deg,
+    linear-gradient(145deg,
       rgba(255, 255, 255, 0.025),
-      rgba(255, 255, 255, 0.008)
-    ) !important;
+      rgba(255, 255, 255, 0.008)) !important;
 }
 
 .dashboard-container .border-zinc-800 {
@@ -227,51 +221,200 @@ body {
 ------------------------------------------------- */
 
 .dashboard-container button {
+  border-radius: 11px;
+
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    opacity 150ms ease,
-    transform 150ms ease;
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
 }
 
 .dashboard-container button:not(:disabled):hover {
-  background: #161616;
+  border-color: var(--border-hover);
+  background: #151515;
+  color: #fff;
+  cursor: pointer;
+  transform: translateY(-1px);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .dashboard-container button:not(:disabled):active {
-  transform: translateY(1px);
+  transform: translateY(0);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.dashboard-container button:focus-visible {
+  outline: none;
+  border-color: #555;
+  box-shadow:
+    0 0 0 3px rgba(143, 245, 170, 0.07);
 }
 
 .dashboard-container button:disabled {
   cursor: not-allowed;
+  opacity: 0.4;
+  transform: none;
+  box-shadow: none;
 }
 
+
 /* -------------------------------------------------
-   Inputs
+   Inputs / Selects / Date controls
 ------------------------------------------------- */
 
 .dashboard-container input,
 .dashboard-container select,
 .dashboard-container textarea {
-  border-color: #2b2b2b;
+  min-height: 50px;
+
+  border: 1px solid #2b2b2b;
+  border-radius: 12px;
+
   background: #090909;
   color: var(--foreground);
+
   outline: none;
+
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.dashboard-container input:hover,
+.dashboard-container select:hover,
+.dashboard-container textarea:hover {
+  border-color: #3a3a3a;
 }
 
 .dashboard-container input:focus,
 .dashboard-container select:focus,
 .dashboard-container textarea:focus {
   border-color: #555;
-  box-shadow: 0 0 0 3px rgba(143, 245, 170, 0.055);
+  background: #0b0b0b;
+
+  box-shadow:
+    0 0 0 3px rgba(143, 245, 170, 0.055);
 }
 
 .dashboard-container input::placeholder,
 .dashboard-container textarea::placeholder {
   color: #555;
+}
+
+
+/* -------------------------------------------------
+   Clean Select Dropdowns
+------------------------------------------------- */
+
+.dashboard-container select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  padding-right: 44px;
+
+  background-color: #090909;
+
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  background-size: 14px;
+  cursor: pointer;
+}
+
+.dashboard-container select:hover {
+  cursor: pointer;
+  background-color: #0c0c0c;
+
+  /* background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23b5b5b5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); */
+}
+
+.dashboard-container select:focus {
+  background-color: #0b0b0b;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  padding-right: 44px;
+
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  background-size: 14px;
+  cursor: pointer;
+}
+
+
+/* -------------------------------------------------
+   Number Inputs — hide browser spinners
+------------------------------------------------- */
+
+.dashboard-container input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.dashboard-container input[type="number"]::-webkit-inner-spin-button,
+.dashboard-container input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+
+/* -------------------------------------------------
+   Date / Time Inputs
+------------------------------------------------- */
+
+.dashboard-container input[type="date"],
+.dashboard-container input[type="datetime-local"],
+.dashboard-container input[type="time"] {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.dashboard-container input[type="date"]::-webkit-calendar-picker-indicator,
+.dashboard-container input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dashboard-container input[type="time"]::-webkit-calendar-picker-indicator {
+  width: 18px;
+  height: 18px;
+
+  margin-right: 2px;
+
+  cursor: pointer;
+
+  opacity: 0.7;
+
+  filter:
+    invert(1) brightness(0.8);
+
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.dashboard-container input[type="date"]:hover::-webkit-calendar-picker-indicator,
+.dashboard-container input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
+.dashboard-container input[type="time"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.dashboard-container input[type="date"]:focus::-webkit-calendar-picker-indicator,
+.dashboard-container input[type="datetime-local"]:focus::-webkit-calendar-picker-indicator,
+.dashboard-container input[type="time"]:focus::-webkit-calendar-picker-indicator {
+  opacity: 1;
 }
 
 /* -------------------------------------------------
@@ -384,14 +527,15 @@ body {
   background: #555;
 }
 
-.demo-nav + .demo-section-label {
+.demo-nav+.demo-section-label {
   margin-top: 28px;
 }
+
 /* -------------------------------------------------
    Anchor scroll offset
 ------------------------------------------------- */
 
-.dashboard-container > [id] {
+.dashboard-container>[id] {
   scroll-margin-top: 90px;
 }
 
@@ -405,7 +549,7 @@ body {
     font-size: 10px;
   }
 
-  .dashboard-container > [id] {
+  .dashboard-container>[id] {
     scroll-margin-top: 70px;
   }
 }
@@ -488,11 +632,9 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   background:
-    linear-gradient(
-      180deg,
+    linear-gradient(180deg,
       rgba(255, 255, 255, 0.018),
-      rgba(255, 255, 255, 0)
-    ),
+      rgba(255, 255, 255, 0)),
     var(--surface);
   transition:
     border-color 150ms ease,
@@ -509,11 +651,9 @@ body {
 .workspace-metric-primary {
   border-color: rgba(143, 245, 170, 0.18);
   background:
-    radial-gradient(
-      circle at 100% 0%,
+    radial-gradient(circle at 100% 0%,
       rgba(143, 245, 170, 0.055),
-      transparent 11rem
-    ),
+      transparent 11rem),
     var(--surface);
 }
 
