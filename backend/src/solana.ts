@@ -6,11 +6,11 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 
-import idl from "../../target/idl/stream_pay_solana.json" with {
+import idl from "./idl/stream_pay_solana.json" with {
   type: "json",
 };
 
-import type { StreamPaySolana } from "../../target/types/stream_pay_solana.js";
+import type { StreamPaySolana } from "../../web/src/idl/stream_pay_solana.ts";
 import { log } from "./logger.js";
 
 const rpcUrls = (
