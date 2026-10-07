@@ -19,7 +19,7 @@ fn create_organization_creates_pda() {
         program_id,
         include_bytes!("../../../target/deploy/stream_pay_solana.so"),
     )
-    .expect("failed to load StreamPay program");
+    .expect("failed to load Tokenva program");
 
     let authority = Keypair::new();
 
@@ -86,7 +86,7 @@ fn unauthorized_wallet_cannot_use_existing_organization() {
         program_id,
         include_bytes!("../../../target/deploy/stream_pay_solana.so"),
     )
-    .expect("failed to load StreamPay program");
+    .expect("failed to load Tokenva program");
 
     let company_a = Keypair::new();
     let company_b = Keypair::new();

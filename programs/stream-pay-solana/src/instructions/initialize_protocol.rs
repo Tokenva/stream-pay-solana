@@ -31,7 +31,7 @@ pub fn handle_initialize_protocol(ctx: Context<InitializeProtocol>) -> Result<()
     protocol_config.bump = ctx.bumps.protocol_config;
     protocol_config.created_at = Clock::get()?.unix_timestamp;
 
-    msg!("StreamPay protocol initialized");
+    msg!("Tokenva protocol initialized");
 
     Ok(())
 }

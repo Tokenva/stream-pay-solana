@@ -117,7 +117,7 @@ fn setup() -> TestContext {
         program_id,
         include_bytes!("../../../target/deploy/stream_pay_solana.so"),
     )
-    .expect("failed to load StreamPay program");
+    .expect("failed to load Tokenva program");
 
     let company = Keypair::new();
 

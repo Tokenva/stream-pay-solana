@@ -216,7 +216,7 @@ pub fn handle_consume_vaa(
 
     /*
      * Everything after the first 51 bytes is
-     * our StreamPay application payload.
+     * our Tokenva application payload.
      */
 
     let payload = &vaa_body[51..];
@@ -319,7 +319,7 @@ pub fn handle_consume_vaa(
         end_time,
     });
 
-    msg!("StreamPay cross-chain VAA consumed");
+    msg!("Tokenva cross-chain VAA consumed");
 
     msg!("Sequence: {}", sequence);
 

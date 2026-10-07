@@ -9,7 +9,7 @@ import {
 
 import {IWormhole} from "./interfaces/IWormhole.sol";
 
-contract StreamPayEvmGateway is Ownable, Pausable, ReentrancyGuard {
+contract TokenvaEvmGateway is Ownable, Pausable, ReentrancyGuard {
     enum Action {
         CreateStream,
         TopUpStream,

@@ -22,7 +22,7 @@ fn initialize_protocol_creates_config_pda() {
         program_id,
         include_bytes!("../../../target/deploy/stream_pay_solana.so"),
     )
-    .expect("failed to load StreamPay program");
+    .expect("failed to load Tokenva program");
 
     let payer = Keypair::new();
 

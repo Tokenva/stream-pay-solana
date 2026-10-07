@@ -23,7 +23,7 @@ fn initialize_cross_chain_asset_config() {
         program_id,
         include_bytes!("../../../target/deploy/stream_pay_solana.so"),
     )
-    .expect("failed to load StreamPay program");
+    .expect("failed to load Tokenva program");
 
     let authority = Keypair::new();
 
@@ -116,7 +116,7 @@ fn unauthorized_authority_cannot_initialize_cross_chain_asset_config() {
         program_id,
         include_bytes!("../../../target/deploy/stream_pay_solana.so"),
     )
-    .expect("failed to load StreamPay program");
+    .expect("failed to load Tokenva program");
 
     let authority = Keypair::new();
     let attacker = Keypair::new();

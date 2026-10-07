@@ -1,8 +1,8 @@
-# StreamPay — Master Roadmap
+# Tokenva — Master Roadmap
 
 ## From Technical Prototype → Product → Paid Production Service
 
-**Project:** StreamPay  
+**Project:** Tokenva  
 
 **Current technical milestone range:** M0–M12  
 
@@ -14,7 +14,7 @@
 
 # 1. Purpose of This Roadmap
 
-This is the new master roadmap for continuing StreamPay in an orderly way.
+This is the new master roadmap for continuing Tokenva in an orderly way.
 
 It reconciles the earlier M0–M12 technical roadmap with the current project state and then adds the work required to turn the technical prototype into a real product.
 
@@ -111,7 +111,7 @@ It is not yet a production payroll product with:
 - independent security audit
 - validated design-partner demand
 
-M11 also has a specific integration limitation: the NTT asset transfer is real, but the demonstrated path is **NTT transfer → destination wallet → manual StreamPay vault deposit**. An automated atomic NTT-receive-to-vault relayer was not demonstrated.
+M11 also has a specific integration limitation: the NTT asset transfer is real, but the demonstrated path is **NTT transfer → destination wallet → manual Tokenva vault deposit**. An automated atomic NTT-receive-to-vault relayer was not demonstrated.
 
 ---
 # 3. Reconciled M0–M12 Technical Roadmap
@@ -229,7 +229,7 @@ Solana Devnet SPL token
       ↓
 Destination wallet
       ↓
-StreamPay Vault
+Tokenva Vault
       ↓
 Stream Escrow
       ↓
@@ -288,7 +288,7 @@ Wormhole sequence:
 2
 ```
 
-The destination wallet received the asset, after which exactly `1 SPT` was manually deposited into the StreamPay vault.
+The destination wallet received the asset, after which exactly `1 SPT` was manually deposited into the Tokenva vault.
 
 ## M11 limitation
 
@@ -301,14 +301,14 @@ NTT transfer
    ↓
 Destination wallet
    ↓
-Manual StreamPay vault deposit
+Manual Tokenva vault deposit
    ↓
 Stream funding
    ↓
 Employee claim
 ```
 
-The prototype does **not** claim an automated atomic `NTT receive → StreamPay Vault` relayer.
+The prototype does **not** claim an automated atomic `NTT receive → Tokenva Vault` relayer.
 
 ---
 
@@ -328,7 +328,7 @@ Cleaned and reconciled:
 
 - `readme.md`
 - `doc.md`
-- `StreamPay_Product_Roadmap_M0-M12.md`
+- `Tokenva_Product_Roadmap_M0-M12.md`
 - setup commands
 - toolchain versions
 - environment variables
@@ -348,7 +348,7 @@ The documentation now contains the four required architecture views:
 3. NTT cross-chain asset flow
 4. Frontend → backend → Solana/indexer application architecture
 
-The application architecture is source-verified against the current frontend/backend implementation: native StreamPay reads and transaction submission use Solana directly, while indexed streams and activity are served through the Express API backed by PostgreSQL.
+The application architecture is source-verified against the current frontend/backend implementation: native Tokenva reads and transaction submission use Solana directly, while indexed streams and activity are served through the Express API backed by PostgreSQL.
 
 ## M12.3 — Reproducible demo
 
@@ -383,7 +383,7 @@ NTT asset transfer
    ↓
 Verify destination receipt
    ↓
-Manual StreamPay vault deposit
+Manual Tokenva vault deposit
    ↓
 Stream funding
    ↓
@@ -500,7 +500,7 @@ Questions should focus on the current workflow:
 
 ## P1 exit criteria
 
-We have evidence of a repeatable pain point, a clearly defined early customer profile, and a reason those customers would consider paying for StreamPay.
+We have evidence of a repeatable pain point, a clearly defined early customer profile, and a reason those customers would consider paying for Tokenva.
 
 ---
 
@@ -636,7 +636,7 @@ And policy controls such as:
 
 ## P3 exit criteria
 
-A small company can run a complete payroll workflow through StreamPay using defined roles and controls.
+A small company can run a complete payroll workflow through Tokenva using defined roles and controls.
 
 ---
 
@@ -1277,4 +1277,4 @@ The project is no longer just a technical prototype when all of the following ar
 
 - the product can support those customers reliably
 
-At that point StreamPay has crossed from **project** to **product/business**.
+At that point Tokenva has crossed from **project** to **product/business**.

@@ -1,4 +1,4 @@
-# StreamPay Solana Project Structure
+# Tokenva Solana Project Structure
 
 This repository combines a Solana Anchor program, an EVM gateway, a TypeScript backend, and a Next.js frontend. The tree below is intentionally source-focused: it includes the project-relevant application and infrastructure files, while excluding generated dependency/build artifacts such as `node_modules`, `.next`, `target`, and cache output.
 
@@ -37,7 +37,7 @@ stream-pay-solana/
 ├── docs/
 │   ├── M12_REPRODUCIBLE_DEMO.md
 │   ├── P1_PRODUCT_DEFINITION.md
-│   ├── StreamPay_Product_Roadmap_M0-M12.md
+│   ├── Tokenva_Product_Roadmap_M0-M12.md
 │   ├── TOKENVA_COMPLETE_PROJECT_CONTEXT.md
 │   ├── doc.md
 │   ├── security/
@@ -54,8 +54,8 @@ stream-pay-solana/
 │   ├── remappings.txt
 │   ├── tsconfig.json
 │   ├── contracts/
-│   │   ├── StreamPayEvmGateway.sol
-│   │   ├── StreamPayM11Token.sol
+│   │   ├── TokenvaEvmGateway.sol
+│   │   ├── TokenvaM11Token.sol
 │   │   ├── interfaces/
 │   │   │   └── IWormhole.sol
 │   │   └── mocks/
@@ -77,17 +77,17 @@ stream-pay-solana/
 │   │   ├── publish-next-message.ts
 │   │   └── publish-top-up.ts
 │   ├── test/
-│   │   └── StreamPayEvmGateway.ts
+│   │   └── TokenvaEvmGateway.ts
 │   └── types/
 │       └── ethers-contracts/
-│           ├── StreamPayEvmGateway.ts
-│           ├── StreamPayM11Token.ts
+│           ├── TokenvaEvmGateway.ts
+│           ├── TokenvaM11Token.ts
 │           ├── common.ts
 │           ├── hardhat.d.ts
 │           ├── index.ts
 │           ├── factories/
-│           │   ├── StreamPayEvmGateway__factory.ts
-│           │   ├── StreamPayM11Token__factory.ts
+│           │   ├── TokenvaEvmGateway__factory.ts
+│           │   ├── TokenvaM11Token__factory.ts
 │           │   ├── index.ts
 │           │   ├── interfaces/
 │           │   │   ├── IWormhole__factory.ts

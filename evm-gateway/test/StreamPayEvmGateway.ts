@@ -6,7 +6,7 @@ import { network } from "hardhat";
 const { ethers } = await network.create();
 
 describe(
-  "StreamPayEvmGateway",
+  "TokenvaEvmGateway",
   function () {
     async function deployGateway() {
       const [owner, attacker] =
@@ -26,7 +26,7 @@ describe(
 
       const gateway =
         await ethers.deployContract(
-          "StreamPayEvmGateway",
+          "TokenvaEvmGateway",
           [
             10002,
             1,

@@ -238,7 +238,7 @@ async function main() {
   );
 
   console.log(
-    `StreamPay payload size: ${payload.length} bytes`,
+    `Tokenva payload size: ${payload.length} bytes`,
   );
 
   console.log("");

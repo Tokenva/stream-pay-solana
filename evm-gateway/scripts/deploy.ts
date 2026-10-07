@@ -48,7 +48,7 @@ if (!deployer) {
 }
 
 console.log(
-  `Deploying StreamPayEvmGateway to ${networkName}...`,
+  `Deploying Tokenva EvmGateway to ${networkName}...`,
 );
 
 console.log(
@@ -65,7 +65,7 @@ console.log(
 
 const gateway =
   await ethers.deployContract(
-    "StreamPayEvmGateway",
+    "TokenvaEvmGateway",
     [
       10002,
       1,
@@ -94,7 +94,7 @@ console.log(
 );
 
 console.log(
-  "StreamPay EVM Gateway deployed",
+  "Tokenva EVM Gateway deployed",
 );
 
 console.log(
