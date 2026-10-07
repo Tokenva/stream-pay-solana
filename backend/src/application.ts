@@ -311,8 +311,6 @@ LEFT JOIN companies c
   ON c.id = pa.company_id
 ${status ? "WHERE pa.status = $1" : ""}
 ORDER BY pa.created_at DESC
-    ${status ? "WHERE status = $1" : ""}
-    ORDER BY created_at DESC
     `,
     status ? [status] : [],
   );
