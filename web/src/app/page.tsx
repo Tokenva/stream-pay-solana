@@ -39,8 +39,7 @@ import { useStream } from "@/hooks/useStream";
 import { useStreamActions } from "@/hooks/useStreamActions";
 import { useIndexedStreams } from "@/hooks/useIndexedStreams";
 
-const MINT =
-    process.env.TOKEN_MINT ?? "";
+const EMPTY_MINT = "";
 
 const DECIMALS = 6;
 const BASE_UNITS = BigInt(1_000_000);
@@ -104,6 +103,51 @@ function formatTokenAmount(raw: bigint) {
 
 function ProtectedHome() {
     const { publicKey } = useWallet();
+
+    const [mint, setMint] =
+        useState(EMPTY_MINT);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadConfig() {
+            try {
+                const response =
+                    await fetch("/api/config", {
+                        cache: "no-store",
+                    });
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Failed to load application configuration",
+                    );
+                }
+
+                const data =
+                    (await response.json()) as {
+                        mint: string;
+                    };
+
+                if (!cancelled) {
+                    setMint(data.mint);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setActionError(
+                        err instanceof Error
+                            ? err.message
+                            : "Failed to load application configuration",
+                    );
+                }
+            }
+        }
+
+        void loadConfig();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const [depositAmount, setDepositAmount] =
         useState("");
@@ -268,7 +312,7 @@ function ProtectedHome() {
         balance: vaultBalance,
         refresh: refreshVault,
         createVault,
-    } = useVault(MINT);
+    } = useVault(mint);
 
     const {
         tokenAccount,
@@ -276,7 +320,7 @@ function ProtectedHome() {
         deposit,
         loading: depositLoading,
     } = useDeposit(
-        MINT,
+        mint,
         refreshVault,
     );
 
@@ -290,7 +334,7 @@ function ProtectedHome() {
         createStream,
         claim,
     } = useStream(
-        MINT,
+        mint,
         streamId,
         employeeAddress,
     );
@@ -301,7 +345,7 @@ function ProtectedHome() {
         topUp,
         cancel,
     } = useStreamActions(
-        MINT,
+        mint,
         streamId,
         employeeAddress,
         async () => {
@@ -1006,7 +1050,7 @@ function ProtectedHome() {
                                 ? publicKey.toBase58()
                                 : null
                         }
-                        mint={MINT}
+                        mint={mint}
                         currentRole={
                             currentRole
                         }

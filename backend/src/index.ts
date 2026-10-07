@@ -4507,7 +4507,6 @@ app.patch(
   },
 );
 
-
 app.get(
   "/api/application",
   requireCustomerSession,
@@ -4589,9 +4588,6 @@ app.post(
     }
   },
 );
-
-
-
 
 app.get(
   "/api/ops/applications",
