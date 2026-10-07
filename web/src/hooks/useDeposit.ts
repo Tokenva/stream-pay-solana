@@ -382,12 +382,8 @@ export function useDeposit(
               vault,
               tokenProgram:
                 SPL_TOKEN_PROGRAM_ID,
-              ...(rolesAccount
-                ? { roles }
-                : {}),
-              ...(policyAccount
-                ? { policy }
-                : {}),
+              roles: rolesAccount ? roles : null,
+              policy: policyAccount ? policy : null,
             })
             .rpc();
 
