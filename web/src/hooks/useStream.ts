@@ -15,6 +15,7 @@ import {
 import { getProgram } from "@/lib/anchor";
 import {
   getOrganizationPda,
+  getOrganizationPolicyPda,
   getOrganizationRolesPda,
   getStreamEscrowPda,
   getStreamPda,
@@ -78,7 +79,7 @@ function calculateClaimable(
 
   const effectiveEnd =
     data.canceled &&
-    cancelTime < end
+      cancelTime < end
       ? cancelTime
       : end;
 
@@ -276,6 +277,11 @@ export function useStream(
             organization,
           );
 
+        const [policy] =
+          getOrganizationPolicyPda(
+            organization,
+          );
+
         const [vault] =
           getVaultPda(
             organization,
@@ -342,6 +348,7 @@ export function useStream(
                   wallet.publicKey,
                 organization,
                 roles,
+                policy,
                 employee,
                 mint,
                 vault,
