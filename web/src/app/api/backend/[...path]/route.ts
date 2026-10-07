@@ -9,7 +9,7 @@ const BACKEND_URL =
   ).replace(/\/+$/, "");
 
 const API_KEY =
-  process.env.STREAMPAY_API_KEY?.trim();
+  process.env.TOKENVAPAY_API_KEY?.trim();
 
 const ALLOWED_PATHS = new Set([
   "/health",

@@ -1,8 +1,8 @@
-# StreamPay Solana
+# Tokenva Solana
 
 > **Trustless Cross-Chain Asset Streaming & Payroll Protocol**
 
-StreamPay is a **Solana-first payroll protocol** that combines time-based payment streams with an EVM/Wormhole cross-chain execution layer and Wormhole NTT asset transfer.
+Tokenva is a **Solana-first payroll protocol** that combines time-based payment streams with an EVM/Wormhole cross-chain execution layer and Wormhole NTT asset transfer.
 
 ---
 
@@ -10,7 +10,7 @@ StreamPay is a **Solana-first payroll protocol** that combines time-based paymen
 
 - [Current Status]\(#current-status)
 
-- [What StreamPay Does]\(#what-streampay-does)
+- [What Tokenva Does]\(#what-tokenva-does)
 
 - [Architecture]\(#architecture)
 
@@ -78,16 +78,16 @@ StreamPay is a **Solana-first payroll protocol** that combines time-based paymen
 
 **M6 is complete.** The dedicated cross-chain security suite contains 19 tests and the native security suite contains 13 tests. The recorded complete regression is **41 passed / 0 failed**.
 
-**M11 is complete.** A real EVM Sepolia → Solana Devnet asset transfer was demonstrated using Wormhole NTT. The destination asset then entered the StreamPay flow through a **manual vault deposit**.
+**M11 is complete.** A real EVM Sepolia → Solana Devnet asset transfer was demonstrated using Wormhole NTT. The destination asset then entered the Tokenva flow through a **manual vault deposit**.
 
-**M11 does not currently prove an automated atomic `NTT receive → StreamPay Vault` relayer transaction.**
+**M11 does not currently prove an automated atomic `NTT receive → Tokenva Vault` relayer transaction.**
 
 **M12 is complete.** The technical prototype is packaged with reproducible documentation, architecture views, demo instructions, public deployment identifiers, live transaction evidence, security notes, and known limitations. The next phase is **P1 — Product Definition + Customer Discovery**.
 
 ---
-# What StreamPay Does
+# What Tokenva Does
 
-StreamPay turns a fixed payroll amount into a **time-based payment stream**.
+Tokenva turns a fixed payroll amount into a **time-based payment stream**.
 
 Example:
 
@@ -167,7 +167,7 @@ flowchart TD
 
     EmployeeToken["Employee Token Account"]
 
-    Program["StreamPay Solana Program"]
+    Program["Tokenva Solana Program"]
 
     Token["SPL Token Program"]
 
@@ -231,7 +231,7 @@ flowchart TD
 
     EVM["Ethereum Sepolia"]
 
-    Gateway["StreamPay EVM Gateway"]
+    Gateway["Tokenva EVM Gateway"]
 
     WH["Wormhole"]
 
@@ -241,7 +241,7 @@ flowchart TD
 
     Consume["consume_vaa"]
 
-    StreamPay["StreamPay Program"]
+    Tokenva["Tokenva Program"]
 
     Action["CreateStream / TopUp"]
 
@@ -255,9 +255,9 @@ flowchart TD
 
     Consume --> Solana
 
-    Solana --> StreamPay
+    Solana --> Tokenva
 
-    StreamPay --> Action
+    Tokenva --> Action
 
 ```
 
@@ -289,7 +289,7 @@ consume_vaa
 
       ↓
 
-StreamPay Solana Program
+Tokenva Solana Program
 
       ↓
 
@@ -301,7 +301,7 @@ Cross-chain action
 
 The application has two distinct data paths:
 
-1. **Native protocol interaction:** the Next.js application reads Solana state and submits native StreamPay transactions through the connected wallet.
+1. **Native protocol interaction:** the Next.js application reads Solana state and submits native Tokenva transactions through the connected wallet.
 2. **Indexed read path:** the Next.js application requests indexed streams and activity from the Express backend, which reads PostgreSQL populated by the stream and activity indexers.
 
 ```mermaid
@@ -309,7 +309,7 @@ flowchart TD
     User[User / Connected Wallet]
     Web[Next.js Web App]
     RPC[Solana Devnet RPC]
-    Program[StreamPay Solana Program]
+    Program[Tokenva Solana Program]
     API[Express Backend API]
     StreamIndexer[Stream Indexer]
     ActivityIndexer[Activity Indexer]
@@ -341,7 +341,7 @@ flowchart TD
     SolanaNTT[Solana NTT Manager / Transceiver]
     SolanaAsset[Solana Devnet SPL token]
     Wallet[Destination Wallet]
-    Vault[StreamPay Vault]
+    Vault[Tokenva Vault]
     Escrow[Stream Escrow]
     Claim[Employee Claim]
 
@@ -355,17 +355,17 @@ flowchart TD
     Escrow --> Claim
 ```
 
-The demonstrated M11 asset path is **NTT transfer → destination wallet → manual StreamPay Vault deposit**. The prototype does not claim an automated atomic NTT-receive-to-vault relayer.
+The demonstrated M11 asset path is **NTT transfer → destination wallet → manual Tokenva Vault deposit**. The prototype does not claim an automated atomic NTT-receive-to-vault relayer.
 
 ---
 
 # Core Solana Concepts
 
-| Concept | Meaning in StreamPay |
+| Concept | Meaning in Tokenva |
 
 |---|---|
 
-| **Program** | On-chain Rust code containing StreamPay rules |
+| **Program** | On-chain Rust code containing Tokenva rules |
 
 | **Account** | On-chain data/state |
 
@@ -453,7 +453,7 @@ top_up_stream
 
 ### Goal
 
-Prepare the development environment and understand the Solana concepts needed to build StreamPay.
+Prepare the development environment and understand the Solana concepts needed to build Tokenva.
 
 ### Toolchain
 
@@ -497,7 +497,7 @@ Build + test workflow
 
 ## Goal
 
-Create the basic StreamPay protocol configuration.
+Create the basic Tokenva protocol configuration.
 
 ## ProtocolConfig PDA
 
@@ -613,7 +613,7 @@ deposit
 
       ↓
 
-StreamPay Program
+Tokenva Program
 
       ↓
 
@@ -673,7 +673,7 @@ deposit(0)               → rejected
 
 ## Goal
 
-Represent the company using StreamPay and connect that company to its own vault.
+Represent the company using Tokenva and connect that company to its own vault.
 
 ## Organization PDA
 
@@ -849,7 +849,7 @@ claim
 
       ↓
 
-StreamPay calculates claimable amount
+Tokenva calculates claimable amount
 
       ↓
 
@@ -1086,7 +1086,7 @@ This evidence is the basis for marking M6 complete.
 
 ## Goal
 
-The Next.js frontend provides the developer-facing web interface for interacting with the StreamPay prototype.
+The Next.js frontend provides the developer-facing web interface for interacting with the Tokenva prototype.
 
 ## Stack
 
@@ -1212,7 +1212,7 @@ The backend must not decide how much an employee has earned or whether an employ
 
 ## Goal
 
-Provide the EVM-side entry point for cross-chain StreamPay actions.
+Provide the EVM-side entry point for cross-chain Tokenva actions.
 
 ## Network
 
@@ -1258,7 +1258,7 @@ validate operation
 
       ↓
 
-encode StreamPay payload
+encode Tokenva payload
 
       ↓
 
@@ -1288,7 +1288,7 @@ EVM Sepolia
 
       ↓
 
-StreamPay EVM Gateway
+Tokenva EVM Gateway
 
       ↓
 
@@ -1308,7 +1308,7 @@ consume_vaa
 
       ↓
 
-StreamPay Solana Program
+Tokenva Solana Program
 
 ```
 
@@ -1356,7 +1356,7 @@ The cross-chain state records consumed VAA information so a previously consumed 
 
 ## Goal
 
-Add a real cross-chain asset-transfer layer and connect the received asset to the StreamPay treasury flow.
+Add a real cross-chain asset-transfer layer and connect the received asset to the Tokenva treasury flow.
 
 ## Chosen mechanism
 
@@ -1373,7 +1373,7 @@ Solana Devnet SPL token
       ↓
 Destination wallet
       ↓
-StreamPay Vault
+Tokenva Vault
       ↓
 Stream Escrow
       ↓
@@ -1403,7 +1403,7 @@ NTT Manager:
 Wormhole transceiver:
 0xeD456304d60850A9fE582E34a427005b98eC880f
 
-StreamPay M11 ERC-20:
+Tokenva M11 ERC-20:
 0x7E37db0F3b62a2b77E206509235da94CC195016D
 
 Decimals:
@@ -1457,7 +1457,7 @@ WormholeScan reference:
 https://wormholescan.io/#/tx/0xbfd21e50369c0b4c7a589cae38ada14bcff146072f06a92fcaa2d9a6ae9e2e50?network=Testnet
 ```
 
-The destination wallet received the transferred asset. Exactly `1 SPT` was then manually deposited into the current StreamPay vault.
+The destination wallet received the transferred asset. Exactly `1 SPT` was then manually deposited into the current Tokenva vault.
 
 ## Demonstrated integration sequence
 
@@ -1466,21 +1466,21 @@ EVM Sepolia NTT transfer
         ↓
 Solana wallet receives SPL asset
         ↓
-Manual StreamPay Vault deposit
+Manual Tokenva Vault deposit
         ↓
 Stream escrow funded
         ↓
 Employee claim
 ```
 
-This proves the real NTT transfer and its use in the StreamPay treasury flow.
+This proves the real NTT transfer and its use in the Tokenva treasury flow.
 
 ## Important limitation
 
 The M11 prototype **does not** prove an automated atomic:
 
 ```text
-NTT receive → StreamPay Vault
+NTT receive → Tokenva Vault
 ```
 
 relayer transaction.
@@ -1492,7 +1492,7 @@ NTT transfer
    ↓
 destination wallet
    ↓
-manual StreamPay deposit
+manual Tokenva deposit
 ```
 
 Documentation should preserve this distinction.
@@ -1983,7 +1983,7 @@ Network:
 
 Ethereum Sepolia
 
-StreamPay EVM Gateway:
+Tokenva EVM Gateway:
 
 0x13a5b0be7F5841Ac2Cb0D07e71bB4209f469F104
 
@@ -2059,7 +2059,7 @@ For cross-chain actions:
 
         ↓
 
-6\. Execute StreamPay action
+6\. Execute Tokenva action
 
         ↓
 
@@ -2203,7 +2203,7 @@ flowchart TD
 
     EVM["Ethereum Sepolia"]
 
-    Gateway["StreamPay EVM Gateway"]
+    Gateway["Tokenva EVM Gateway"]
 
     Wormhole["Wormhole"]
 
@@ -2211,7 +2211,7 @@ flowchart TD
 
     Consume["consume_vaa"]
 
-    Program["StreamPay Solana Program"]
+    Program["Tokenva Solana Program"]
 
     Create["Cross-chain CreateStream"]
 
@@ -2249,7 +2249,7 @@ flowchart TD
     NTT["Wormhole NTT"]
     SolanaAsset["Solana Devnet SPL token"]
     Wallet["Destination Wallet"]
-    Vault["StreamPay Vault"]
+    Vault["Tokenva Vault"]
     Escrow["Stream Escrow"]
     Claim["Employee Claim"]
 
@@ -2261,7 +2261,7 @@ flowchart TD
     Escrow --> Claim
 ```
 
-The current M11 prototype demonstrates the NTT transfer to the destination wallet followed by a manual StreamPay vault deposit.
+The current M11 prototype demonstrates the NTT transfer to the destination wallet followed by a manual Tokenva vault deposit.
 
 ---
 
@@ -2286,7 +2286,7 @@ The current M11 prototype demonstrates the NTT transfer to the destination walle
 
 > **M12 is complete.** The technical milestone track M0–M12 is finished, the final regression is green, the repository was reviewed for generated artifacts and secrets, and the intended changes were committed and pushed.
 
-> The demonstrated M11 NTT integration remains **NTT transfer → destination wallet → manual StreamPay Vault deposit**. An automated atomic `NTT receive → StreamPay Vault` relayer was not demonstrated.
+> The demonstrated M11 NTT integration remains **NTT transfer → destination wallet → manual Tokenva Vault deposit**. An automated atomic `NTT receive → Tokenva Vault` relayer was not demonstrated.
 
 > **Next phase: P1 — Product Definition + Customer Discovery.** The product track begins with customer validation before major commercial feature expansion.
 

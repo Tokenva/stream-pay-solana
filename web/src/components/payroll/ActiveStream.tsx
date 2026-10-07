@@ -323,7 +323,7 @@ export default function ActiveStream({
               </h2>
 
               <p className="mt-2 text-sm text-zinc-500">
-                Streams indexed by the StreamPay backend.
+                Streams indexed by the Tokenva backend.
               </p>
             </div>
           </div>

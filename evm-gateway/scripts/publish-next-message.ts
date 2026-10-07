@@ -75,12 +75,12 @@ const timestamp =
 
 const operationId =
   ethers.id(
-    `streampay-operation-${timestamp}`,
+    `tokenva-operation-${timestamp}`,
   );
 
 const streamId =
   ethers.id(
-    `streampay-stream-${timestamp}`,
+    `tokenva-stream-${timestamp}`,
   );
 
 const solanaOrganization =
@@ -139,7 +139,7 @@ console.log(
 
 console.log("");
 console.log(
-  "Creating fresh stream intent through StreamPay Gateway...",
+  "Creating fresh stream intent through Tokenva Gateway...",
 );
 
 const createTx =

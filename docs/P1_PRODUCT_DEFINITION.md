@@ -1,4 +1,4 @@
-# StreamPay — P1 Product Definition + Customer Discovery
+# Tokenva — P1 Product Definition + Customer Discovery
 
 **Status:** Active  
 **Product direction:** Programmable stablecoin payroll for global crypto-native teams
@@ -110,11 +110,11 @@ For each major pain, record:
 
 ---
 
-## 6. StreamPay value proposition
+## 6. Tokenva value proposition
 
 **Working proposition:**
 
-> StreamPay aims to make recurring stablecoin payroll programmable, trackable, and easier to operate for global crypto-native teams.
+> Tokenva aims to make recurring stablecoin payroll programmable, trackable, and easier to operate for global crypto-native teams.
 
 Potential value:
 
@@ -172,7 +172,7 @@ NTT transfer
    ↓
 Destination wallet
    ↓
-Manual StreamPay vault deposit
+Manual Tokenva vault deposit
 ```
 
 No automated atomic NTT-receive-to-vault relayer is claimed.

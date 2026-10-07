@@ -1,6 +1,6 @@
 cd /projects/stream-pay-solana
 cat > docs/security/THREAT_OPERATION.md <<'EOF'
-# StreamPay — Threat Operations
+# Tokenva — Threat Operations
 
 ## Production Threat Model, Security Operations, Incident Response, Detection, Containment, Recovery
 
@@ -8,7 +8,7 @@ cat > docs/security/THREAT_OPERATION.md <<'EOF'
 
 # 1. Purpose
 
-This document defines the complete threat-operation model for StreamPay.
+This document defines the complete threat-operation model for Tokenva.
 
 It covers:
 
@@ -37,7 +37,7 @@ It covers:
 - residual risks
 - production security assumptions
 
-The current StreamPay technical prototype uses:
+The current Tokenva technical prototype uses:
 
 - Solana Devnet
 - EVM Sepolia/Testnet
@@ -52,7 +52,7 @@ This document describes the operational security model. It is not an independent
 
 # 2. Security Objectives
 
-StreamPay must preserve:
+Tokenva must preserve:
 
 1. Authorization
 2. Transaction integrity
@@ -163,7 +163,7 @@ StreamPay must preserve:
                  ▼
           ┌──────────────┐
           │ Solana       │
-          │ StreamPay    │
+          │ Tokenva    │
           │ Program      │
           └──────┬───────┘
                  │

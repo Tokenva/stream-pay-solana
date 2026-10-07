@@ -9,7 +9,7 @@ const BACKEND_URL = (
 ).replace(/\/+$/, "");
 
 const API_KEY =
-  process.env.STREAMPAY_API_KEY?.trim();
+  process.env.TOKENVAPAY_API_KEY?.trim();
 
 const OPERATOR_KEY =
   process.env.TOKENVA_OPERATOR_KEY?.trim();
@@ -80,7 +80,7 @@ export async function backendOpsRequest(
 ) {
   if (!API_KEY) {
     throw new Error(
-      "STREAMPAY_API_KEY is not configured",
+      "TOKENVAPAY_API_KEY is not configured",
     );
   }
 

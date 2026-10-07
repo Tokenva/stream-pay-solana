@@ -10,23 +10,23 @@ import * as Contracts from "./index.js";
 
 declare module "@nomicfoundation/hardhat-ethers/types" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
-  getContractFactory(name: 'StreamPayEvmGateway', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.StreamPayEvmGateway__factory>
-getContractFactory(name: 'StreamPayM11Token', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.StreamPayM11Token__factory>
+  getContractFactory(name: 'TokenvaM11Token', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.TokenvaM11Token__factory>
+getContractFactory(name: 'TokenvaEvmGateway', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.TokenvaEvmGateway__factory>
 getContractFactory(name: 'IWormhole', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.IWormhole__factory>
 getContractFactory(name: 'MockWormhole', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockWormhole__factory>
 
-  getContractAt(name: 'StreamPayEvmGateway', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.StreamPayEvmGateway>
-getContractAt(name: 'StreamPayM11Token', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.StreamPayM11Token>
+  getContractAt(name: 'TokenvaM11Token', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.TokenvaM11Token>
+getContractAt(name: 'TokenvaEvmGateway', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.TokenvaEvmGateway>
 getContractAt(name: 'IWormhole', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.IWormhole>
 getContractAt(name: 'MockWormhole', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockWormhole>
 
-  deployContract(name: 'StreamPayEvmGateway', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.StreamPayEvmGateway>
-deployContract(name: 'StreamPayM11Token', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.StreamPayM11Token>
+  deployContract(name: 'TokenvaM11Token', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.TokenvaM11Token>
+deployContract(name: 'TokenvaEvmGateway', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.TokenvaEvmGateway>
 deployContract(name: 'IWormhole', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.IWormhole>
 deployContract(name: 'MockWormhole', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockWormhole>
 
-  deployContract(name: 'StreamPayEvmGateway', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.StreamPayEvmGateway>
-deployContract(name: 'StreamPayM11Token', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.StreamPayM11Token>
+  deployContract(name: 'TokenvaM11Token', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.TokenvaM11Token>
+deployContract(name: 'TokenvaEvmGateway', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.TokenvaEvmGateway>
 deployContract(name: 'IWormhole', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.IWormhole>
 deployContract(name: 'MockWormhole', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockWormhole>
 

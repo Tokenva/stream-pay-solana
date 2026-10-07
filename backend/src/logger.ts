@@ -12,7 +12,7 @@ export function log(
     JSON.stringify({
       timestamp: new Date().toISOString(),
       level,
-      service: "streampay-backend",
+      service: "tokenva-backend",
       event,
       ...fields,
     }),

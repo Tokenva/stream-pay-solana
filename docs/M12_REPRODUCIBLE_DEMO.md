@@ -1,15 +1,15 @@
-# StreamPay — M12 Reproducible Demo
+# Tokenva — M12 Reproducible Demo
 
 ## Purpose
 
-This document records the verified StreamPay prototype flow for another developer.
+This document records the verified Tokenva prototype flow for another developer.
 
 The prototype has four demonstrated paths:
 
 1. Native Solana payroll
 2. EVM → Wormhole cross-chain messaging
 3. Wormhole NTT asset transfer
-4. Manual StreamPay vault funding after NTT receipt
+4. Manual Tokenva vault funding after NTT receipt
 
 The demonstrated M11 asset path is:
 
@@ -20,14 +20,14 @@ Wormhole NTT
     ↓
 Solana Devnet destination wallet
     ↓
-Manual StreamPay Vault deposit
+Manual Tokenva Vault deposit
     ↓
 Stream Escrow
     ↓
 Employee claim
 ```
 
-The prototype does not claim an automated atomic `NTT receive → StreamPay Vault` relayer.
+The prototype does not claim an automated atomic `NTT receive → Tokenva Vault` relayer.
 
 ---
 
@@ -107,7 +107,7 @@ npm run build
 npm run dev
 ```
 
-The web application uses Next.js, Solana Devnet, the StreamPay Solana program, the Express backend, and PostgreSQL-backed indexing.
+The web application uses Next.js, Solana Devnet, the Tokenva Solana program, the Express backend, and PostgreSQL-backed indexing.
 
 ---
 
@@ -139,7 +139,7 @@ Wormhole Sepolia Core:
 ```text
 EVM Sepolia
     ↓
-StreamPay EVM Gateway
+Tokenva EVM Gateway
     ↓
 Wormhole
     ↓
@@ -149,7 +149,7 @@ Solana VAA verification shim
     ↓
 consume_vaa
     ↓
-Cross-chain StreamPay action
+Cross-chain Tokenva action
 ```
 
 Solana Wormhole Core:
@@ -199,7 +199,7 @@ artifacts/cross-chain/vaa.json
 artifacts/cross-chain/vaa-body.bin
 ```
 
-The VAA body format used by the StreamPay scripts is:
+The VAA body format used by the Tokenva scripts is:
 
 ```text
 0..3     timestamp
@@ -208,10 +208,10 @@ The VAA body format used by the StreamPay scripts is:
 10..41   emitter address
 42..49   sequence
 50       consistency
-51..     StreamPay payload
+51..     Tokenva payload
 ```
 
-The StreamPay payload is 416 bytes.
+The Tokenva payload is 416 bytes.
 
 ---
 
@@ -318,7 +318,7 @@ Wormhole sequence:
 
 ---
 
-## 13. NTT → StreamPay Integration
+## 13. NTT → Tokenva Integration
 
 ```text
 EVM Sepolia
@@ -327,14 +327,14 @@ Wormhole NTT
     ↓
 Solana destination wallet
     ↓
-Manual StreamPay Vault deposit
+Manual Tokenva Vault deposit
     ↓
 Stream Escrow
     ↓
 Employee claim
 ```
 
-The prototype does not claim an automated atomic `NTT receive → StreamPay Vault` relayer.
+The prototype does not claim an automated atomic `NTT receive → Tokenva Vault` relayer.
 
 ---
 

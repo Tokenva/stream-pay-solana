@@ -66,7 +66,7 @@ import {
 const app = express();
 
 const allowedCorsOrigins = (
-  process.env.STREAMPAY_CORS_ORIGINS ??
+  process.env.TOKENVAPAY_CORS_ORIGINS ??
   "http://localhost:3000"
 )
   .split(",")
@@ -97,7 +97,7 @@ function requireApiKey(
   }
 
   const configuredKey =
-    process.env.STREAMPAY_API_KEY?.trim();
+    process.env.TOKENVAPAY_API_KEY?.trim();
 
   if (!configuredKey) {
     log("error", "api_auth_not_configured", {
@@ -350,7 +350,7 @@ async function verifyTransactionOnChain(
 
   if (verifiedInstructions.length === 0) {
     throw new Error(
-      "Transaction does not contain a recognized StreamPay instruction",
+      "Transaction does not contain a recognized Tokenva instruction",
     );
   }
 
@@ -480,7 +480,7 @@ app.get("/health", async (_req, res) => {
 
   return res.status(ok ? 200 : 503).json({
     ok,
-    service: "streampay-backend",
+    service: "tokenva-backend",
     database,
     rpc,
     rpcEndpoints: rpcConnections.length,
@@ -1081,7 +1081,7 @@ app.post("/api/transactions", async (req, res) => {
     if (matchingInstructions.length === 0) {
       return res.status(400).json({
         error:
-          "action does not match the on-chain StreamPay instruction",
+          "action does not match the on-chain Tokenva instruction",
       });
     }
 
@@ -1204,7 +1204,7 @@ app.post("/api/transactions", async (req, res) => {
 
     if (
       message ===
-      "Transaction does not contain a recognized StreamPay instruction"
+      "Transaction does not contain a recognized Tokenva instruction"
     ) {
       return res.status(400).json({
         error: message,
@@ -1704,7 +1704,7 @@ async function runReconciliation() {
       "reconciliation_completed",
     actorType: "worker",
     entityType: "system",
-    entityId: "streampay",
+    entityId: "tokenva",
     metadata: summary,
   });
 }
@@ -2202,7 +2202,7 @@ app.get("/api/ops/metrics", async (_req, res) => {
     }
 
     const payload = {
-      service: "streampay-backend",
+      service: "tokenva-backend",
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.floor(process.uptime()),
       rpcEndpoints: rpcConnections.length,
@@ -3249,7 +3249,7 @@ app.get(
 
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="streampay-payroll-${targetMonth}.csv"`,
+        `attachment; filename="tokenva-payroll-${targetMonth}.csv"`,
       );
 
       return res.send(csv);
@@ -3428,7 +3428,7 @@ app.get(
 
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="streampay-employees-${targetMonth}.csv"`,
+        `attachment; filename="tokenva-employees-${targetMonth}.csv"`,
       );
 
       return res.send(csv);
@@ -3566,7 +3566,7 @@ app.get(
 
       res.setHeader(
         "Content-Disposition",
-        'attachment; filename="streampay-transactions.csv"',
+        'attachment; filename="tokenva-transactions.csv"',
       );
 
       return res.send(csv);
@@ -4931,7 +4931,7 @@ async function startServer() {
     });
 
     console.log(
-      `StreamPay backend running at http://localhost:${port}`,
+      `Tokenva backend running at http://localhost:${port}`,
     );
   });
 }

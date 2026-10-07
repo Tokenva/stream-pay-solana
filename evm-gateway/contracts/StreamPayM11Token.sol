@@ -5,13 +5,13 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract StreamPayM11Token is ERC20, ERC20Burnable, Ownable {
+contract TokenvaM11Token is ERC20, ERC20Burnable, Ownable {
     address public minter;
 
     error CallerNotMinter();
 
     constructor()
-        ERC20("StreamPay Test Token", "SPT")
+        ERC20("Tokenva Test Token", "SPT")
         Ownable(msg.sender)
     {
         minter = msg.sender;

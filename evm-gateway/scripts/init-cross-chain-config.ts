@@ -21,7 +21,7 @@ const WALLET_PATH = `${process.env.HOME}/.config/solana/id.json`;
 const PROTOCOL_CONFIG_SEED = Buffer.from("protocol");
 const CROSS_CHAIN_CONFIG_SEED = Buffer.from("cross-chain");
 
-// Sepolia StreamPay gateway emitter
+// Sepolia Tokenva gateway emitter
 const SOURCE_EMITTER = Buffer.from(
   "00000000000000000000000013a5b0be7f5841ac2cb0d07e71bb4209f469f104",
   "hex",
@@ -35,7 +35,7 @@ function instructionDiscriminator(name: string): Buffer {
 }
 
 async function main() {
-  console.log("Initializing StreamPay cross-chain config...");
+  console.log("Initializing Tokenva cross-chain config...");
 
   const secretKey = Uint8Array.from(
     JSON.parse(fs.readFileSync(WALLET_PATH, "utf8")),

@@ -525,7 +525,7 @@ function ProtectedHome() {
             anchor.href = downloadUrl;
 
             anchor.download =
-                `streampay-${type}-${month}.csv`;
+                `tokenva-${type}-${month}.csv`;
 
             document.body.appendChild(
                 anchor,
