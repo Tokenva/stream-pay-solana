@@ -20,13 +20,19 @@ const API_BASE_URL =
 
 export async function fetchIndexedStreams(
   params?: {
+    companyId?: string
     organization?: string;
     employee?: string;
     canceled?: boolean;
   },
 ): Promise<IndexedStream[]> {
   const searchParams = new URLSearchParams();
-
+  if (params?.companyId) {
+    searchParams.set(
+      "companyId",
+      params.companyId,
+    );
+  }
   if (params?.organization) {
     searchParams.set("organization", params.organization);
   }
@@ -45,8 +51,7 @@ export async function fetchIndexedStreams(
   const query = searchParams.toString();
 
   const response = await fetch(
-    `${API_BASE_URL}/api/indexed/streams${
-      query ? `?${query}` : ""
+    `${API_BASE_URL}/api/indexed/streams${query ? `?${query}` : ""
     }`,
     {
       cache: "no-store",
@@ -138,8 +143,7 @@ export async function fetchActivities(
     searchParams.toString();
 
   const response = await fetch(
-    `/api/backend/api/activities${
-      query ? `?${query}` : ""
+    `/api/backend/api/activities${query ? `?${query}` : ""
     }`,
     {
       credentials: "include",

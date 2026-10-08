@@ -20,6 +20,7 @@ export function useStreamActions(
   mintAddress: string,
   streamId: number,
   employeeAddress: string,
+  companyOwnerAddress = "",
   onComplete?: () => Promise<void>,
 ) {
   const { connection } = useConnection();
@@ -38,8 +39,14 @@ export function useStreamActions(
     const mint = new PublicKey(mintAddress);
     const employee = new PublicKey(employeeAddress);
 
+    const owner =
+      new PublicKey(
+        companyOwnerAddress.trim() ||
+        wallet.publicKey.toBase58(),
+      );
+
     const [organization] =
-      getOrganizationPda(wallet.publicKey);
+      getOrganizationPda(owner);
 
     const [roles] =
       getOrganizationRolesPda(
@@ -83,6 +90,7 @@ export function useStreamActions(
     mintAddress,
     employeeAddress,
     streamId,
+    companyOwnerAddress,
   ]);
 
   const topUp = useCallback(

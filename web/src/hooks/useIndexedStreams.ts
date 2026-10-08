@@ -7,6 +7,7 @@ import {
 } from "@/lib/backend";
 
 export function useIndexedStreams(
+  companyId?: string,
   employee?: string,
 ) {
   const [streams, setStreams] = useState<IndexedStream[]>([]);
@@ -19,8 +20,9 @@ export function useIndexedStreams(
       setError(null);
 
       const data = await fetchIndexedStreams({
+        companyId,
         employee,
-      });
+      });;
 
       setStreams(data);
     } catch (err) {
@@ -32,7 +34,7 @@ export function useIndexedStreams(
     } finally {
       setLoading(false);
     }
-  }, [employee]);
+ }, [companyId, employee]);
 
   useEffect(() => {
     void refresh();

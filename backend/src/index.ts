@@ -15,6 +15,8 @@ import {
 
 import {
   getCompanyForWallet,
+  getCompanyForWalletById,
+  getCompaniesForWallet,
   getCompanyAccessForWallet,
   createCompany,
   updatePilotStatus,
@@ -681,10 +683,31 @@ app.get(
     const wallet =
       res.locals.wallet as string;
 
-    const organization =
-      await getCustomerOrganization(
+    const companyId =
+      typeof req.query.companyId === "string"
+        ? req.query.companyId
+        : null;
+
+    if (!companyId) {
+      return res.status(400).json({
+        error: "Company ID is required",
+      });
+    }
+
+    const company =
+      await getCompanyForWalletById(
         wallet,
+        companyId,
       );
+
+    if (!company) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
+    }
+
+    const organization =
+      company.created_by;
 
     if (!organization) {
       return res.status(403).json({
@@ -4286,23 +4309,23 @@ app.post(
 );
 
 app.get(
-  "/api/company",
+  "/api/companies",
   requireCustomerSession,
   async (_req, res) => {
     try {
       const wallet =
         res.locals.wallet as string;
 
-      const company =
-        await getCompanyForWallet(wallet);
+      const companies =
+        await getCompaniesForWallet(wallet);
 
       return res.json({
-        company,
+        companies,
       });
     } catch (error) {
       log(
         "error",
-        "company_fetch_failed",
+        "companies_fetch_failed",
         {
           error:
             error instanceof Error
@@ -4312,14 +4335,14 @@ app.get(
       );
 
       return res.status(500).json({
-        error: "Failed to fetch company",
+        error: "Failed to fetch companies",
       });
     }
   },
 );
 
 app.get(
-  "/api/company",
+  "/api/company/access",
   requireCustomerSession,
   async (_req, res) => {
     try {

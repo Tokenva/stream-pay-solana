@@ -263,38 +263,40 @@ export default function ActiveStream({
                 </p>
               </div>
             )}
+            {currentRole === "Employee" && (
 
-            <div className="rounded-xl border border-zinc-800 p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium">
-                    Employee claim
-                  </p>
+              <div className="rounded-xl border border-zinc-800 p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium">
+                      Employee claim
+                    </p>
 
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Claim funds that have become available
-                    under the current stream.
-                  </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Claim funds that have become available
+                      under the current stream.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={
+                      streamLoading ||
+                      claimable === BigInt(0) ||
+                      streamData.canceled
+                    }
+                    onClick={onClaim}
+                    className="rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {streamLoading
+                      ? "Processing..."
+                      : claimable > BigInt(0)
+                        ? `Claim ${earnedDisplay}`
+                        : "Nothing to claim yet"}
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  disabled={
-                    streamLoading ||
-                    claimable === BigInt(0) ||
-                    streamData.canceled
-                  }
-                  onClick={onClaim}
-                  className="rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {streamLoading
-                    ? "Processing..."
-                    : claimable > BigInt(0)
-                      ? `Claim ${earnedDisplay}`
-                      : "Nothing to claim yet"}
-                </button>
               </div>
-            </div>
+            )} F
           </div>
         ) : (
           <div className="mt-6 rounded-xl border border-dashed border-zinc-800 p-8 text-center">

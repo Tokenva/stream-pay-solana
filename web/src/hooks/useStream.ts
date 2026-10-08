@@ -111,6 +111,7 @@ export function useStream(
   mintAddress: string,
   streamId: number,
   employeeAddress: string,
+  companyOwnerAddress = "",
 ) {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
@@ -151,10 +152,14 @@ export function useStream(
         setError(null);
 
 
-        const [organization] =
-          getOrganizationPda(
-            wallet.publicKey,
+        const owner =
+          new PublicKey(
+            companyOwnerAddress.trim() ||
+            wallet.publicKey.toBase58(),
           );
+
+        const [organization] =
+          getOrganizationPda(owner);
 
         const [streamPda] =
           getStreamPda(
@@ -203,7 +208,8 @@ export function useStream(
       wallet,
       mintAddress,
       streamId,
-      employeeAddress
+      employeeAddress,
+      companyOwnerAddress,
     ],
   );
 
@@ -267,10 +273,14 @@ export function useStream(
         const mint =
           new PublicKey(mintAddress);
 
-        const [organization] =
-          getOrganizationPda(
-            wallet.publicKey,
+        const owner =
+          new PublicKey(
+            companyOwnerAddress.trim() ||
+            wallet.publicKey.toBase58(),
           );
+
+        const [organization] =
+          getOrganizationPda(owner);
 
         const [roles] =
           getOrganizationRolesPda(
@@ -400,6 +410,7 @@ export function useStream(
         mintAddress,
         streamId,
         loadStream,
+        companyOwnerAddress,
       ],
     );
 

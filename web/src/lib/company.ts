@@ -64,6 +64,28 @@ export async function getCompany() {
   };
 }
 
+export async function getCompanies() {
+  const response = await fetch(
+    "/api/backend/api/companies",
+    {
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ?? "Unable to load companies",
+    );
+  }
+
+  return data as {
+    companies: Company[];
+  };
+}
+
 export async function getCompanyAccess() {
   const response = await fetch(
     "/api/backend/api/company/access",

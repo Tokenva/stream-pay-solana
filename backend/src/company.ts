@@ -69,6 +69,64 @@ export async function getCompanyForWallet(
   return result.rows[0] ?? null;
 }
 
+export async function getCompanyForWalletById(
+  wallet: string,
+  companyId: string,
+): Promise<Company | null> {
+  const result = await pool.query(
+    `
+    SELECT
+      c.id,
+      c.name,
+      c.treasury_wallet,
+      c.created_by,
+      c.pilot_status,
+      c.pilot_start,
+      c.pilot_end,
+      c.created_at,
+      c.updated_at,
+      cm.role
+    FROM company_members cm
+    INNER JOIN companies c
+      ON c.id = cm.company_id
+    WHERE cm.wallet = $1
+      AND c.id = $2
+    LIMIT 1
+    `,
+    [wallet, companyId],
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function getCompaniesForWallet(
+  wallet: string,
+): Promise<Company[]> {
+  const result = await pool.query(
+    `
+    SELECT
+      c.id,
+      c.name,
+      c.treasury_wallet,
+      c.created_by,
+      c.pilot_status,
+      c.pilot_start,
+      c.pilot_end,
+      c.created_at,
+      c.updated_at,
+      cm.role
+    FROM company_members cm
+    INNER JOIN companies c
+      ON c.id = cm.company_id
+    WHERE cm.wallet = $1
+    ORDER BY c.created_at ASC
+    `,
+    [wallet],
+  );
+
+  return result.rows;
+}
+
 export async function getCompanyAccessForWallet(
   wallet: string,
 ): Promise<CompanyAccess> {
@@ -114,111 +172,60 @@ export async function createCompany(
   name: string,
   treasuryWallet?: string,
 ) {
-  new PublicKey(wallet);
+  const authority = new PublicKey(wallet);
 
-  const normalizedName = name.trim();
-
-  if (!normalizedName) {
+  if (!name.trim()) {
     throw new Error("Company name is required");
   }
 
-  if (normalizedName.length > 120) {
-    throw new Error(
-      "Company name must be 120 characters or less",
-    );
+  if (treasuryWallet) {
+    new PublicKey(treasuryWallet);
   }
 
-  let normalizedTreasuryWallet: string | null =
-    treasuryWallet?.trim() || wallet;
-
-  normalizedTreasuryWallet =
-    new PublicKey(normalizedTreasuryWallet).toBase58();
-
-  const existing = await pool.query(
+  const result = await pool.query(
     `
-    SELECT c.id
-    FROM company_members cm
-    INNER JOIN companies c
-      ON c.id = cm.company_id
-    WHERE cm.wallet = $1
-    LIMIT 1
+    INSERT INTO companies (
+      name,
+      treasury_wallet,
+      created_by
+    )
+    VALUES ($1, $2, $3)
+    RETURNING
+      id,
+      name,
+      treasury_wallet,
+      created_by,
+      pilot_status,
+      pilot_start,
+      pilot_end,
+      created_at,
+      updated_at
     `,
-    [wallet],
+    [
+      name.trim(),
+      treasuryWallet?.trim() || null,
+      authority.toBase58(),
+    ],
   );
 
-  if (existing.rows[0]) {
-    throw new Error(
-      "This wallet already belongs to a company",
-    );
-  }
+  const company = result.rows[0];
 
-  const client = await pool.connect();
+  await pool.query(
+    `
+    INSERT INTO company_members (
+      company_id,
+      wallet,
+      role
+    )
+    VALUES ($1, $2, 'owner')
+    `,
+    [company.id, authority.toBase58()],
+  );
 
-  try {
-    await client.query("BEGIN");
-
-    const companyResult = await client.query(
-      `
-      INSERT INTO companies (
-        name,
-        treasury_wallet,
-        created_by,
-        pilot_status
-      )
-      VALUES (
-        $1,
-        $2,
-        $3,
-        'pending'
-      )
-      RETURNING
-        id,
-        name,
-        treasury_wallet,
-        created_by,
-        pilot_status,
-        pilot_start,
-        pilot_end,
-        created_at,
-        updated_at
-      `,
-      [
-        normalizedName,
-        normalizedTreasuryWallet,
-        wallet,
-      ],
-    );
-
-    const company = companyResult.rows[0];
-
-    await client.query(
-      `
-      INSERT INTO company_members (
-        company_id,
-        wallet,
-        role
-      )
-      VALUES (
-        $1,
-        $2,
-        'owner'
-      )
-      `,
-      [company.id, wallet],
-    );
-
-    await client.query("COMMIT");
-
-    return {
-      ...company,
-      role: "owner" as const,
-    };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  return {
+    ...company,
+    role: "owner" as CompanyRole,
+  };
 }
 
 export async function updatePilotStatus(input: {
@@ -301,4 +308,26 @@ export async function updatePilotStatus(input: {
   );
 
   return result.rows[0] ?? null;
+}
+
+export async function getCompanies() {
+  const response = await fetch(
+    "/api/backend/api/companies",
+    {
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ?? "Unable to load companies",
+    );
+  }
+
+  return data as {
+    companies: Company[];
+  };
 }

@@ -287,7 +287,7 @@ export default function LandingPage() {
 
             <span>A product of</span>
 
-            <Link href="https\://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="text-white/55 transition hover:text-white">
+            <Link href="https://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="text-white/55 transition hover:text-white">
 
               Tokenva
 
@@ -809,7 +809,7 @@ export default function LandingPage() {
                 {authenticated ? "Dashboard" : "Explore TokenvaPay"}
               </Link>
 
-                <Link href="https\://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-3 text-sm font-medium text-white/75 transition hover:border-white/30 hover:text-white">
+                <Link href="https://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-3 text-sm font-medium text-white/75 transition hover:border-white/30 hover:text-white">
 
                   Visit Tokenva
 
@@ -886,7 +886,7 @@ export default function LandingPage() {
 
                   TokenvaPay is a product of{" "}
 
-                  <Link href="https\://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="text-white/50 transition hover:text-white">
+                  <Link href="https://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="text-white/50 transition hover:text-white">
 
                     Tokenva
 
@@ -920,7 +920,7 @@ export default function LandingPage() {
 
                 <div className="mt-5 flex flex-col gap-3 text-sm text-white/45">
 
-                  <Link href="https\://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="transition hover:text-white">Tokenva</Link>
+                  <Link href="https://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="transition hover:text-white">Tokenva</Link>
 
                   <Link href="#design-partners" className="transition hover:text-white">Design partners</Link>
 
@@ -948,7 +948,7 @@ export default function LandingPage() {
 
             <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs text-white/30 sm:flex-row sm:items-center sm:justify-between">
 
-              <span>© 2026 Tokenva. All rights reserved.</span>
+              <span>© {new Date().getFullYear()} Tokenva. All rights reserved.</span>
 
               <span>TokenvaPay — programmable payment infrastructure.</span>
 

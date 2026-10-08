@@ -46,7 +46,7 @@ export function useVault(mintAddress: string, companyOwnerAddress = "") {
       const owner =
         new PublicKey(
           companyOwnerAddress.trim() ||
-            wallet.publicKey.toBase58(),
+          wallet.publicKey.toBase58(),
         );
 
       const [organizationPda] =
@@ -118,8 +118,14 @@ export function useVault(mintAddress: string, companyOwnerAddress = "") {
 
     const mint = new PublicKey(mintAddress);
 
+    const owner =
+      new PublicKey(
+        companyOwnerAddress.trim() ||
+        wallet.publicKey.toBase58(),
+      );
+
     const [organizationPda] =
-      getOrganizationPda(wallet.publicKey);
+      getOrganizationPda(owner);
 
     const [vaultPda] = getVaultPda(
       organizationPda,
@@ -160,6 +166,7 @@ export function useVault(mintAddress: string, companyOwnerAddress = "") {
     connection,
     wallet,
     mintAddress,
+    companyOwnerAddress,
     loadVault,
   ]);
 

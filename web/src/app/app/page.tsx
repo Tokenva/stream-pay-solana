@@ -10,6 +10,8 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import {
     getCompanyAccess,
+    getCompanies,
+    type Company,
     type CompanyAccess,
 } from "@/lib/company";
 
@@ -21,7 +23,7 @@ import WalletButton from "@/components/WalletButton";
 import OperationalDashboard from "@/components/OperationalDashboard";
 
 import CompanyOverview from "@/components/dashboard/CompanyOverview";
-
+import EmployeeWorkspace from "@/components/dashboard/EmployeeWorkspace";
 import CompanySetup from "@/components/payroll/CompanySetup";
 import EmployeeDirectory from "@/components/payroll/EmployeeDirectory";
 import TreasuryFunding from "@/components/payroll/TreasuryFunding";
@@ -38,6 +40,7 @@ import { useDeposit } from "@/hooks/useDeposit";
 import { useStream } from "@/hooks/useStream";
 import { useStreamActions } from "@/hooks/useStreamActions";
 import { useIndexedStreams } from "@/hooks/useIndexedStreams";
+import Link from "next/link";
 
 const EMPTY_MINT = "";
 
@@ -101,7 +104,11 @@ function formatTokenAmount(raw: bigint) {
         .replace(/0+$/, "")}`;
 }
 
-function ProtectedHome() {
+function ProtectedHome({
+    selectedCompany,
+}: {
+    selectedCompany: Company;
+}) {
     const { publicKey } = useWallet();
 
     const [mint, setMint] =
@@ -298,6 +305,20 @@ function ProtectedHome() {
         );
     }, []);
 
+    useEffect(() => {
+        if (
+            selectedCompany.role === "employee" &&
+            publicKey
+        ) {
+            setEmployeeAddress(
+                publicKey.toBase58(),
+            );
+            setEmployeeWalletValid(true);
+        }
+    }, [
+        selectedCompany.role,
+        publicKey,
+    ]);
     const {
         organization,
         organizationRoles,
@@ -313,7 +334,10 @@ function ProtectedHome() {
         balance: vaultBalance,
         refresh: refreshVault,
         createVault,
-    } = useVault(mint);
+    } = useVault(
+        mint,
+        selectedCompany.created_by,
+    );
 
     const {
         tokenAccount,
@@ -323,6 +347,7 @@ function ProtectedHome() {
     } = useDeposit(
         mint,
         refreshVault,
+        selectedCompany.created_by,
     );
 
     const {
@@ -338,6 +363,7 @@ function ProtectedHome() {
         mint,
         streamId,
         employeeAddress,
+        selectedCompany.created_by,
     );
 
     const {
@@ -349,6 +375,7 @@ function ProtectedHome() {
         mint,
         streamId,
         employeeAddress,
+        selectedCompany.created_by,
         async () => {
             await refreshVault();
         },
@@ -360,7 +387,10 @@ function ProtectedHome() {
         error: indexedStreamsError,
         refresh: refreshIndexedStreams,
     } = useIndexedStreams(
-        publicKey?.toBase58(),
+        selectedCompany.id,
+        selectedCompany.role === "employee"
+            ? publicKey?.toBase58()
+            : undefined,
     );
 
     async function loadPayrollReport() {
@@ -918,34 +948,18 @@ function ProtectedHome() {
                 ).length,
         }));
 
-    const isOwner =
-        organizationExists &&
-        !!publicKey;
-
     const currentRole =
-        isOwner
+        selectedCompany.role === "owner"
             ? "Owner"
-            : rolesExists &&
-                organizationRoles &&
-                publicKey
-                ? publicKey.equals(
-                    organizationRoles.admin,
-                )
-                    ? "Admin"
-                    : publicKey.equals(
-                        organizationRoles.finance,
-                    )
-                        ? "Finance"
-                        : publicKey.equals(
-                            organizationRoles.approver,
-                        )
-                            ? "Approver"
-                            : publicKey.equals(
-                                organizationRoles.viewer,
-                            )
-                                ? "Viewer"
-                                : "Employee"
-                : "Unassigned";
+            : selectedCompany.role === "admin"
+                ? "Admin"
+                : selectedCompany.role === "finance"
+                    ? "Finance"
+                    : selectedCompany.role === "approver"
+                        ? "Approver"
+                        : selectedCompany.role === "viewer"
+                            ? "Viewer"
+                            : "Employee";
 
     const canCreatePayroll =
         currentRole === "Owner" ||
@@ -966,6 +980,16 @@ function ProtectedHome() {
     const canClaimPayroll =
         currentRole === "Employee";
 
+    if (currentRole === "Employee") {
+        return (
+            <EmployeeWorkspace
+                companyName={selectedCompany.name}
+                currentRole={currentRole}
+                walletAddress={publicKey?.toBase58() ?? null}
+            />
+        );
+    }
+
     return (
         <main className="dashboard-shell">
             <div className="dashboard-container">
@@ -976,7 +1000,9 @@ function ProtectedHome() {
                         </p>
 
                         <h1 className="dashboard-title">
-                            TokenvaPay
+                            <Link href="/">
+                                TokenvaPay
+                            </Link>
                         </h1>
 
                         <p className="dashboard-subtitle">
@@ -1382,11 +1408,20 @@ export default function Home() {
         authenticated,
         setAuthenticated,
     ] = useState(false);
-
     const [
         companyAccess,
         setCompanyAccess,
     ] = useState<CompanyAccess | null>(null);
+
+    const [
+        companies,
+        setCompanies,
+    ] = useState<Company[]>([]);
+
+    const [
+        selectedCompany,
+        setSelectedCompany,
+    ] = useState<Company | null>(null);
 
     const [
         companyChecked,
@@ -1514,14 +1549,26 @@ export default function Home() {
 
         async function loadCompanyAccess() {
             try {
-                const access =
-                    await getCompanyAccess();
+                const [access, companiesData] =
+                    await Promise.all([
+                        getCompanyAccess(),
+                        getCompanies(),
+                    ]);
 
                 if (cancelled) {
                     return;
                 }
 
+                const availableCompanies =
+                    companiesData.companies;
+
                 setCompanyAccess(access);
+                setCompanies(availableCompanies);
+
+                setSelectedCompany(
+                    availableCompanies[0] ?? null,
+                );
+
                 setCompanyChecked(true);
             } catch (err) {
                 if (cancelled) {
@@ -1556,74 +1603,74 @@ export default function Home() {
         router,
     ]);
 
-if (
-    !authChecked ||
-    !authenticated ||
-    !companyChecked
-) {
-    return (
-        <main className="relative flex min-h-screen overflow-hidden bg-black text-white">
-            {/* Ambient background */}
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0"
-            >
-                <div className="absolute left-1/2 top-[-18rem] h-[36rem] w-[36rem] -translate-x-1/2 rounded-full bg-white/[0.025] blur-3xl" />
-                <div className="absolute bottom-[-18rem] right-[-10rem] h-[28rem] w-[28rem] rounded-full bg-white/[0.02] blur-3xl" />
-            </div>
-
-            <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 sm:px-8">
-                {/* Header */}
-                <header className="flex h-20 items-center justify-between border-b border-white/[0.08]">
-                    <div className="text-sm font-semibold tracking-[-0.02em]">
-                        TokenvaPay
-                    </div>
-
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/25">
-                        Secure workspace
-                    </div>
-                </header>
-
-                {/* Loading state */}
-                <div className="flex flex-1 items-center justify-center py-16">
-                    <div className="w-full max-w-md">
-                        <div className="rounded-3xl border border-white/[0.1] bg-white/[0.035] p-8 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-10">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.04]">
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-white/80" />
-                                </div>
-
-                                <div>
-                                    <p className="text-sm font-medium text-white">
-                                        Preparing your workspace
-                                    </p>
-
-                                    <p className="mt-1 text-xs text-white/35">
-                                        Verifying authentication and company access
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 h-px overflow-hidden bg-white/[0.07]">
-                                <div className="h-full w-1/3 animate-pulse bg-white/30" />
-                            </div>
-
-                            <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-white/20">
-                                TokenvaPay · Secure workspace
-                            </p>
-                        </div>
-                    </div>
+    if (
+        !authChecked ||
+        !authenticated ||
+        !companyChecked
+    ) {
+        return (
+            <main className="relative flex min-h-screen overflow-hidden bg-black text-white">
+                {/* Ambient background */}
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0"
+                >
+                    <div className="absolute left-1/2 top-[-18rem] h-[36rem] w-[36rem] -translate-x-1/2 rounded-full bg-white/[0.025] blur-3xl" />
+                    <div className="absolute bottom-[-18rem] right-[-10rem] h-[28rem] w-[28rem] rounded-full bg-white/[0.02] blur-3xl" />
                 </div>
 
-                {/* Footer */}
-                <footer className="flex min-h-16 items-center justify-between border-t border-white/[0.07] py-5 text-[10px] uppercase tracking-[0.16em] text-white/20">
-                    <span>TokenvaPay</span>
-                    <span>© 2026 Tokenva</span>
-                </footer>
-            </div>
-        </main>
-    );
-}
+                <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 sm:px-8">
+                    {/* Header */}
+                    <header className="flex h-20 items-center justify-between border-b border-white/[0.08]">
+                        <div className="text-sm font-semibold tracking-[-0.02em]">
+                            TokenvaPay
+                        </div>
+
+                        <div className="text-[10px] uppercase tracking-[0.22em] text-white/25">
+                            Secure workspace
+                        </div>
+                    </header>
+
+                    {/* Loading state */}
+                    <div className="flex flex-1 items-center justify-center py-16">
+                        <div className="w-full max-w-md">
+                            <div className="rounded-3xl border border-white/[0.1] bg-white/[0.035] p-8 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.04]">
+                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-white/80" />
+                                    </div>
+
+                                    <div>
+                                        <p className="text-sm font-medium text-white">
+                                            Preparing your workspace
+                                        </p>
+
+                                        <p className="mt-1 text-xs text-white/35">
+                                            Verifying authentication and company access
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 h-px overflow-hidden bg-white/[0.07]">
+                                    <div className="h-full w-1/3 animate-pulse bg-white/30" />
+                                </div>
+
+                                <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-white/20">
+                                    TokenvaPay · Secure workspace
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <footer className="flex min-h-16 items-center justify-between border-t border-white/[0.07] py-5 text-[10px] uppercase tracking-[0.16em] text-white/20">
+                        <span>TokenvaPay</span>
+                        <span>© 2026 Tokenva</span>
+                    </footer>
+                </div>
+            </main>
+        );
+    }
 
     if (!companyAccess?.company) {
         if (!companyAccess?.application) {
@@ -1668,5 +1715,11 @@ if (
         );
     }
 
-    return <ProtectedHome />;
+    return selectedCompany
+        ? (
+            <ProtectedHome
+                selectedCompany={selectedCompany}
+            />
+        )
+        : null;
 }
