@@ -1,1617 +1,967 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
-import {
-    getSession,
-    logout,
-} from "@/lib/auth";
-import { PublicKey } from "@solana/web3.js";
-import {
-    getCompanyAccess,
-    type CompanyAccess,
-} from "@/lib/company";
-
-import CompanyOnboarding from "@/components/company/CompanyOnboarding";
-import ApplicationStatus from "@/components/company/ApplicationStatus";
-import PilotStatus from "@/components/company/PilotStatus";
-
-import WalletButton from "@/components/WalletButton";
-import OperationalDashboard from "@/components/OperationalDashboard";
-
-import CompanyOverview from "@/components/dashboard/CompanyOverview";
-
-import CompanySetup from "@/components/payroll/CompanySetup";
-import EmployeeDirectory from "@/components/payroll/EmployeeDirectory";
-import TreasuryFunding from "@/components/payroll/TreasuryFunding";
-import CreatePayroll from "@/components/payroll/CreatePayroll";
-import ActiveStream from "@/components/payroll/ActiveStream";
-import PayrollReports from "@/components/payroll/PayrollReports";
-
-import ActivityStats from "@/components/activity/ActivityStats";
-import ActivityHistory from "@/components/activity/ActivityHistory";
-
-import { useOrganization } from "@/hooks/useOrganization";
-import { useVault } from "@/hooks/useVault";
-import { useDeposit } from "@/hooks/useDeposit";
-import { useStream } from "@/hooks/useStream";
-import { useStreamActions } from "@/hooks/useStreamActions";
-import { useIndexedStreams } from "@/hooks/useIndexedStreams";
-
-const EMPTY_MINT = "";
-
-const DECIMALS = 6;
-const BASE_UNITS = BigInt(1_000_000);
-const ZERO = BigInt(0);
-
-function shortenAddress(address: string) {
-    return `${address.slice(0, 4)}...${address.slice(-4)}`;
-}
-
-function toBaseUnits(value: string) {
-    const [whole, fraction = ""] =
-        value.trim().split(".");
-
-    if (!/^\d+$/.test(whole)) {
-        throw new Error("Invalid token amount");
-    }
-
-    const padded = fraction
-        .padEnd(DECIMALS, "0")
-        .slice(0, DECIMALS);
-
-    return (
-        BigInt(whole) * BASE_UNITS +
-        BigInt(padded || "0")
-    ).toString();
-}
-
-function formatDateTimeLocal(date: Date) {
-    return `${date
-        .getFullYear()
-        .toString()
-        .padStart(4, "0")}-${(
-            date.getMonth() + 1
-        )
-            .toString()
-            .padStart(2, "0")}-${date
-                .getDate()
-                .toString()
-                .padStart(2, "0")}T${date
-                    .getHours()
-                    .toString()
-                    .padStart(2, "0")}:${date
-                        .getMinutes()
-                        .toString()
-                        .padStart(2, "0")}`;
-}
-
-function formatTokenAmount(raw: bigint) {
-    const whole = raw / BASE_UNITS;
-    const fraction = raw % BASE_UNITS;
-
-    if (fraction === ZERO) {
-        return whole.toString();
-    }
-
-    return `${whole}.${fraction
-        .toString()
-        .padStart(6, "0")
-        .replace(/0+$/, "")}`;
-}
-
-function ProtectedHome() {
-    const { publicKey } = useWallet();
-
-    const [mint, setMint] =
-        useState(EMPTY_MINT);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadConfig() {
-            try {
-                const response =
-                    await fetch("/api/config", {
-                        cache: "no-store",
-                    });
-
-                if (!response.ok) {
-                    throw new Error(
-                        "Failed to load application configuration",
-                    );
-                }
-
-                const data =
-                    (await response.json()) as {
-                        mint: string;
-                    };
-
-                if (!cancelled) {
-                    setMint(data.mint);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    setActionError(
-                        err instanceof Error
-                            ? err.message
-                            : "Failed to load application configuration",
-                    );
-                }
-            }
-        }
-
-        void loadConfig();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    const [depositAmount, setDepositAmount] =
-        useState("");
-
-    const [employeeAddress, setEmployeeAddress] =
-        useState("");
-
-    const [streamAmount, setStreamAmount] =
-        useState("500");
-
-    const [payrollType, setPayrollType] =
-        useState("Salary");
-
-    const [payrollTemplate, setPayrollTemplate] =
-        useState("Monthly Salary");
-
-    const [streamId, setStreamId] =
-        useState(1);
-
-    const [startTime, setStartTime] =
-        useState("");
-
-    const [endTime, setEndTime] =
-        useState("");
-
-    const [message, setMessage] =
-        useState<string | null>(null);
-
-    const [actionError, setActionError] =
-        useState<string | null>(null);
-
-    const [mounted, setMounted] =
-        useState(false);
-
-    const [onboardingLoading, setOnboardingLoading] =
-        useState(false);
-
-    const [employeeWalletValid, setEmployeeWalletValid] =
-        useState(false);
-
-    const [payrollReport, setPayrollReport] =
-        useState<{
-            month: string;
-            employees: number;
-            grossPayout: string;
-            totalClaimed: string;
-            completed: number;
-            pending: number;
-            canceled: number;
-            streamCount: number;
-        } | null>(null);
-
-    const [payrollReportLoading, setPayrollReportLoading] =
-        useState(false);
-
-    const [payrollReportError, setPayrollReportError] =
-        useState<string | null>(null);
-
-    const [employeeReports, setEmployeeReports] =
-        useState<
-            {
-                employee: string;
-                streamCount: number;
-                grossPayout: string;
-                totalClaimed: string;
-                remaining: string;
-                completed: number;
-                pending: number;
-                canceled: number;
-            }[]
-        >([]);
-
-    const [employeeReportLoading, setEmployeeReportLoading] =
-        useState(false);
-
-    const [employeeReportError, setEmployeeReportError] =
-        useState<string | null>(null);
-
-    const [treasuryReport, setTreasuryReport] =
-        useState<{
-            month: string;
-            streamCount: number;
-            grossPayout: string;
-            totalClaimed: string;
-            outstanding: string;
-            active: number;
-            completed: number;
-            canceled: number;
-            transactions: Record<string, number>;
-        } | null>(null);
-
-    const [treasuryReportLoading, setTreasuryReportLoading] =
-        useState(false);
-
-    const [treasuryReportError, setTreasuryReportError] =
-        useState<string | null>(null);
-
-    const [reconciliationReport, setReconciliationReport] =
-        useState<{
-            checked: number;
-            databaseStreams: number;
-            matched: number;
-            mismatched: number;
-            missingFromDb: number;
-            staleInDb: number;
-            healthy: boolean;
-            details: Array<{
-                type: string;
-                address: string;
-                fields?: string[];
-            }>;
-        } | null>(null);
-
-    const [
-        reconciliationLoading,
-        setReconciliationLoading,
-    ] = useState(false);
-
-    const [
-        reconciliationError,
-        setReconciliationError,
-    ] = useState<string | null>(null);
-
-    const [exportLoading, setExportLoading] =
-        useState<string | null>(null);
-
-    useEffect(() => {
-        setMounted(true);
-
-        const now = Math.floor(
-            Date.now() / 1000,
-        );
-
-        const start = new Date(
-            (now - 3600) * 1000,
-        );
-
-        const end = new Date(
-            (now + 30 * 24 * 3600) * 1000,
-        );
-
-        setStartTime(
-            formatDateTimeLocal(start),
-        );
-
-        setEndTime(
-            formatDateTimeLocal(end),
-        );
-    }, []);
-
-    const {
-        organization,
-        organizationRoles,
-        rolesExists,
-        exists: organizationExists,
-        createOrganization,
-        initializeOrganizationRoles,
-    } = useOrganization();
-
-    const {
-        vault,
-        exists: vaultExists,
-        balance: vaultBalance,
-        refresh: refreshVault,
-        createVault,
-    } = useVault(mint);
-
-    const {
-        tokenAccount,
-        tokenBalance,
-        deposit,
-        loading: depositLoading,
-    } = useDeposit(
-        mint,
-        refreshVault,
-    );
-
-    const {
-        stream,
-        streamEscrow,
-        data: streamData,
-        claimable,
-        loading: streamLoading,
-        error: streamError,
-        createStream,
-        claim,
-    } = useStream(
-        mint,
-        streamId,
-        employeeAddress,
-    );
-
-    const {
-        loading: actionLoading,
-        error: actionErrorStream,
-        topUp,
-        cancel,
-    } = useStreamActions(
-        mint,
-        streamId,
-        employeeAddress,
-        async () => {
-            await refreshVault();
-        },
-    );
-
-    const {
-        streams: indexedStreams,
-        loading: indexedStreamsLoading,
-        error: indexedStreamsError,
-        refresh: refreshIndexedStreams,
-    } = useIndexedStreams(
-        publicKey?.toBase58(),
-    );
-
-    async function loadPayrollReport() {
-        try {
-            setPayrollReportLoading(true);
-            setPayrollReportError(null);
-
-            const month = new Date()
-                .toISOString()
-                .slice(0, 7);
-
-            const response = await fetch(
-                `/api/backend/api/reports/payroll?month=${month}`,
-                {
-                    credentials: "include",
-                    cache: "no-store",
-                },
-            );
-
-            if (!response.ok) {
-                throw new Error(
-                    "Failed to load payroll report",
-                );
-            }
-
-            const data = await response.json();
-
-            setPayrollReport(data);
-        } catch (err) {
-            setPayrollReportError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to load payroll report",
-            );
-        } finally {
-            setPayrollReportLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        void loadPayrollReport();
-    }, []);
-
-    async function loadEmployeeReports() {
-        try {
-            setEmployeeReportLoading(true);
-            setEmployeeReportError(null);
-
-            const month = new Date()
-                .toISOString()
-                .slice(0, 7);
-
-            const response = await fetch(
-                `/api/backend/api/reports/employees?month=${month}`,
-                {
-                    credentials: "include",
-                    cache: "no-store",
-                },
-            );
-
-            if (!response.ok) {
-                throw new Error(
-                    "Failed to load employee reports",
-                );
-            }
-
-            const data = await response.json();
-
-            setEmployeeReports(
-                Array.isArray(data.employees)
-                    ? data.employees
-                    : [],
-            );
-        } catch (err) {
-            setEmployeeReportError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to load employee reports",
-            );
-        } finally {
-            setEmployeeReportLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        void loadEmployeeReports();
-    }, []);
-
-    async function loadTreasuryReport() {
-        try {
-            setTreasuryReportLoading(true);
-            setTreasuryReportError(null);
-
-            const month = new Date()
-                .toISOString()
-                .slice(0, 7);
-
-            const response = await fetch(
-                `/api/backend/api/reports/treasury?month=${month}`,
-                {
-                    credentials: "include",
-                    cache: "no-store",
-                },
-            );
-
-            if (!response.ok) {
-                throw new Error(
-                    "Failed to load treasury report",
-                );
-            }
-
-            const data =
-                await response.json();
-
-            setTreasuryReport(data);
-        } catch (err) {
-            setTreasuryReportError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to load treasury report",
-            );
-        } finally {
-            setTreasuryReportLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        void loadTreasuryReport();
-    }, []);
-
-    async function loadReconciliationReport() {
-        try {
-            setReconciliationLoading(true);
-            setReconciliationError(null);
-
-            const response = await fetch(
-                "/api/backend/api/reports/reconciliation",
-                {
-                    credentials: "include",
-                    cache: "no-store",
-                },
-            );
-
-            if (!response.ok) {
-                throw new Error(
-                    "Failed to load reconciliation report",
-                );
-            }
-
-            const data =
-                await response.json();
-
-            setReconciliationReport(data);
-        } catch (err) {
-            setReconciliationError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to load reconciliation report",
-            );
-        } finally {
-            setReconciliationLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        void loadReconciliationReport();
-    }, []);
-
-    async function downloadReportCsv(
-        type:
-            | "payroll"
-            | "employees"
-            | "transactions",
-    ) {
-        try {
-            setExportLoading(type);
-
-            const month = new Date()
-                .toISOString()
-                .slice(0, 7);
-
-            const url =
-                type === "transactions"
-                    ? "/api/backend/api/reports/transactions.csv"
-                    : `/api/backend/api/reports/${type}.csv?month=${month}`;
-
-            const response =
-                await fetch(url, {
-                    credentials: "include",
-                });
-
-            if (!response.ok) {
-                throw new Error(
-                    `Failed to export ${type} CSV`,
-                );
-            }
-
-            const blob =
-                await response.blob();
-
-            const downloadUrl =
-                URL.createObjectURL(blob);
-
-            const anchor =
-                document.createElement("a");
-
-            anchor.href = downloadUrl;
-
-            anchor.download =
-                `tokenva-${type}-${month}.csv`;
-
-            document.body.appendChild(
-                anchor,
-            );
-
-            anchor.click();
-
-            anchor.remove();
-
-            URL.revokeObjectURL(
-                downloadUrl,
-            );
-        } catch (err) {
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "CSV export failed",
-            );
-        } finally {
-            setExportLoading(null);
-        }
-    }
-
-    async function handleCompanySetup() {
-        try {
-            setMessage(null);
-            setActionError(null);
-            setOnboardingLoading(true);
-
-            if (!publicKey) {
-                throw new Error(
-                    "Connect your treasury wallet first",
-                );
-            }
-
-            if (!organizationExists) {
-                await createOrganization();
-            }
-
-            if (!vaultExists) {
-                await createVault();
-            }
-
-            if (!rolesExists) {
-                await initializeOrganizationRoles(
-                    publicKey,
-                    publicKey,
-                    publicKey,
-                    publicKey,
-                );
-            }
-
-            await refreshVault();
-
-            setMessage(
-                "Company setup complete",
-            );
-        } catch (err) {
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Company setup failed",
-            );
-        } finally {
-            setOnboardingLoading(false);
-        }
-    }
-
-    function handleVerifyEmployeeWallet() {
-        try {
-            const address =
-                employeeAddress.trim();
-
-            if (!address) {
-                throw new Error(
-                    "Enter the employee wallet address",
-                );
-            }
-
-            const normalized =
-                new PublicKey(address).toBase58();
-
-            setEmployeeAddress(normalized);
-            setEmployeeWalletValid(true);
-            setMessage(
-                "Employee wallet address is valid",
-            );
-            setActionError(null);
-        } catch (err) {
-            setEmployeeWalletValid(false);
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Invalid employee wallet address",
-            );
-        }
-    }
-
-    async function handleDeposit() {
-        try {
-            setMessage(null);
-            setActionError(null);
-
-            const signature =
-                await deposit(
-                    depositAmount,
-                );
-
-            setDepositAmount("");
-
-            setMessage(
-                `Deposit successful: ${signature.slice(
-                    0,
-                    8,
-                )}...`,
-            );
-        } catch (err) {
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Deposit failed",
-            );
-        }
-    }
-
-    async function handleTopUp() {
-        try {
-            setMessage(null);
-            setActionError(null);
-
-            const rawAmount =
-                toBaseUnits("100");
-
-            const signature =
-                await topUp(rawAmount);
-
-            setMessage(
-                `Stream topped up: ${signature.slice(
-                    0,
-                    8,
-                )}...`,
-            );
-        } catch (err) {
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Top-up failed",
-            );
-        }
-    }
-
-    async function handleCancel() {
-        try {
-            setMessage(null);
-            setActionError(null);
-
-            const signature =
-                await cancel();
-
-            setMessage(
-                `Stream canceled: ${signature.slice(
-                    0,
-                    8,
-                )}...`,
-            );
-        } catch (err) {
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Top-up failed",
-            );
-        }
-    }
-
-    function applyPayrollTemplate(
-        template: string,
-    ) {
-        if (template === "Custom") {
-            return;
-        }
-
-        const start = new Date(
-            Date.now() + 5 * 60 * 1000,
-        );
-
-        const days =
-            template === "Bonus"
-                ? 7
-                : 30;
-
-        const amount =
-            template === "Bonus"
-                ? "100"
-                : "500";
-
-        setPayrollType(
-            template === "Monthly Salary"
-                ? "Salary"
-                : template,
-        );
-
-        setStreamAmount(amount);
-
-        setStartTime(
-            formatDateTimeLocal(start),
-        );
-
-        setEndTime(
-            formatDateTimeLocal(
-                new Date(
-                    start.getTime() +
-                    days *
-                    24 *
-                    60 *
-                    60 *
-                    1000,
-                ),
-            ),
-        );
-    }
-
-    async function handleCreateStream() {
-        try {
-            setMessage(null);
-            setActionError(null);
-
-            if (!startTime || !endTime) {
-                throw new Error(
-                    "Choose stream start and end times",
-                );
-            }
-
-            const start = Math.floor(
-                new Date(startTime).getTime() /
-                1000,
-            );
-
-            const end = Math.floor(
-                new Date(endTime).getTime() /
-                1000,
-            );
-
-            const rawAmount =
-                toBaseUnits(streamAmount);
-
-            const result =
-                await createStream(
-                    employeeAddress,
-                    rawAmount,
-                    start,
-                    end,
-                );
-
-            await refreshVault();
-
-            setMessage(
-                `${payrollType} payroll created: ${shortenAddress(
-                    result.stream.toBase58(),
-                )}`,
-            );
-        } catch (err) {
-            console.error(
-                "CREATE STREAM ERROR:",
-                err,
-            );
-
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Create Stream failed",
-            );
-        }
-    }
-
-    async function handleClaim() {
-        try {
-            setMessage(null);
-            setActionError(null);
-
-            const signature =
-                await claim();
-
-            setMessage(
-                `Claim successful: ${signature.slice(
-                    0,
-                    8,
-                )}...`,
-            );
-        } catch (err) {
-            setActionError(
-                err instanceof Error
-                    ? err.message
-                    : "Claim failed",
-            );
-        }
-    }
-
-    function handleSelectEmployee(
-        address: string,
-    ) {
-        setEmployeeAddress(address);
-        setEmployeeWalletValid(true);
-        setMessage(
-            `Selected employee ${shortenAddress(
-                address,
-            )}`,
-        );
-        setActionError(null);
-    }
-
-    const earnedDisplay =
-        formatTokenAmount(claimable);
-
-    const activeStreamCount =
-        indexedStreams.filter(
-            (item) => !item.canceled,
-        ).length;
-
-    const employeeCount =
-        new Set(
-            indexedStreams.map(
-                (item) => item.employee,
-            ),
-        ).size;
-
-    const employeeDirectory =
-        Array.from(
-            new Set(
-                indexedStreams.map(
-                    (item) => item.employee,
-                ),
-            ),
-        ).map((employee) => ({
-            address: employee,
-            totalStreams:
-                indexedStreams.filter(
-                    (item) =>
-                        item.employee === employee,
-                ).length,
-            activeStreams:
-                indexedStreams.filter(
-                    (item) =>
-                        item.employee === employee &&
-                        !item.canceled,
-                ).length,
-        }));
-
-    const isOwner =
-        organizationExists &&
-        !!publicKey;
-
-    const currentRole =
-        isOwner
-            ? "Owner"
-            : rolesExists &&
-                organizationRoles &&
-                publicKey
-                ? publicKey.equals(
-                    organizationRoles.admin,
-                )
-                    ? "Admin"
-                    : publicKey.equals(
-                        organizationRoles.finance,
-                    )
-                        ? "Finance"
-                        : publicKey.equals(
-                            organizationRoles.approver,
-                        )
-                            ? "Approver"
-                            : publicKey.equals(
-                                organizationRoles.viewer,
-                            )
-                                ? "Viewer"
-                                : "Employee"
-                : "Unassigned";
-
-    const canCreatePayroll =
-        currentRole === "Owner" ||
-        currentRole === "Admin" ||
-        currentRole === "Approver";
-
-    const canManageTreasury =
-        currentRole === "Owner" ||
-        currentRole === "Admin" ||
-        currentRole === "Finance";
-
-    const canManageStreams =
-        currentRole === "Owner" ||
-        currentRole === "Admin" ||
-        currentRole === "Finance" ||
-        currentRole === "Approver";
-
-    const canClaimPayroll =
-        currentRole === "Employee";
-
-    return (
-        <main className="dashboard-shell">
-            <div className="dashboard-container">
-                <header className="dashboard-header flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="dashboard-brand-block">
-                        <p className="dashboard-eyebrow">
-                            Programmable payment infrastructure
-                        </p>
-
-                        <h1 className="dashboard-title">
-                            Tokenva
-                        </h1>
-
-                        <p className="dashboard-subtitle">
-                            Payroll operations for global teams — treasury, payment streams,
-                            employee claims, and financial reporting in one workspace.
-                        </p>
-                    </div>
-
-                    <div className="dashboard-wallet"><WalletButton /></div>
-                </header>
-
-                <nav className="demo-nav" aria-label="Dashboard sections">
-                    <a href="#overview">Overview</a>
-                    <a href="#payroll">Payroll</a>
-                    <a href="#treasury">Treasury</a>
-                    <a href="#employees">Employees</a>
-                    <a href="#reports">Reports</a>
-                    <a href="#activity">Activity</a>
-                </nav>
-
-                {message && (
-                    <div className="dashboard-message mt-8 rounded-xl border p-4 text-sm">
-                        {message}
-                    </div>
+import Link from "next/link";
+import { getSession } from "@/lib/auth";
+
+const capabilities = [
+
+  {
+
+    number: "01",
+
+    title: "Programmable payment streams",
+
+    text: "Define recurring payment flows instead of manually initiating every individual transfer.",
+
+  },
+
+  {
+
+    number: "02",
+
+    title: "Stablecoin infrastructure",
+
+    text: "Designed around digital-dollar payment workflows for internationally distributed teams.",
+
+  },
+
+  {
+
+    number: "03",
+
+    title: "Cross-chain workflows",
+
+    text: "Coordinate payment operations across supported blockchain environments.",
+
+  },
+
+  {
+
+    number: "04",
+
+    title: "Transparent settlement",
+
+    text: "On-chain activity provides a verifiable settlement layer for clearer reconciliation.",
+
+  },
+
+];
+
+const steps = [
+
+  {
+
+    number: "01",
+
+    title: "Fund",
+
+    text: "The company funds the payment environment with supported assets.",
+
+  },
+
+  {
+
+    number: "02",
+
+    title: "Create",
+
+    text: "The company defines the recipient and programmable payment stream.",
+
+  },
+
+  {
+
+    number: "03",
+
+    title: "Claim",
+
+    text: "Employees or contractors claim available payments according to the configured stream.",
+
+  },
+
+  {
+
+    number: "04",
+
+    title: "Reconcile",
+
+    text: "Operations teams can track payment activity and settlement history.",
+
+  },
+
+];
+
+export default function LandingPage() {
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    void getSession().then((session) => {
+      if (active) {
+        setAuthenticated(Boolean(session?.authenticated));
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const accessHref = authenticated ? "/app" : "/login";
+  const accessLabel = authenticated ? "Dashboard" : "Get started";
+
+  return (
+
+    <main className="min-h-screen scroll-smooth bg-black text-white">
+
+      <nav className="sticky top-0 z-50 border-b border-white/10 bg-black/90 backdrop-blur-xl">
+
+      <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+
+        <div className="flex h-16 items-center justify-between">
+
+          <Link href="/" className="text-lg font-semibold tracking-[-0.03em]">
+
+            TokenvaPay
+
+          </Link>
+
+          <div className="hidden items-center gap-7 text-sm text-white/55 md:flex">
+
+            <Link href="#product" className="transition hover:text-white">Product</Link>
+
+            <Link href="#how-it-works" className="transition hover:text-white">How it works</Link>
+
+            <Link href="#technology" className="transition hover:text-white">Technology</Link>
+
+            <Link href="#security" className="transition hover:text-white">Security</Link>
+
+            <Link href="#design-partners" className="transition hover:text-white">Design partners</Link>
+          </div>
+
+          <div className="flex items-center gap-2">
+
+            {!authenticated && (
+              <Link
+
+              href="/login"
+
+              className="hidden rounded-full border border-white/20 px-4 py-2 text-sm font-medium transition hover:border-white/40 hover:bg-white/5 sm:inline-flex md:hidden"
+
+            >
+
+              Login
+
+            </Link>
+            )}
+
+            <Link
+              href={accessHref}
+              className="inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-white/90"
+            >
+              {accessLabel}
+            </Link>
+
+            <details className="relative md:hidden">
+
+              <summary
+
+                className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-white/15 text-white/70 transition hover:border-white/30 hover:text-white [&::-webkit-details-marker]:hidden"
+
+                aria-label="Open navigation menu"
+
+              >
+
+                <span className="sr-only">Open navigation menu</span>
+
+                <span className="flex flex-col gap-1.5">
+
+                  <span className="block h-px w-4 bg-current" />
+
+                  <span className="block h-px w-4 bg-current" />
+
+                </span>
+
+              </summary>
+
+              <div className="absolute right-0 top-12 w-56 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 p-2 shadow-2xl backdrop-blur-xl">
+
+                <Link href="#product" className="block rounded-xl px-4 py-3 text-sm text-white/65 transition hover:bg-white/5 hover:text-white">Product</Link>
+
+                <Link href="#how-it-works" className="block rounded-xl px-4 py-3 text-sm text-white/65 transition hover:bg-white/5 hover:text-white">How it works</Link>
+
+                <Link href="#technology" className="block rounded-xl px-4 py-3 text-sm text-white/65 transition hover:bg-white/5 hover:text-white">Technology</Link>
+
+                <Link href="#security" className="block rounded-xl px-4 py-3 text-sm text-white/65 transition hover:bg-white/5 hover:text-white">Security</Link>
+
+                <Link href="#design-partners" className="block rounded-xl px-4 py-3 text-sm text-white/65 transition hover:bg-white/5 hover:text-white">Design partners</Link>
+
+                <div className="my-2 border-t border-white/10" />
+
+                {authenticated ? (
+                  <Link href="/app" className="block rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:bg-white/5">
+                    Dashboard
+                  </Link>
+                ) : (
+                  <Link href="/login" className="block rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:bg-white/5">
+                    Login
+                  </Link>
                 )}
 
-                {actionError && (
-                    <div className="dashboard-error mt-8 rounded-xl border p-4 text-sm">
-                        {actionError}
-                    </div>
-                )}
+              </div>
 
-                <div id="overview">
-                    <CompanyOverview
-                        treasuryBalance={
-                            vaultBalance ?? "0"
-                        }
-                        payrollThisMonth={
-                            payrollReport
-                                ? formatTokenAmount(
-                                    BigInt(
-                                        payrollReport.grossPayout,
-                                    ),
-                                )
-                                : ""
-                        }
-                        payrollLoading={
-                            payrollReportLoading
-                        }
-                        activeStreamCount={
-                            activeStreamCount
-                        }
-                        employeeCount={
-                            employeeCount
-                        }
-                        hasRecentActivity={
-                            indexedStreams.length > 0
-                        }
-                        currentRole={
-                            currentRole
-                        }
-                    />
-                </div>
+            </details>
 
-                <div id="payroll">
-                    <p className="demo-section-label">
-                        Payroll Operations
-                    </p>
-                    <CompanySetup
-                        organizationExists={
-                            organizationExists
-                        }
-                        vaultExists={
-                            vaultExists
-                        }
-                        rolesExists={
-                            rolesExists
-                        }
-                        onboardingLoading={
-                            onboardingLoading
-                        }
-                        publicKey={
-                            publicKey
-                                ? publicKey.toBase58()
-                                : null
-                        }
-                        mint={mint}
-                        currentRole={
-                            currentRole
-                        }
-                        canCreatePayroll={
-                            canCreatePayroll
-                        }
-                        canManageTreasury={
-                            canManageTreasury
-                        }
-                        canManageStreams={
-                            canManageStreams
-                        }
-                        canClaimPayroll={
-                            canClaimPayroll
-                        }
-                        organizationAddress={
-                            organization
-                                ? organization.toBase58()
-                                : null
-                        }
-                        vaultAddress={
-                            vault
-                                ? vault.toBase58()
-                                : null
-                        }
-                        vaultBalance={
-                            vaultBalance ?? "0"
-                        }
-                        tokenBalance={
-                            tokenBalance ?? "0"
-                        }
-                        onSetup={
-                            handleCompanySetup
-                        }
-                        shortenAddress={
-                            shortenAddress
-                        }
-                    />
-                    <CreatePayroll
-                        payrollTemplate={
-                            payrollTemplate
-                        }
-                        setPayrollTemplate={
-                            setPayrollTemplate
-                        }
-                        payrollType={
-                            payrollType
-                        }
-                        setPayrollType={
-                            setPayrollType
-                        }
-                        employeeAddress={
-                            employeeAddress
-                        }
-                        setEmployeeAddress={
-                            setEmployeeAddress
-                        }
-                        streamId={
-                            streamId
-                        }
-                        setStreamId={
-                            setStreamId
-                        }
-                        streamAmount={
-                            streamAmount
-                        }
-                        setStreamAmount={
-                            setStreamAmount
-                        }
-                        mounted={
-                            mounted
-                        }
-                        startTime={
-                            startTime
-                        }
-                        setStartTime={
-                            setStartTime
-                        }
-                        endTime={
-                            endTime
-                        }
-                        setEndTime={
-                            setEndTime
-                        }
-                        streamLoading={
-                            streamLoading
-                        }
-                        canCreatePayroll={
-                            canCreatePayroll
-                        }
-                        vaultExists={
-                            vaultExists
-                        }
-                        employeeWalletValid={
-                            employeeWalletValid
-                        }
-                        onTemplateChange={
-                            applyPayrollTemplate
-                        }
-                        onCreate={
-                            handleCreateStream
-                        }
-                    />
-                    <ActiveStream
-                        streamData={
-                            streamData
-                        }
-                        stream={
-                            stream
-                        }
-                        streamEscrow={
-                            streamEscrow
-                        }
-                        claimable={
-                            claimable
-                        }
-                        earnedDisplay={
-                            earnedDisplay
-                        }
-                        streamLoading={
-                            streamLoading
-                        }
-                        streamError={
-                            streamError
-                        }
-                        actionLoading={
-                            actionLoading
-                        }
-                        actionErrorStream={
-                            actionErrorStream
-                        }
-                        canManageStreams={
-                            canManageStreams
-                        }
-                        currentRole={
-                            currentRole
-                        }
-                        indexedStreams={
-                            indexedStreams
-                        }
-                        indexedStreamsLoading={
-                            indexedStreamsLoading
-                        }
-                        indexedStreamsError={
-                            indexedStreamsError
-                        }
-                        onTopUp={
-                            handleTopUp
-                        }
-                        onCancel={
-                            handleCancel
-                        }
-                        onClaim={
-                            handleClaim
-                        }
-                        onRefreshIndexedStreams={() =>
-                            void refreshIndexedStreams()
-                        }
-                        shortenAddress={
-                            shortenAddress
-                        }
-                        formatTokenAmount={
-                            formatTokenAmount
-                        }
-                    />
-                </div>
+          </div>
 
-                <div id="treasury">
-                    <TreasuryFunding
-                        depositAmount={
-                            depositAmount
-                        }
-                        setDepositAmount={
-                            setDepositAmount
-                        }
-                        depositLoading={
-                            depositLoading
-                        }
-                        canManageTreasury={
-                            canManageTreasury
-                        }
-                        vaultExists={
-                            vaultExists
-                        }
-                        tokenAccount={
-                            !!tokenAccount
-                        }
-                        onDeposit={
-                            handleDeposit
-                        }
-                    />
-                </div>
+        </div>
 
-                <div id="employees">
-                    <EmployeeDirectory
-                        employeeAddress={
-                            employeeAddress
-                        }
-                        setEmployeeAddress={
-                            setEmployeeAddress
-                        }
-                        employeeWalletValid={
-                            employeeWalletValid
-                        }
-                        setEmployeeWalletValid={
-                            setEmployeeWalletValid
-                        }
-                        employeeDirectory={
-                            employeeDirectory
-                        }
-                        onVerify={
-                            handleVerifyEmployeeWallet
-                        }
-                        onSelect={
-                            handleSelectEmployee
-                        }
-                        shortenAddress={
-                            shortenAddress
-                        }
-                    />
-                </div>
+      </div>
 
+    </nav>
 
-                <div id="reports">
-                    <PayrollReports
-                        payrollReport={
-                            payrollReport
-                        }
-                        payrollReportLoading={
-                            payrollReportLoading
-                        }
-                        payrollReportError={
-                            payrollReportError
-                        }
-                        employeeReports={
-                            employeeReports
-                        }
-                        employeeReportLoading={
-                            employeeReportLoading
-                        }
-                        employeeReportError={
-                            employeeReportError
-                        }
-                        treasuryReport={
-                            treasuryReport
-                        }
-                        treasuryReportLoading={
-                            treasuryReportLoading
-                        }
-                        treasuryReportError={
-                            treasuryReportError
-                        }
-                        reconciliationReport={
-                            reconciliationReport
-                        }
-                        reconciliationLoading={
-                            reconciliationLoading
-                        }
-                        reconciliationError={
-                            reconciliationError
-                        }
-                        exportLoading={
-                            exportLoading
-                        }
-                        onPayrollRefresh={() =>
-                            void loadPayrollReport()
-                        }
-                        onEmployeeRefresh={() =>
-                            void loadEmployeeReports()
-                        }
-                        onTreasuryRefresh={() =>
-                            void loadTreasuryReport()
-                        }
-                        onReconciliation={() =>
-                            void loadReconciliationReport()
-                        }
-                        onExport={
-                            downloadReportCsv
-                        }
-                        shortenAddress={
-                            shortenAddress
-                        }
-                        formatTokenAmount={
-                            formatTokenAmount
-                        }
-                    />
-                </div>
+      <section className="border-b border-white/10">
 
-                <OperationalDashboard />
+        <div className="mx-auto max-w-7xl px-6 pb-24 pt-24 lg:px-8 lg:pb-32 lg:pt-32">
 
-                <div id="activity">
-                    <p className="demo-section-label">
-                        Activity
-                    </p>
-                    <ActivityStats />
-                    <ActivityHistory />
-                </div>
+          <div className="max-w-5xl">
+
+            <p className="mb-6 text-xs font-medium uppercase tracking-[0.28em] text-white/45">
+
+              Programmable payment infrastructure
+
+            </p>
+
+            <h1 className="max-w-5xl text-5xl font-medium leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-8xl">
+
+              Payments built for
+
+              <br />
+
+              global teams.
+
+            </h1>
+
+            <p className="mt-8 max-w-2xl text-lg leading-8 text-white/55 sm:text-xl">
+
+              TokenvaPay provides programmable payment infrastructure for
+
+              distributed teams — enabling recurring stablecoin payments,
+
+              transparent settlement, and cross-chain workflows.
+
+            </p>
+
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+
+              <Link
+              href={accessHref}
+              className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-medium text-black transition hover:bg-white/90"
+            >
+              {accessLabel}
+            </Link>
+
+              <Link
+
+                href="#product"
+
+                className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-3 text-sm font-medium text-white/75 transition hover:border-white/30 hover:text-white"
+
+              >
+
+                Explore TokenvaPay
+
+              </Link>
+
             </div>
-        </main>
-    );
-}
 
-export default function Home() {
-    const router = useRouter();
-    const {
-        connected,
-        connecting,
-    } = useWallet();
+          </div>
 
-    const [
-        authChecked,
-        setAuthChecked,
-    ] = useState(false);
+          <div className="mt-8 flex items-center gap-2 text-xs text-white/35">
 
-    const [
-        authenticated,
-        setAuthenticated,
-    ] = useState(false);
+            <span>TokenvaPay</span>
 
-    const [
-        companyAccess,
-        setCompanyAccess,
-    ] = useState<CompanyAccess | null>(null);
+            <span aria-hidden="true">·</span>
 
-    const [
-        companyChecked,
-        setCompanyChecked,
-    ] = useState(false);
+            <span>A product of</span>
 
-    useEffect(() => {
-        let cancelled = false;
+            <Link href="https\://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="text-white/55 transition hover:text-white">
 
-        async function checkAuthentication() {
-            const session = await getSession();
+              Tokenva
 
-            if (cancelled) {
-                return;
-            }
+            </Link>
 
-            if (!session?.authenticated) {
-                setAuthenticated(false);
-                setAuthChecked(true);
-                setCompanyAccess(null);
-                setCompanyChecked(false);
-                router.replace("/login");
-                return;
-            }
+          </div>
 
-            setAuthenticated(true);
-            setAuthChecked(true);
-        }
+          <div className="mt-24 grid border-t border-white/10 pt-6 text-xs uppercase tracking-[0.18em] text-white/35 sm:grid-cols-3">
 
-        void checkAuthentication();
+            <span>Payments</span>
 
-        return () => {
-            cancelled = true;
-        };
-    }, [router]);
+            <span>Stablecoins</span>
 
-    useEffect(() => {
-        if (!authChecked || !authenticated) {
-            return;
-        }
+            <span>On-chain settlement</span>
 
-        let cancelled = false;
+          </div>
 
-        async function verifySession() {
-            const session = await getSession();
+        </div>
 
-            if (cancelled) {
-                return;
-            }
+      </section>
 
-            if (!session?.authenticated) {
-                setAuthenticated(false);
-                setAuthChecked(true);
-                setCompanyAccess(null);
-                setCompanyChecked(false);
-                router.replace("/login");
-            }
-        }
+      <section id="product" className="border-b border-white/10">
 
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") {
-                void verifySession();
-            }
-        };
+        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
 
-        document.addEventListener(
-            "visibilitychange",
-            handleVisibilityChange,
-        );
+          <div className="grid gap-16 lg:grid-cols-[0.7fr_1.3fr]">
 
-        const interval = window.setInterval(
-            () => {
-                void verifySession();
-            },
-            30_000,
-        );
+            <div>
 
-        return () => {
-            cancelled = true;
-            document.removeEventListener(
-                "visibilitychange",
-                handleVisibilityChange,
-            );
-            window.clearInterval(interval);
-        };
-    }, [
-        authChecked,
-        authenticated,
-        router,
-    ]);
+              <p className="text-xs uppercase tracking-[0.25em] text-white/35">
 
-    useEffect(() => {
-        if (
-            !authChecked ||
-            !authenticated ||
-            connecting
-        ) {
-            return;
-        }
+                01 / The problem
 
-        if (!connected) {
-            void (async () => {
-                await logout();
+              </p>
 
-                setAuthenticated(false);
-                setCompanyAccess(null);
-                setCompanyChecked(false);
-                router.replace("/login");
-            })();
-        }
-    }, [
-        authChecked,
-        authenticated,
-        connected,
-        connecting,
-        router,
-    ]);
+            </div>
 
-    useEffect(() => {
-        if (!authChecked || !authenticated) {
-            return;
-        }
+            <div>
 
-        let cancelled = false;
+              <h2 className="max-w-3xl text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
 
-        async function loadCompanyAccess() {
-            try {
-                const access =
-                    await getCompanyAccess();
+                Global payments are still too manual.
 
-                if (cancelled) {
-                    return;
-                }
+              </h2>
 
-                setCompanyAccess(access);
-                setCompanyChecked(true);
-            } catch (err) {
-                if (cancelled) {
-                    return;
-                }
+              <p className="mt-6 max-w-2xl text-base leading-7 text-white/50">
 
-                console.error(
-                    "COMPANY ACCESS ERROR:",
-                    err,
-                );
+                Distributed companies often rely on wallets, spreadsheets,
 
-                if (cancelled) {
-                    return;
-                }
+                manual transfers, and disconnected payment records to pay
 
-                setAuthenticated(false);
-                setCompanyAccess(null);
-                setCompanyChecked(false);
+                international teams. TokenvaPay is designed to turn that
 
-                router.replace("/login");
-            }
-        }
+                fragmented process into a programmable payment workflow.
 
-        void loadCompanyAccess();
+              </p>
 
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        authChecked,
-        authenticated,
-        router,
-    ]);
+              <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-3">
 
-    if (
-        !authChecked ||
-        !authenticated ||
-        !companyChecked
-    ) {
-        return (
-            <main className="flex min-h-screen items-center justify-center bg-black text-white">
-                <p className="text-sm text-white/50">
-                    Checking authentication...
+                {[
+
+                  ["01", "Manual operations", "Repeated transfers and wallet management create unnecessary operational work."],
+
+                  ["02", "Limited visibility", "Finance teams need a clearer picture of what was funded, streamed, claimed, and settled."],
+
+                  ["03", "Fragmented rails", "Global teams operate across multiple chains, assets, wallets, and payment environments."],
+
+                ].map(([number, title, text]) => (
+
+                  <div key={number} className="bg-black p-6">
+
+                    <span className="text-xs text-white/30">{number}</span>
+
+                    <h3 className="mt-12 text-lg font-medium">{title}</h3>
+
+                    <p className="mt-3 text-sm leading-6 text-white/45">
+
+                      {text}
+
+                    </p>
+
+                  </div>
+
+                ))}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <section className="border-b border-white/10">
+
+        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+
+          <div className="grid gap-16 lg:grid-cols-[0.7fr_1.3fr]">
+
+            <div>
+
+              <p className="text-xs uppercase tracking-[0.25em] text-white/35">
+
+                02 / TokenvaPay
+
+              </p>
+
+            </div>
+
+            <div>
+
+              <h2 className="max-w-3xl text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
+
+                One programmable layer for recurring payments.
+
+              </h2>
+
+              <p className="mt-6 max-w-2xl text-base leading-7 text-white/50">
+
+                TokenvaPay is being built as payment infrastructure — not simply
+
+                another payroll dashboard.
+
+              </p>
+
+              <div className="mt-14 rounded-2xl border border-white/10">
+
+                <div className="border-b border-white/10 p-6">
+
+                  <p className="text-xs uppercase tracking-[0.2em] text-white/35">
+
+                    Payment flow
+
+                  </p>
+
+                  <h3 className="mt-2 text-xl font-medium">
+
+                    Programmable payroll stream
+
+                  </h3>
+
+                </div>
+
+                <div className="grid divide-y divide-white/10 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+
+                  {[
+
+                    ["01", "Company", "Funds treasury"],
+
+                    ["02", "Stream", "Programmable payment"],
+
+                    ["03", "Employee", "Claims payment"],
+
+                    ["04", "Settlement", "Track & reconcile"],
+
+                  ].map(([number, title, text]) => (
+
+                    <div key={number} className="p-6">
+
+                      <span className="text-xs text-white/30">{number}</span>
+
+                      <p className="mt-10 text-sm font-medium">{title}</p>
+
+                      <p className="mt-2 text-xs text-white/40">{text}</p>
+
+                    </div>
+
+                  ))}
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <section className="border-b border-white/10">
+
+        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+
+          <div className="mb-14">
+
+            <p className="text-xs uppercase tracking-[0.25em] text-white/35">
+
+              03 / Capabilities
+
+            </p>
+
+          </div>
+
+          <div className="grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-2">
+
+            {capabilities.map((item) => (
+
+              <div key={item.number} className="bg-black p-8 lg:p-10">
+
+                <span className="text-xs text-white/30">{item.number}</span>
+
+                <h3 className="mt-16 text-xl font-medium">{item.title}</h3>
+
+                <p className="mt-4 max-w-md text-sm leading-6 text-white/45">
+
+                  {item.text}
+
                 </p>
-            </main>
-        );
-    }
 
-    if (!companyAccess?.company) {
-        if (!companyAccess?.application) {
-            return (
-                <CompanyOnboarding
-                    onSubmitted={(application) => {
-                        setCompanyAccess({
-                            company: null,
-                            application,
-                            hasDashboardAccess: false,
-                            accessStatus: null,
-                        });
-                    }}
-                />
-            );
-        }
+              </div>
 
-        return (
-            <ApplicationStatus
-                application={companyAccess.application}
-                onRefresh={async () => {
-                    const access =
-                        await getCompanyAccess();
+            ))}
 
-                    setCompanyAccess(access);
-                }}
-            />
-        );
-    }
+          </div>
 
-    if (!companyAccess.hasDashboardAccess) {
-        return (
-            <PilotStatus
-                access={companyAccess}
-                onRefresh={async () => {
-                    const access =
-                        await getCompanyAccess();
+        </div>
 
-                    setCompanyAccess(access);
-                }}
-            />
-        );
-    }
+      </section>
 
-    return <ProtectedHome />;
+      <section id="how-it-works" className="border-b border-white/10">
+
+        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+
+          <div className="grid gap-16 lg:grid-cols-[0.7fr_1.3fr]">
+
+            <div>
+
+              <p className="text-xs uppercase tracking-[0.25em] text-white/35">
+
+                04 / How it works
+
+              </p>
+
+            </div>
+
+            <div>
+
+              <h2 className="max-w-3xl text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
+
+                Simple for the team.
+
+                <br />
+
+                Programmable underneath.
+
+              </h2>
+
+              <p className="mt-6 max-w-2xl text-base leading-7 text-white/50">
+
+                The goal is to make the payment experience understandable for
+
+                companies while the underlying infrastructure handles the
+
+                programmable settlement logic.
+
+              </p>
+
+              <div className="mt-14 divide-y divide-white/10 border-y border-white/10">
+
+                {steps.map((step) => (
+
+                  <div
+
+                    key={step.number}
+
+                    className="grid gap-4 py-7 sm:grid-cols-[80px_180px_1fr]"
+
+                  >
+
+                    <span className="text-xs text-white/30">
+
+                      {step.number}
+
+                    </span>
+
+                    <h3 className="font-medium">{step.title}</h3>
+
+                    <p className="text-sm leading-6 text-white/45">
+
+                      {step.text}
+
+                    </p>
+
+                  </div>
+
+                ))}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <section id="technology" className="border-b border-white/10">
+
+        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+
+          <div className="grid gap-16 lg:grid-cols-[0.7fr_1.3fr]">
+
+            <div>
+
+              <p className="text-xs uppercase tracking-[0.25em] text-white/35">
+
+                05 / Technology
+
+              </p>
+
+            </div>
+
+            <div>
+
+              <h2 className="max-w-3xl text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
+
+                Infrastructure for programmable money.
+
+              </h2>
+
+              <p className="mt-6 max-w-2xl text-base leading-7 text-white/50">
+
+                TokenvaPay is being developed with a blockchain-native
+
+                architecture designed around programmable payments and
+
+                cross-chain operations.
+
+              </p>
+
+              <div className="mt-14 grid gap-3 sm:grid-cols-2">
+
+                {[
+
+                  ["Solana", "Core programmable payment infrastructure", "DEVNET"],
+
+                  ["EVM", "Cross-chain gateway infrastructure", "TESTNET"],
+
+                  ["Stablecoins", "Digital-dollar payment workflows", "SUPPORTED"],
+
+                  ["Cross-chain messaging", "Coordinated multi-chain operations", "TESTING"],
+
+                ].map(([title, text, status]) => (
+
+                  <div
+
+                    key={title}
+
+                    className="rounded-2xl border border-white/10 p-6"
+
+                  >
+
+                    <div className="flex items-center justify-between gap-4">
+
+                      <h3 className="font-medium">{title}</h3>
+
+                      <span className="text-[10px] uppercase tracking-[0.16em] text-white/30">
+
+                        {status}
+
+                      </span>
+
+                    </div>
+
+                    <p className="mt-8 text-sm leading-6 text-white/45">
+
+                      {text}
+
+                    </p>
+
+                  </div>
+
+                ))}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <section id="security" className="border-b border-white/10">
+
+        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+
+          <div className="grid gap-16 lg:grid-cols-[0.7fr_1.3fr]">
+
+            <div>
+
+              <p className="text-xs uppercase tracking-[0.25em] text-white/35">
+
+                06 / Security
+
+              </p>
+
+            </div>
+
+            <div>
+
+              <h2 className="max-w-3xl text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
+
+                Built with security as a requirement.
+
+              </h2>
+
+              <p className="mt-6 max-w-2xl text-base leading-7 text-white/50">
+
+                TokenvaPay is being developed with explicit policy enforcement,
+
+                transaction verification, cross-chain validation, cancellation
+
+                controls, backend protections, and incident-response
+
+                procedures.
+
+              </p>
+
+              <div className="mt-12 grid gap-3 sm:grid-cols-2">
+
+                {[
+
+                  ["On-chain policy enforcement", "Organization-level controls and transaction limits."],
+
+                  ["Transaction verification", "Backend transaction records are verified against on-chain activity."],
+
+                  ["Cross-chain validation", "Source, destination, payload, operation and replay protections."],
+
+                  ["Incident readiness", "Threat operations and incident-response procedures documented."],
+
+                ].map(([title, text]) => (
+
+                  <div key={title} className="border-t border-white/10 pt-5">
+
+                    <h3 className="text-sm font-medium">{title}</h3>
+
+                    <p className="mt-2 text-sm leading-6 text-white/40">
+
+                      {text}
+
+                    </p>
+
+                  </div>
+
+                ))}
+
+              </div>
+
+              <div className="mt-12 rounded-2xl border border-white/10 p-6">
+
+                <p className="text-[10px] uppercase tracking-[0.2em] text-white/30">
+
+                  Security status
+
+                </p>
+
+                <p className="mt-4 text-sm leading-6 text-white/50">
+
+                  TokenvaPay is currently being prepared for controlled
+
+                  design-partner pilots. Independent security review and
+
+                  production readiness remain required before unrestricted
+
+                  customer funds are accepted.
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <section id="design-partners" className="border-b border-white/10">
+
+        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+
+          <div className="grid gap-16 lg:grid-cols-[0.7fr_1.3fr]">
+
+            <div>
+
+              <p className="text-xs uppercase tracking-[0.25em] text-white/35">07 / Design partners</p>
+
+            </div>
+
+            <div>
+
+              <h2 className="max-w-3xl text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
+
+                Help shape the payment layer for global teams.
+
+              </h2>
+
+              <p className="mt-6 max-w-2xl text-base leading-7 text-white/50">
+
+                TokenvaPay is being prepared for a small number of controlled
+
+                design-partner pilots. We are building with teams that want
+
+                programmable payroll, treasury, and payment infrastructure.
+
+              </p>
+
+              <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+
+                <Link href={accessHref} className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-medium text-black transition hover:bg-white/90">
+                {authenticated ? "Dashboard" : "Explore TokenvaPay"}
+              </Link>
+
+                <Link href="https\://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-3 text-sm font-medium text-white/75 transition hover:border-white/30 hover:text-white">
+
+                  Visit Tokenva
+
+                </Link>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <section>
+
+        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+
+          <div className="rounded-3xl border border-white/10 p-8 sm:p-12 lg:p-16">
+
+            <p className="text-xs uppercase tracking-[0.25em] text-white/35">
+
+              08 / Get started
+
+            </p>
+
+            <div className="mt-10 flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
+
+              <div>
+
+                <h2 className="max-w-3xl text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
+
+                  Programmable payment infrastructure for global teams.
+
+                </h2>
+
+                <p className="mt-6 max-w-2xl text-sm leading-6 text-white/45">
+
+                  Start with your TokenvaPay workspace and explore programmable
+
+                  payroll, treasury, payment streams, and settlement.
+
+                </p>
+
+              </div>
+
+              <Link
+              href={accessHref}
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-medium text-black transition hover:bg-white/90"
+            >
+              {accessLabel}
+            </Link>
+
+            </div>
+
+          </div>
+
+          <footer className="mt-20 border-t border-white/10 pt-12">
+
+            <div className="grid gap-12 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+
+              <div>
+
+                <Link href="/" className="text-lg font-semibold tracking-[-0.03em] text-white">TokenvaPay</Link>
+
+                <p className="mt-4 max-w-xs text-sm leading-6 text-white/40">
+
+                  Programmable payment infrastructure for global teams.
+
+                </p>
+
+                <p className="mt-6 text-xs leading-5 text-white/30">
+
+                  TokenvaPay is a product of{" "}
+
+                  <Link href="https\://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="text-white/50 transition hover:text-white">
+
+                    Tokenva
+
+                  </Link>.
+
+                </p>
+
+              </div>
+
+              <div>
+
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/35">Product</p>
+
+                <div className="mt-5 flex flex-col gap-3 text-sm text-white/45">
+
+                  <Link href="#product" className="transition hover:text-white">Product</Link>
+
+                  <Link href="#how-it-works" className="transition hover:text-white">How it works</Link>
+
+                  <Link href="#technology" className="transition hover:text-white">Technology</Link>
+
+                  <Link href="#security" className="transition hover:text-white">Security</Link>
+
+                </div>
+
+              </div>
+
+              <div>
+
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/35">Company</p>
+
+                <div className="mt-5 flex flex-col gap-3 text-sm text-white/45">
+
+                  <Link href="https\://tokenva-web.vercel.app" target="\_blank" rel="noreferrer" className="transition hover:text-white">Tokenva</Link>
+
+                  <Link href="#design-partners" className="transition hover:text-white">Design partners</Link>
+
+                  <Link href={accessHref} className="transition hover:text-white">{accessLabel}</Link>
+
+                </div>
+
+              </div>
+
+              <div>
+
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/35">Access</p>
+
+                <div className="mt-5 flex flex-col gap-3 text-sm text-white/45">
+
+                  <Link href={accessHref} className="transition hover:text-white">{accessLabel}</Link>
+
+                  <Link href="/app" className="transition hover:text-white">TokenvaPay workspace</Link>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs text-white/30 sm:flex-row sm:items-center sm:justify-between">
+
+              <span>© 2026 Tokenva. All rights reserved.</span>
+
+              <span>TokenvaPay — programmable payment infrastructure.</span>
+
+            </div>
+
+          </footer>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  );
+
 }

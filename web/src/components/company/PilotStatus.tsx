@@ -195,7 +195,7 @@ export default function PilotStatus({
               loading ||
               switchingWallet
             }
-            className="mt-6 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-6 w-full cursor-pointer rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading
               ? "Checking pilot status..."
@@ -209,7 +209,7 @@ export default function PilotStatus({
               loading ||
               switchingWallet
             }
-            className="mt-3 w-full rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 w-full cursor-pointer rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {switchingWallet
               ? "Switching wallet..."

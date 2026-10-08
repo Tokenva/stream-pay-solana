@@ -1,6 +1,6 @@
-# Tokenva Solana Project Structure
+# StreamPay Solana Project Structure
 
-This repository combines a Solana Anchor program, an EVM gateway, a TypeScript backend, and a Next.js frontend. The tree below is intentionally source-focused: it includes the project-relevant application and infrastructure files, while excluding generated dependency/build artifacts such as `node_modules`, `.next`, `target`, and cache output.
+This repository combines the Solana Anchor program, an EVM gateway, a TypeScript backend, and a Next.js frontend. The tree below reflects the current source layout in this workspace and intentionally excludes generated dependency/build artifacts such as `target/`, `node_modules/`, `.next/`, and cache output.
 
 ```text
 stream-pay-solana/
@@ -12,13 +12,13 @@ stream-pay-solana/
 ├── deployment.json
 ├── readme.md
 ├── rust-toolchain.toml
-├── app/                                  # workspace scaffold / empty wrapper
+├── app/                                  # workspace scaffold / placeholder
 ├── backend/
 │   ├── .env
 │   ├── .env.example
 │   ├── .gitignore
-│   ├── package-lock.json
 │   ├── package.json
+│   ├── package-lock.json
 │   ├── tsconfig.json
 │   └── src/
 │       ├── activityIndexer.ts
@@ -29,6 +29,8 @@ stream-pay-solana/
 │       ├── company.ts
 │       ├── crossChain.ts
 │       ├── db.ts
+│       ├── idl/
+│       │   └── stream_pay_solana.json
 │       ├── index.ts
 │       ├── indexer.ts
 │       ├── logger.ts
@@ -37,8 +39,8 @@ stream-pay-solana/
 ├── docs/
 │   ├── M12_REPRODUCIBLE_DEMO.md
 │   ├── P1_PRODUCT_DEFINITION.md
-│   ├── Tokenva_Product_Roadmap_M0-M12.md
 │   ├── TOKENVA_COMPLETE_PROJECT_CONTEXT.md
+│   ├── Tokenva_Product_Roadmap_M0-M12.md
 │   ├── doc.md
 │   ├── security/
 │   │   └── THREAT_MODEL.md
@@ -49,13 +51,12 @@ stream-pay-solana/
 │   ├── .gitignore
 │   ├── deployment.json
 │   ├── hardhat.config.ts
-│   ├── package-lock.json
 │   ├── package.json
 │   ├── remappings.txt
 │   ├── tsconfig.json
 │   ├── contracts/
-│   │   ├── TokenvaEvmGateway.sol
-│   │   ├── TokenvaM11Token.sol
+│   │   ├── StreamPayEvmGateway.sol
+│   │   ├── StreamPayM11Token.sol
 │   │   ├── interfaces/
 │   │   │   └── IWormhole.sol
 │   │   └── mocks/
@@ -77,30 +78,9 @@ stream-pay-solana/
 │   │   ├── publish-next-message.ts
 │   │   └── publish-top-up.ts
 │   ├── test/
-│   │   └── TokenvaEvmGateway.ts
+│   │   └── StreamPayEvmGateway.ts
 │   └── types/
 │       └── ethers-contracts/
-│           ├── TokenvaEvmGateway.ts
-│           ├── TokenvaM11Token.ts
-│           ├── common.ts
-│           ├── hardhat.d.ts
-│           ├── index.ts
-│           ├── factories/
-│           │   ├── TokenvaEvmGateway__factory.ts
-│           │   ├── TokenvaM11Token__factory.ts
-│           │   ├── index.ts
-│           │   ├── interfaces/
-│           │   │   ├── IWormhole__factory.ts
-│           │   │   └── index.ts
-│           │   └── mocks/
-│           │       ├── MockWormhole__factory.ts
-│           │       └── index.ts
-│           ├── interfaces/
-│           │   ├── IWormhole.ts
-│           │   └── index.ts
-│           └── mocks/
-│               ├── MockWormhole.ts
-│               └── index.ts
 ├── idls/
 │   └── wormhole_verify_vaa_shim.json
 ├── programs/
@@ -148,30 +128,33 @@ stream-pay-solana/
 │   ├── eslint.config.mjs
 │   ├── next-env.d.ts
 │   ├── next.config.ts
-│   ├── package-lock.json
 │   ├── package.json
 │   ├── postcss.config.mjs
 │   ├── tsconfig.json
 │   ├── public/
-│   │   ├── file.svg
-│   │   ├── globe.svg
-│   │   ├── next.svg
-│   │   ├── vercel.svg
-│   │   └── window.svg
 │   └── src/
 │       ├── app/
 │       │   ├── api/
 │       │   │   ├── backend/
-│       │   │   │   └── [...path]/route.ts
+│       │   │   │   └── [...path]/
+│       │   │   │       └── route.ts
+│       │   │   ├── config/
+│       │   │   │   └── route.ts
 │       │   │   └── ops/
 │       │   │       ├── applications/
 │       │   │       │   ├── route.ts
-│       │   │       │   └── [applicationId]/route.ts
+│       │   │       │   └── [applicationId]/
+│       │   │       │       └── route.ts
 │       │   │       ├── companies/
 │       │   │       │   └── [companyId]/
-│       │   │       │       └── pilot/route.ts
-│       │   │       ├── login/route.ts
-│       │   │       └── logout/route.ts
+│       │   │       │       └── pilot/
+│       │   │       │           └── route.ts
+│       │   │       ├── login/
+│       │   │       │   └── route.ts
+│       │   │       └── logout/
+│       │   │           └── route.ts
+│       │   ├── app/
+│       │   │   └── page.tsx
 │       │   ├── favicon.ico
 │       │   ├── globals.css
 │       │   ├── layout.tsx
@@ -221,8 +204,7 @@ stream-pay-solana/
 │           ├── backend.ts
 │           ├── company.ts
 │           ├── ops-server.ts
-│           ├── pdas.ts
-│           └── ...
+│           └── pdas.ts
 └── ...
 ```
 
@@ -232,7 +214,7 @@ stream-pay-solana/
 - `evm-gateway/`: Solidity smart contracts, deployment config, and Hardhat scripts.
 - `backend/`: TypeScript services for indexing, auth, company logic, and cross-chain processing.
 - `web/`: Next.js app with pages, API routes, dashboard components, hooks, IDL bindings, and wallet logic.
-- `docs/`: product, roadmap, threat-model, and project context documentation.
+- `docs/`: product, roadmap, security, and project context documentation.
 - `idls/`: Wormhole verification interface definitions used across stacks.
 
-This structure intentionally excludes generated output such as `target/`, `node_modules/`, `.next/`, build caches, and other transient artifacts, while keeping all source-relevant project files visible.
+This structure intentionally excludes generated output such as `target/`, `node_modules/`, `.next/`, build caches, and other transient artifacts, while keeping the current source-relevant project files visible.
