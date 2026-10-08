@@ -414,3 +414,43 @@ await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_pilot_applications_created
     ON pilot_applications (created_at DESC);
   `);
+
+
+// Tokenva employee invitations
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS employee_invitations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL
+      REFERENCES companies(id)
+      ON DELETE CASCADE,
+    employee_wallet TEXT NOT NULL,
+    code_hash TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (
+        status IN (
+          'pending',
+          'accepted',
+          'revoked'
+        )
+      ),
+    expires_at TIMESTAMPTZ NOT NULL,
+    accepted_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    created_by TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
+
+await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_employee_invitations_company
+  ON employee_invitations (company_id);
+
+  CREATE INDEX IF NOT EXISTS idx_employee_invitations_wallet
+  ON employee_invitations (employee_wallet);
+
+  CREATE INDEX IF NOT EXISTS idx_employee_invitations_status
+  ON employee_invitations (status);
+
+  CREATE INDEX IF NOT EXISTS idx_employee_invitations_expires
+  ON employee_invitations (expires_at);
+`);

@@ -10,7 +10,7 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import {
     getCompanyAccess,
-    getCompanies,
+    createEmployeeInvitation,
     type Company,
     type CompanyAccess,
 } from "@/lib/company";
@@ -111,8 +111,10 @@ function ProtectedHome({
 }) {
     const { publicKey } = useWallet();
 
-    const [mint, setMint] =
-        useState(EMPTY_MINT);
+    const [mint, setMint] = useState(EMPTY_MINT);
+
+    const [actionError, setActionError] =
+        useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -183,9 +185,6 @@ function ProtectedHome({
     const [message, setMessage] =
         useState<string | null>(null);
 
-    const [actionError, setActionError] =
-        useState<string | null>(null);
-
     const [mounted, setMounted] =
         useState(false);
 
@@ -194,6 +193,21 @@ function ProtectedHome({
 
     const [employeeWalletValid, setEmployeeWalletValid] =
         useState(false);
+
+    const [
+        invitationLoading,
+        setInvitationLoading,
+    ] = useState(false);
+
+    const [
+        invitationCode,
+        setInvitationCode,
+    ] = useState<string | null>(null);
+
+    const [
+        invitationPath,
+        setInvitationPath,
+    ] = useState<string | null>(null);
 
     const [payrollReport, setPayrollReport] =
         useState<{
@@ -321,7 +335,6 @@ function ProtectedHome({
     ]);
     const {
         organization,
-        organizationRoles,
         rolesExists,
         exists: organizationExists,
         createOrganization,
@@ -699,6 +712,51 @@ function ProtectedHome({
         }
     }
 
+    async function handleCreateEmployeeInvitation() {
+        try {
+            setMessage(null);
+            setActionError(null);
+            setInvitationLoading(true);
+
+            if (!selectedCompany) {
+                throw new Error(
+                    "Company access is required",
+                );
+            }
+
+            if (!employeeWalletValid) {
+                throw new Error(
+                    "Verify the employee wallet first",
+                );
+            }
+
+            const result =
+                await createEmployeeInvitation(
+                    selectedCompany.id,
+                    employeeAddress,
+                );
+
+            setInvitationCode(
+                result.code,
+            );
+
+            setInvitationPath(
+                result.path,
+            );
+
+            setMessage(
+                "Employee invitation created",
+            );
+        } catch (err) {
+            setActionError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to create employee invitation",
+            );
+        } finally {
+            setInvitationLoading(false);
+        }
+    }
     async function handleDeposit() {
         try {
             setMessage(null);
@@ -988,9 +1046,12 @@ function ProtectedHome({
     if (currentRole === "Employee") {
         return (
             <EmployeeWorkspace
+                companyId={selectedCompany.id}
                 companyName={selectedCompany.name}
                 currentRole={currentRole}
                 walletAddress={publicKey?.toBase58() ?? null}
+                companyOwnerAddress={selectedCompany.created_by}
+                mintAddress={mint}
             />
         );
     }
@@ -1313,6 +1374,18 @@ function ProtectedHome({
                         shortenAddress={
                             shortenAddress
                         }
+                        onInvite={
+                            handleCreateEmployeeInvitation
+                        }
+                        invitationLoading={
+                            invitationLoading
+                        }
+                        invitationCode={
+                            invitationCode
+                        }
+                        invitationPath={
+                            invitationPath
+                        }
                     />
                 </div>
 
@@ -1418,7 +1491,7 @@ export default function Home() {
     ] = useState<CompanyAccess | null>(null);
 
     const [
-        companies,
+        ,
         setCompanies,
     ] = useState<Company[]>([]);
 
@@ -1553,18 +1626,16 @@ export default function Home() {
 
         async function loadCompanyAccess() {
             try {
-                const [access, companiesData] =
-                    await Promise.all([
-                        getCompanyAccess(),
-                        getCompanies(),
-                    ]);
+                const access = await getCompanyAccess();
 
                 if (cancelled) {
                     return;
                 }
 
                 const availableCompanies =
-                    companiesData.companies;
+                    access.company
+                        ? [access.company]
+                        : [];
 
                 setCompanyAccess(access);
                 setCompanies(availableCompanies);

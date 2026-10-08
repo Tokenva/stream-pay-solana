@@ -139,3 +139,148 @@ export async function createCompany(
     company: Company;
   };
 }
+
+export type EmployeeInvitation = {
+  id: string;
+  company_id: string;
+  employee_wallet: string;
+  status:
+    | "pending"
+    | "accepted"
+    | "revoked";
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+export async function getEmployeeInvitations(
+  companyId: string,
+) {
+  const response = await fetch(
+    `/api/backend/api/company/invitations?companyId=${encodeURIComponent(
+      companyId,
+    )}`,
+    {
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ??
+        "Unable to load employee invitations",
+    );
+  }
+
+  return data as {
+    invitations: EmployeeInvitation[];
+  };
+}
+
+export async function createEmployeeInvitation(
+  companyId: string,
+  employeeWallet: string,
+) {
+  const response = await fetch(
+    "/api/backend/api/company/invitations",
+    {
+      method: "POST",
+      headers: {
+        "content-type":
+          "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        companyId,
+        employeeWallet,
+      }),
+    },
+  );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ??
+        "Unable to create employee invitation",
+    );
+  }
+
+  return data as {
+    invitation: EmployeeInvitation;
+    code: string;
+    path: string;
+  };
+}
+
+export async function revokeEmployeeInvitation(
+  companyId: string,
+  invitationId: string,
+) {
+  const response = await fetch(
+    `/api/backend/api/company/invitations/${encodeURIComponent(
+      invitationId,
+    )}?companyId=${encodeURIComponent(
+      companyId,
+    )}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    },
+  );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ??
+        "Unable to revoke invitation",
+    );
+  }
+
+  return data as {
+    success: boolean;
+  };
+}
+
+export async function acceptEmployeeInvitation(
+  code: string,
+) {
+  const response = await fetch(
+    "/api/backend/api/company/invitations/accept",
+    {
+      method: "POST",
+      headers: {
+        "content-type":
+          "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        code,
+      }),
+    },
+  );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ??
+        "Unable to accept invitation",
+    );
+  }
+
+  return data as {
+    success: boolean;
+    companyId: string;
+  };
+}

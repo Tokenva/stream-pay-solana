@@ -23,6 +23,13 @@ import {
 } from "./company.js";
 
 import {
+  createEmployeeInvitation,
+  listEmployeeInvitations,
+  revokeEmployeeInvitation,
+  acceptEmployeeInvitation,
+} from "./employeeInvitations.js";
+
+import {
   createAuthNonce,
   authenticateWallet,
   getSession,
@@ -4383,16 +4390,14 @@ app.get(
       const wallet =
         res.locals.wallet as string;
 
-      const company =
-        await getCompanyForWallet(wallet);
+      const access =
+        await getCompanyAccessForWallet(wallet);
 
-      return res.json({
-        company,
-      });
+      return res.json(access);
     } catch (error) {
       log(
         "error",
-        "company_fetch_failed",
+        "company_access_fetch_failed",
         {
           error:
             error instanceof Error
@@ -4402,7 +4407,7 @@ app.get(
       );
 
       return res.status(500).json({
-        error: "Failed to fetch company",
+        error: "Failed to fetch company access",
       });
     }
   },
@@ -4926,6 +4931,343 @@ app.patch(
 
       return res.status(400).json({
         error: message,
+      });
+    }
+  },
+);
+
+
+app.post(
+  "/api/company/invitations",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const {
+        companyId,
+        employeeWallet,
+      } = req.body ?? {};
+
+      if (
+        typeof companyId !== "string" ||
+        !companyId
+      ) {
+        return res.status(400).json({
+          error:
+            "companyId is required",
+        });
+      }
+
+      if (
+        typeof employeeWallet !==
+        "string" ||
+        !employeeWallet.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            "Employee wallet is required",
+        });
+      }
+
+      const result =
+        await createEmployeeInvitation({
+          companyId,
+          employeeWallet,
+          createdBy: wallet,
+        });
+
+      return res.status(201).json({
+        invitation:
+          result.invitation,
+        code: result.code,
+        path:
+          `/join/${encodeURIComponent(
+            result.code,
+          )}`,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create invitation",
+      });
+    }
+  },
+);
+
+app.delete(
+  "/api/company/invitations/:invitationId",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const companyId =
+        typeof req.query.companyId ===
+          "string"
+          ? req.query.companyId
+          : "";
+
+      if (!companyId) {
+        return res.status(400).json({
+          error:
+            "companyId is required",
+        });
+      }
+
+      await revokeEmployeeInvitation(
+        wallet,
+        companyId,
+        Array.isArray(req.params.invitationId)
+          ? req.params.invitationId[0]
+          : req.params.invitationId,
+      );
+
+      return res.json({
+        success: true,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to revoke invitation",
+      });
+    }
+  },
+);
+
+app.post(
+  "/api/company/invitations/accept",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const { code } =
+        req.body ?? {};
+
+      if (
+        typeof code !== "string" ||
+        !code.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            "Invitation code is required",
+        });
+      }
+
+      const result =
+        await acceptEmployeeInvitation(
+          code,
+          wallet,
+        );
+
+      return res.json({
+        success: true,
+        companyId:
+          result.companyId,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to accept invitation",
+      });
+    }
+  },
+);
+
+
+app.get(
+  "/api/company/invitations",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const companyId =
+        typeof req.query.companyId ===
+          "string"
+          ? req.query.companyId
+          : "";
+
+      if (!companyId) {
+        return res.status(400).json({
+          error:
+            "companyId is required",
+        });
+      }
+
+      const invitations =
+        await listEmployeeInvitations(
+          wallet,
+          companyId,
+        );
+
+      return res.json({
+        invitations,
+      });
+    } catch (error) {
+      return res.status(403).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch invitations",
+      });
+    }
+  },
+);
+
+app.post(
+  "/api/company/invitations",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const {
+        companyId,
+        employeeWallet,
+      } = req.body ?? {};
+
+      if (
+        typeof companyId !== "string" ||
+        !companyId
+      ) {
+        return res.status(400).json({
+          error:
+            "companyId is required",
+        });
+      }
+
+      if (
+        typeof employeeWallet !==
+        "string" ||
+        !employeeWallet.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            "Employee wallet is required",
+        });
+      }
+
+      const result =
+        await createEmployeeInvitation({
+          companyId,
+          employeeWallet,
+          createdBy: wallet,
+        });
+
+      return res.status(201).json({
+        invitation:
+          result.invitation,
+        code: result.code,
+        path:
+          `/join/${encodeURIComponent(
+            result.code,
+          )}`,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create employee invitation",
+      });
+    }
+  },
+);
+
+app.delete(
+  "/api/company/invitations/:invitationId",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const companyId =
+        typeof req.query.companyId ===
+          "string"
+          ? req.query.companyId
+          : "";
+
+      if (!companyId) {
+        return res.status(400).json({
+          error:
+            "companyId is required",
+        });
+      }
+
+      await revokeEmployeeInvitation(
+        wallet,
+        companyId,
+        Array.isArray(req.params.invitationId)
+          ? req.params.invitationId[0]
+          : req.params.invitationId,
+      );
+
+      return res.json({
+        success: true,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to revoke invitation",
+      });
+    }
+  },
+);
+
+app.post(
+  "/api/company/invitations/accept",
+  requireCustomerSession,
+  async (req, res) => {
+    try {
+      const wallet =
+        res.locals.wallet as string;
+
+      const { code } =
+        req.body ?? {};
+
+      if (
+        typeof code !== "string" ||
+        !code.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            "Invitation code is required",
+        });
+      }
+
+      const result =
+        await acceptEmployeeInvitation(
+          code,
+          wallet,
+        );
+
+      return res.json({
+        success: true,
+        companyId:
+          result.companyId,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to accept invitation",
       });
     }
   },

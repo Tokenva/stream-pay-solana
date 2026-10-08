@@ -14,6 +14,11 @@ type EmployeeDirectoryProps = {
   employeeDirectory: Employee[];
   onVerify: () => void;
   onSelect: (address: string) => void;
+  onInvite: () => void;
+  invitationLoading: boolean;
+  invitationCode: string | null;
+  invitationPath: string | null;
+  onRevokeInvitation?: () => void;
   shortenAddress: (address: string) => string;
 };
 
@@ -24,6 +29,10 @@ export default function EmployeeDirectory({
   employeeDirectory,
   onVerify,
   onSelect,
+  onInvite,
+  invitationLoading,
+  invitationCode,
+  invitationPath,
 }: EmployeeDirectoryProps) {
   return (
     <>
@@ -79,23 +88,34 @@ export default function EmployeeDirectory({
             >
               Verify Wallet
             </button>
+            <button
+              type="button"
+              disabled={
+                !employeeWalletValid ||
+                invitationLoading
+              }
+              onClick={onInvite}
+              className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {invitationLoading
+                ? "Generating..."
+                : "Generate Invitation"}
+            </button>
           </div>
 
           <div className="mt-4 flex items-center gap-2">
             <span
-              className={`h-2 w-2 rounded-full ${
-                employeeWalletValid
-                  ? "bg-green-400"
-                  : "bg-zinc-700"
-              }`}
+              className={`h-2 w-2 rounded-full ${employeeWalletValid
+                ? "bg-green-400"
+                : "bg-zinc-700"
+                }`}
             />
 
             <p
-              className={`text-sm ${
-                employeeWalletValid
-                  ? "text-green-400"
-                  : "text-zinc-500"
-              }`}
+              className={`text-sm ${employeeWalletValid
+                ? "text-green-400"
+                : "text-zinc-500"
+                }`}
             >
               {employeeWalletValid
                 ? "Wallet address validated"
@@ -180,6 +200,30 @@ export default function EmployeeDirectory({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {invitationCode && invitationPath && (
+          <div className="mt-5 rounded-xl border border-green-400/20 bg-green-400/5 p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-green-400">
+              Invitation created
+            </p>
+
+            <p className="mt-3 text-sm text-zinc-400">
+              Share this one-time invitation with the employee.
+            </p>
+
+            <div className="mt-4 rounded-lg border border-zinc-800 bg-black p-3">
+              <p className="break-all text-sm font-medium text-white">
+                {typeof window !== "undefined"
+                  ? `${window.location.origin}${invitationPath}`
+                  : invitationPath}
+              </p>
+            </div>
+
+            <p className="mt-3 text-xs text-zinc-600">
+              Invitation code: {invitationCode}
+            </p>
           </div>
         )}
       </section>

@@ -300,21 +300,45 @@ export default function OpsPage() {
             return;
         }
 
-        const start =
-            new Date(pilotStart).toISOString();
+if (!pilotStart || !pilotEnd) {
+    setError(
+        "Pilot start and end are required.",
+    );
+    return;
+}
 
-        const end =
-            new Date(pilotEnd).toISOString();
+const startDate =
+    new Date(pilotStart);
 
-        if (
-            new Date(end) <=
-            new Date(start)
-        ) {
-            setError(
-                "Pilot end must be after pilot start.",
-            );
-            return;
-        }
+const endDate =
+    new Date(pilotEnd);
+
+if (
+    Number.isNaN(
+        startDate.getTime(),
+    ) ||
+    Number.isNaN(
+        endDate.getTime(),
+    )
+) {
+    setError(
+        "Please enter valid pilot start and end dates.",
+    );
+    return;
+}
+
+if (endDate <= startDate) {
+    setError(
+        "Pilot end must be after pilot start.",
+    );
+    return;
+}
+
+const start =
+    startDate.toISOString();
+
+const end =
+    endDate.toISOString();
 
         setActionLoading(true);
         setError("");
@@ -371,10 +395,57 @@ export default function OpsPage() {
 
     if (authenticated === null) {
         return (
-            <main className="min-h-screen bg-black text-white flex items-center justify-center">
-                <p className="text-zinc-500">
-                    Loading Tokenva Ops...
-                </p>
+            <main className="min-h-screen bg-black text-white">
+                <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-8 lg:px-10">
+
+                    <header className="flex items-center justify-between border-b border-white/10 pb-6">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">
+                                TOKENVA
+                            </p>
+
+                            <p className="mt-2 text-sm font-medium text-white/70">
+                                Operations
+                            </p>
+                        </div>
+
+                        <div className="h-9 w-24 animate-pulse rounded-xl border border-white/10 bg-white/[0.03]" />
+                    </header>
+
+                    <div className="flex flex-1 items-center justify-center py-20">
+                        <section className="w-full max-w-3xl">
+
+                            <div className="mb-8">
+                                <div className="h-3 w-24 animate-pulse rounded bg-white/10" />
+
+                                <div className="mt-4 h-10 w-72 animate-pulse rounded-lg bg-white/10" />
+
+                                <div className="mt-3 h-4 w-full max-w-xl animate-pulse rounded bg-white/5" />
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <div className="h-28 animate-pulse rounded-2xl border border-white/10 bg-white/[0.025]" />
+                                <div className="h-28 animate-pulse rounded-2xl border border-white/10 bg-white/[0.025]" />
+                                <div className="h-28 animate-pulse rounded-2xl border border-white/10 bg-white/[0.025]" />
+                            </div>
+
+                            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+                                <div className="flex items-center gap-3">
+                                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white/50" />
+
+                                    <p className="text-sm text-white/50">
+                                        Loading Tokenva Ops
+                                    </p>
+                                </div>
+
+                                <div className="mt-5 h-3 w-full animate-pulse rounded bg-white/5" />
+                                <div className="mt-3 h-3 w-4/5 animate-pulse rounded bg-white/5" />
+                                <div className="mt-3 h-3 w-3/5 animate-pulse rounded bg-white/5" />
+                            </div>
+
+                        </section>
+                    </div>
+                </div>
             </main>
         );
     }

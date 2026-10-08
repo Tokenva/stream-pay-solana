@@ -1,11 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 import {
   getApplication,
   type PilotApplication,
 } from "@/lib/application";
+
+import { logout } from "@/lib/auth";
+
 
 type Props = {
   application: PilotApplication;
@@ -18,8 +24,19 @@ export default function ApplicationStatus({
   application,
   onRefresh,
 }: Props) {
+  const router = useRouter();
+
+  const {
+    disconnect,
+  } = useWallet();
+
   const [loading, setLoading] =
     useState(false);
+
+  const [
+    switchingWallet,
+    setSwitchingWallet,
+  ] = useState(false);
 
   const [error, setError] =
     useState("");
@@ -51,6 +68,43 @@ export default function ApplicationStatus({
 
   const isApproved =
     application.status === "approved";
+
+  async function refresh() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const result =
+        await getApplication();
+
+      if (result.application) {
+        onRefresh(result.application);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to refresh application status.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function switchWallet() {
+  setSwitchingWallet(true);
+  setError("");
+
+  try {
+    await logout();
+  } finally {
+    try {
+      await disconnect();
+    } finally {
+      router.replace("/login");
+    }
+  }
+}
 
   return (
     <main className="min-h-screen bg-black px-5 py-10 text-white sm:px-6 sm:py-16">
@@ -139,13 +193,37 @@ export default function ApplicationStatus({
           <button
             type="button"
             onClick={refresh}
-            disabled={loading}
+            disabled={
+              loading ||
+              switchingWallet
+            }
             className="mt-6 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading
               ? "Checking status..."
               : "Check application status"}
           </button>
+
+          <button
+            type="button"
+            onClick={switchWallet}
+            disabled={
+              loading ||
+              switchingWallet
+            }
+            className="mt-3 w-full cursor-pointer rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm font-medium text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {switchingWallet
+              ? "Switching wallet..."
+              : "Use another wallet"}
+          </button>
+
+          <Link
+            href="/"
+            className="mt-3 block w-full rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-center text-sm font-medium text-white/60 transition hover:bg-white/10 hover:text-white"
+          >
+            Back to Tokenva home
+          </Link>
 
           <p className="mt-4 text-center text-xs text-white/25">
             Application ID: {application.id}

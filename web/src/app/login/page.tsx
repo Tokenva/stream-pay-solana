@@ -173,7 +173,7 @@ export default function LoginPage() {
                       <button
                         type="button"
                         disabled
-                        className="h-12 w-full rounded-xl border border-white/10 bg-white/[0.06] text-sm font-medium text-white/35"
+                        className="h-12 cursor-pointer w-full rounded-xl border border-white/10 bg-white/[0.06] text-sm font-medium text-white/35"
                       >
                         Select wallet
                       </button>
@@ -186,7 +186,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={authenticate}
                     disabled={loading}
-                    className="group flex h-12 w-full items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.06] px-4 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="group flex cursor-pointer h-12 w-full items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.06] px-4 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <span>
                       {loading
