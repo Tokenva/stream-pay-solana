@@ -15,8 +15,8 @@ export type IndexedStream = {
   updated_at: string;
 };
 
-const API_BASE_URL =
-  process.env.BACKEND_URL ?? "http://localhost:4000";
+// const API_BASE_URL =
+//   process.env.BACKEND_URL ?? "http://localhost:4000";
 
 export async function fetchIndexedStreams(
   params?: {
@@ -50,13 +50,13 @@ export async function fetchIndexedStreams(
 
   const query = searchParams.toString();
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/indexed/streams${query ? `?${query}` : ""
-    }`,
-    {
-      cache: "no-store",
-    },
-  );
+const response = await fetch(
+  `/api/backend/api/indexed/streams${query ? `?${query}` : ""}`,
+  {
+    credentials: "include",
+    cache: "no-store",
+  },
+);
 
   if (!response.ok) {
     throw new Error(

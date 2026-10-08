@@ -177,7 +177,7 @@ export default function EmployeeJoinPage() {
                                         disabled={
                                             loading
                                         }
-                                        className="mt-5 w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="mt-5 cursor-pointer w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         {loading
                                             ? "Verifying invitation..."

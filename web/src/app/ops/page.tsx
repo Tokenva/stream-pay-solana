@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
     useCallback,
     useEffect,
@@ -84,24 +85,6 @@ export default function OpsPage() {
                 ) ?? null,
             [applications, selectedId],
         );
-
-    async function checkSession() {
-        try {
-            const response = await fetch(
-                "/api/ops/applications",
-                {
-                    credentials: "include",
-                    cache: "no-store",
-                },
-            );
-
-            setAuthenticated(
-                response.status !== 401,
-            );
-        } catch {
-            setAuthenticated(false);
-        }
-    }
 
     async function login() {
         setLoading(true);
@@ -300,45 +283,45 @@ export default function OpsPage() {
             return;
         }
 
-if (!pilotStart || !pilotEnd) {
-    setError(
-        "Pilot start and end are required.",
-    );
-    return;
-}
+        if (!pilotStart || !pilotEnd) {
+            setError(
+                "Pilot start and end are required.",
+            );
+            return;
+        }
 
-const startDate =
-    new Date(pilotStart);
+        const startDate =
+            new Date(pilotStart);
 
-const endDate =
-    new Date(pilotEnd);
+        const endDate =
+            new Date(pilotEnd);
 
-if (
-    Number.isNaN(
-        startDate.getTime(),
-    ) ||
-    Number.isNaN(
-        endDate.getTime(),
-    )
-) {
-    setError(
-        "Please enter valid pilot start and end dates.",
-    );
-    return;
-}
+        if (
+            Number.isNaN(
+                startDate.getTime(),
+            ) ||
+            Number.isNaN(
+                endDate.getTime(),
+            )
+        ) {
+            setError(
+                "Please enter valid pilot start and end dates.",
+            );
+            return;
+        }
 
-if (endDate <= startDate) {
-    setError(
-        "Pilot end must be after pilot start.",
-    );
-    return;
-}
+        if (endDate <= startDate) {
+            setError(
+                "Pilot end must be after pilot start.",
+            );
+            return;
+        }
 
-const start =
-    startDate.toISOString();
+        const start =
+            startDate.toISOString();
 
-const end =
-    endDate.toISOString();
+        const end =
+            endDate.toISOString();
 
         setActionLoading(true);
         setError("");
@@ -384,7 +367,7 @@ const end =
     }
 
     useEffect(() => {
-        void checkSession();
+        setAuthenticated(false);
     }, []);
 
     useEffect(() => {
@@ -452,66 +435,73 @@ const end =
 
     if (!authenticated) {
         return (
-            <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
-                <section className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-7">
-                    <div className="mb-8">
-                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                            Tokenva
-                        </p>
+                <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
+                    <section className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-7">
+                        <div className="mb-8">
+                            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+                                TokenvaPay
+                            </p>
 
-                        <h1 className="mt-2 text-3xl font-semibold">
-                            Operator access
-                        </h1>
+                            <h1 className="mt-2 text-3xl font-semibold">
+                                Operator access
+                            </h1>
 
-                        <p className="mt-3 text-sm leading-6 text-zinc-500">
-                            Review design partner applications
-                            and manage pilot access.
-                        </p>
-                    </div>
-
-                    <label className="block text-sm text-zinc-400">
-                        Operator key
-                    </label>
-
-                    <input
-                        type="password"
-                        value={operatorKey}
-                        onChange={(event) =>
-                            setOperatorKey(
-                                event.target.value,
-                            )
-                        }
-                        onKeyDown={(event) => {
-                            if (
-                                event.key === "Enter"
-                            ) {
-                                void login();
-                            }
-                        }}
-                        className="mt-2 w-full rounded-xl border border-zinc-800 bg-black px-4 py-3 text-sm outline-none focus:border-zinc-500"
-                        placeholder="Enter operator key"
-                    />
-
-                    {error && (
-                        <div className="mt-4 rounded-xl border border-red-900/50 bg-red-950/20 px-4 py-3 text-sm text-red-300">
-                            {error}
+                            <p className="mt-3 text-sm leading-6 text-zinc-500">
+                                Review design partner applications and manage pilot access.
+                            </p>
                         </div>
-                    )}
 
-                    <button
-                        onClick={() => void login()}
-                        disabled={
-                            loading ||
-                            !operatorKey
-                        }
-                        className="mt-5 cursor-pointer w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm font-medium hover:bg-zinc-800 disabled:opacity-40"
-                    >
-                        {loading
-                            ? "Signing in..."
-                            : "Enter Tokenva Ops"}
-                    </button>
-                </section>
-            </main>
+                        <label className="block text-sm text-zinc-400">
+                            Operator key
+                        </label>
+
+                        <input
+                            type="password"
+                            value={operatorKey}
+                            onChange={(event) =>
+                                setOperatorKey(
+                                    event.target.value,
+                                )
+                            }
+                            onKeyDown={(event) => {
+                                if (
+                                    event.key === "Enter"
+                                ) {
+                                    void login();
+                                }
+                            }}
+                            className="mt-2 w-full rounded-xl border border-zinc-800 bg-black px-4 py-3 text-sm outline-none focus:border-zinc-500"
+                            placeholder="Enter operator key"
+                        />
+
+                        {error && (
+                            <div className="mt-4 rounded-xl border border-red-900/50 bg-red-950/20 px-4 py-3 text-sm text-red-300">
+                                {error}
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => void login()}
+                            disabled={
+                                loading ||
+                                !operatorKey
+                            }
+                            className="mt-5 cursor-pointer w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm font-medium hover:bg-zinc-800 disabled:opacity-40"
+                        >
+                            {loading
+                                ? "Signing in..."
+                                : "Enter Tokenva Ops"}
+                        </button>
+                        <div className="mt-6 flex items-center justify-between">
+    <Link
+        href="/"
+        className="text-sm text-zinc-500 transition hover:text-white"
+    >
+        ← Back to Tokenva
+    </Link>
+</div>
+                    </section>
+                </main>
         );
     }
 

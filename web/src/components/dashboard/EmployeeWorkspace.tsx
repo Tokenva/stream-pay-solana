@@ -13,6 +13,10 @@ import {
 import {
   useIndexedStreams,
 } from "@/hooks/useIndexedStreams";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { logout } from "@/lib/auth";
 
 type EmployeeWorkspaceProps = {
   companyId: string;
@@ -52,6 +56,8 @@ export default function EmployeeWorkspace({
   companyOwnerAddress,
   mintAddress,
 }: EmployeeWorkspaceProps) {
+  const router = useRouter();
+  const { disconnect } = useWallet();
   const [selectedStreamId, setSelectedStreamId] =
     useState(0);
 
@@ -77,19 +83,23 @@ export default function EmployeeWorkspace({
         ) === selectedStreamId,
     ) ?? null;
 
-  const {
-    // stream,
-    data: streamData,
-    claimable,
-    loading: streamLoading,
-    error: streamError,
-    claim,
-  } = useStream(
-    mintAddress,
-    selectedStreamId,
-    employeeAddress,
-    companyOwnerAddress,
-  );
+const {
+  data: streamData,
+  claimable,
+  loading: streamLoading,
+  error: streamError,
+  claim,
+} = useStream(
+  mintAddress,
+  selectedStream
+    ? Number.parseInt(
+        selectedStream.stream_id,
+        10,
+      )
+    : null,
+  employeeAddress,
+  companyOwnerAddress,
+);
 
   useEffect(() => {
     if (streams.length === 0) {
@@ -149,6 +159,18 @@ export default function EmployeeWorkspace({
       // useStream exposes the claim error.
     }
   }
+
+  async function handleLogout() {
+    try {
+      await logout();
+    } finally {
+      try {
+        await disconnect();
+      } finally {
+        router.replace("/login");
+      }
+    }
+  }
   return (
     <main className="dashboard-shell">
       <div className="dashboard-container">
@@ -163,17 +185,31 @@ export default function EmployeeWorkspace({
             </h1>
 
             <p className="dashboard-subtitle">
-              Your payroll, earnings, claims, and payment history in one
-              secure workspace.
+              Your payroll, earnings, claims, and payment history in one secure workspace.
             </p>
           </div>
 
-          <div className="dashboard-wallet">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <span className="text-xs text-zinc-500">
               {walletAddress
                 ? shortenAddress(walletAddress)
                 : "Wallet"}
             </span>
+
+            <Link
+              href="/"
+              className="rounded-xl border border-zinc-800 px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
+            >
+              Home
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="cursor-pointer rounded-xl border border-zinc-800 px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
+            >
+              Sign out
+            </button>
           </div>
         </header>
 

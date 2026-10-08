@@ -4,7 +4,7 @@ import "./globals.css";
 import { SolanaProvider } from "@/components/providers/SolanaProvider";
 
 export const metadata: Metadata = {
-  title: "Tokenva",
+  title: "TokenvaPay",
   description: "Trustless Cross-Chain Asset Streaming & Payroll Protocol",
 };
 

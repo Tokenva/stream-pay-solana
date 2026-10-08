@@ -109,7 +109,7 @@ function calculateClaimable(
 
 export function useStream(
   mintAddress: string,
-  streamId: number,
+  streamId: number | null,
   employeeAddress: string,
   companyOwnerAddress = "",
 ) {
@@ -138,7 +138,9 @@ export function useStream(
     async () => {
       if (
         !wallet ||
-        !mintAddress.trim()
+        !mintAddress.trim() ||
+        streamId === null ||
+        !employeeAddress.trim()
       ) {
         setStream(null);
         setStreamEscrow(null);

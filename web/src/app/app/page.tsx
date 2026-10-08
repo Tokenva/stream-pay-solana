@@ -11,6 +11,7 @@ import { PublicKey } from "@solana/web3.js";
 import {
     getCompanyAccess,
     createEmployeeInvitation,
+    acceptEmployeeInvitation,
     type Company,
     type CompanyAccess,
 } from "@/lib/company";
@@ -1505,6 +1506,26 @@ export default function Home() {
         setCompanyChecked,
     ] = useState(false);
 
+    const [
+        selectedRole,
+        setSelectedRole,
+    ] = useState<"owner" | "employee" | null>(null);
+
+    const [
+        invitationCode,
+        setInvitationCode,
+    ] = useState("");
+
+    const [
+        invitationLoading,
+        setInvitationLoading,
+    ] = useState(false);
+
+    const [
+        invitationError,
+        setInvitationError,
+    ] = useState("");
+
     useEffect(() => {
         let cancelled = false;
 
@@ -1683,6 +1704,47 @@ export default function Home() {
         !authenticated ||
         !companyChecked
     ) {
+        async function handleEmployeeJoin() {
+            const code = invitationCode.trim();
+
+            if (!code) {
+                setInvitationError(
+                    "Enter your employee invitation code.",
+                );
+                return;
+            }
+
+            setInvitationLoading(true);
+            setInvitationError("");
+
+            try {
+                await acceptEmployeeInvitation(code);
+
+                const access = await getCompanyAccess();
+
+                setCompanyAccess(access);
+
+                const company = access.company
+                    ? [access.company]
+                    : [];
+
+                setSelectedCompany(
+                    company[0] ?? null,
+                );
+
+                setCompanies(company);
+                setSelectedRole(null);
+                setInvitationCode("");
+            } catch (err) {
+                setInvitationError(
+                    err instanceof Error
+                        ? err.message
+                        : "Unable to join the company.",
+                );
+            } finally {
+                setInvitationLoading(false);
+            }
+        }
         return (
             <main className="relative flex min-h-screen overflow-hidden bg-black text-white">
                 {/* Ambient background */}
@@ -1749,6 +1811,162 @@ export default function Home() {
 
     if (!companyAccess?.company) {
         if (!companyAccess?.application) {
+            if (selectedRole === null) {
+                return (
+                    <main className="min-h-screen bg-black text-white">
+                        <header className="mx-auto flex h-20 w-full max-w-5xl items-center px-5 sm:px-8">
+                            <Link
+                                href="/"
+                                className="text-sm font-semibold tracking-[-0.02em] text-white/80 transition hover:text-white"
+                            >
+                                TokenvaPay
+                            </Link>
+                        </header>
+                        <div className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-5 py-16 sm:px-8">
+                            <section className="w-full">
+                                <div className="mx-auto max-w-2xl text-center">
+                                    <p className="text-xs font-medium uppercase tracking-[0.28em] text-white/35">
+                                        TokenvaPay
+                                    </p>
+
+                                    <h1 className="mt-5 text-4xl font-medium tracking-[-0.04em] sm:text-5xl">
+                                        How will you use TokenvaPay?
+                                    </h1>
+
+                                    <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/45">
+                                        Choose your role to continue to the right
+                                        TokenvaPay workspace.
+                                    </p>
+                                </div>
+
+                                <div className="mx-auto mt-10 grid max-w-3xl gap-5 sm:grid-cols-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedRole("owner")}
+                                        className="group cursor-pointer rounded-3xl border border-white/[0.1] bg-white/[0.035] p-7 text-left transition hover:border-white/25 hover:bg-white/[0.06]"
+                                    >
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-lg">
+                                            →
+                                        </div>
+
+                                        <h2 className="mt-6 text-xl font-medium">
+                                            Company Owner
+                                        </h2>
+
+                                        <p className="mt-3 text-sm leading-6 text-white/45">
+                                            Set up your company, manage employees,
+                                            fund your treasury, and create payroll.
+                                        </p>
+
+                                        <p className="mt-7 text-sm font-medium text-white">
+                                            Continue as owner
+                                            <span className="ml-2 text-white/35 transition group-hover:translate-x-1">
+                                                →
+                                            </span>
+                                        </p>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedRole("employee");
+                                            setInvitationError("");
+                                        }}
+                                        className="group rounded-3xl cursor-pointer border border-white/[0.1] bg-white/[0.035] p-7 text-left transition hover:border-white/25 hover:bg-white/[0.06]"
+                                    >
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-lg">
+                                            →
+                                        </div>
+
+                                        <h2 className="mt-6 text-xl font-medium">
+                                            Employee
+                                        </h2>
+
+                                        <p className="mt-3 text-sm leading-6 text-white/45">
+                                            Join your company using the invitation
+                                            code provided by your employer.
+                                        </p>
+
+                                        <p className="mt-7 text-sm font-medium text-white">
+                                            Continue as employee
+                                            <span className="ml-2 text-white/35 transition group-hover:translate-x-1">
+                                                →
+                                            </span>
+                                        </p>
+                                    </button>
+                                </div>
+                            </section>
+                        </div>
+                    </main>
+                );
+            }
+
+            if (selectedRole === "employee") {
+                return (
+                    <main className="min-h-screen bg-black text-white">
+                        <div className="mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-5 py-16 sm:px-8">
+                            <section className="w-full max-w-md">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedRole(null);
+                                        setInvitationError("");
+                                    }}
+                                    className="mb-8 text-sm text-white/40 transition hover:text-white"
+                                >
+                                    ← Back
+                                </button>
+
+                                <div className="rounded-3xl border border-white/[0.1] bg-white/[0.035] p-7 shadow-2xl shadow-black/40 sm:p-9">
+                                    <p className="text-xs font-medium uppercase tracking-[0.28em] text-white/35">
+                                        Employee
+                                    </p>
+
+                                    <h1 className="mt-4 text-3xl font-medium tracking-[-0.04em]">
+                                        Join your company
+                                    </h1>
+
+                                    <p className="mt-3 text-sm leading-6 text-white/45">
+                                        Enter the invitation code your employer
+                                        gave you.
+                                    </p>
+
+                                    <input
+                                        value={invitationCode}
+                                        onChange={(event) =>
+                                            setInvitationCode(
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="TV-..."
+                                        className="mt-7 h-12 w-full rounded-xl border border-white/[0.1] bg-black/30 px-4 text-sm text-white outline-none placeholder:text-white/25 focus:border-white/25"
+                                    />
+
+                                    {invitationError && (
+                                        <div className="mt-4 rounded-xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3">
+                                            <p className="text-sm text-red-300">
+                                                {invitationError}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={handleEmployeeJoin}
+                                        disabled={invitationLoading}
+                                        className="mt-5 h-12 w-full rounded-xl bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        {invitationLoading
+                                            ? "Joining..."
+                                            : "Join company"}
+                                    </button>
+                                </div>
+                            </section>
+                        </div>
+                    </main>
+                );
+            }
+
             return (
                 <CompanyOnboarding
                     onSubmitted={(application) => {
