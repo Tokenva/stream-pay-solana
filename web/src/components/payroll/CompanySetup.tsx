@@ -3,6 +3,7 @@
 type CompanySetupProps = {
   organizationExists: boolean;
   vaultExists: boolean;
+  rolesExists: boolean;
   onboardingLoading: boolean;
   publicKey: string | null;
   mint: string;
@@ -22,6 +23,7 @@ type CompanySetupProps = {
 export default function CompanySetup({
   organizationExists,
   vaultExists,
+  rolesExists,
   onboardingLoading,
   publicKey,
   mint,
@@ -38,7 +40,7 @@ export default function CompanySetup({
   shortenAddress,
 }: CompanySetupProps) {
   const setupComplete =
-    organizationExists && vaultExists;
+    organizationExists && vaultExists && rolesExists;
 
   return (
     <>

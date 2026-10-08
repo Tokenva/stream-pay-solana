@@ -304,6 +304,7 @@ function ProtectedHome() {
         rolesExists,
         exists: organizationExists,
         createOrganization,
+        initializeOrganizationRoles,
     } = useOrganization();
 
     const {
@@ -611,6 +612,15 @@ function ProtectedHome() {
 
             if (!vaultExists) {
                 await createVault();
+            }
+
+            if (!rolesExists) {
+                await initializeOrganizationRoles(
+                    publicKey,
+                    publicKey,
+                    publicKey,
+                    publicKey,
+                );
             }
 
             await refreshVault();
@@ -1041,6 +1051,9 @@ function ProtectedHome() {
                         }
                         vaultExists={
                             vaultExists
+                        }
+                        rolesExists={
+                            rolesExists
                         }
                         onboardingLoading={
                             onboardingLoading
