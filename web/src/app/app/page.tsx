@@ -971,10 +971,15 @@ function ProtectedHome({
         currentRole === "Admin" ||
         currentRole === "Finance";
 
-    const canManageStreams =
+    const canTopUpStream =
         currentRole === "Owner" ||
         currentRole === "Admin" ||
         currentRole === "Finance" ||
+        currentRole === "Approver";
+
+    const canCancelStream =
+        currentRole === "Owner" ||
+        currentRole === "Admin" ||
         currentRole === "Approver";
 
     const canClaimPayroll =
@@ -1072,27 +1077,17 @@ function ProtectedHome({
                         Payroll Operations
                     </p>
                     <CompanySetup
-                        organizationExists={
-                            organizationExists
-                        }
-                        vaultExists={
-                            vaultExists
-                        }
-                        rolesExists={
-                            rolesExists
-                        }
-                        onboardingLoading={
-                            onboardingLoading
-                        }
+                        organizationExists={organizationExists}
+                        vaultExists={vaultExists}
+                        rolesExists={rolesExists}
+                        onboardingLoading={onboardingLoading}
                         publicKey={
                             publicKey
                                 ? publicKey.toBase58()
                                 : null
                         }
                         mint={mint}
-                        currentRole={
-                            currentRole
-                        }
+                        currentRole={currentRole}
                         canCreatePayroll={
                             canCreatePayroll
                         }
@@ -1100,7 +1095,13 @@ function ProtectedHome({
                             canManageTreasury
                         }
                         canManageStreams={
-                            canManageStreams
+                            canTopUpStream || canCancelStream
+                        }
+                        canTopUpStream={
+                            canTopUpStream
+                        }
+                        canCancelStream={
+                            canCancelStream
                         }
                         canClaimPayroll={
                             canClaimPayroll
@@ -1221,8 +1222,11 @@ function ProtectedHome({
                         actionErrorStream={
                             actionErrorStream
                         }
-                        canManageStreams={
-                            canManageStreams
+                        canTopUpStream={
+                            canTopUpStream
+                        }
+                        canCancelStream={
+                            canCancelStream
                         }
                         currentRole={
                             currentRole

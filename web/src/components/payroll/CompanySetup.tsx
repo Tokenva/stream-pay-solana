@@ -7,10 +7,12 @@ type CompanySetupProps = {
   onboardingLoading: boolean;
   publicKey: string | null;
   mint: string;
-  currentRole: string;
   canCreatePayroll: boolean;
   canManageTreasury: boolean;
   canManageStreams: boolean;
+  canTopUpStream: boolean;
+  canCancelStream: boolean;
+  currentRole: string;
   canClaimPayroll: boolean;
   organizationAddress: string | null;
   vaultAddress: string | null;
@@ -97,11 +99,10 @@ export default function CompanySetup({
               </p>
 
               <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                  organizationExists
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${organizationExists
                     ? "bg-green-500/10 text-green-400"
                     : "bg-yellow-500/10 text-yellow-400"
-                }`}
+                  }`}
               >
                 {organizationExists
                   ? "Ready"
@@ -123,11 +124,10 @@ export default function CompanySetup({
               </p>
 
               <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                  vaultExists
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${vaultExists
                     ? "bg-green-500/10 text-green-400"
                     : "bg-yellow-500/10 text-yellow-400"
-                }`}
+                  }`}
               >
                 {vaultExists
                   ? "Ready"
@@ -190,20 +190,18 @@ export default function CompanySetup({
                 </p>
 
                 <span
-                  className={`h-2 w-2 rounded-full ${
-                    allowed
+                  className={`h-2 w-2 rounded-full ${allowed
                       ? "bg-green-400"
                       : "bg-zinc-700"
-                  }`}
+                    }`}
                 />
               </div>
 
               <p
-                className={`mt-3 text-xs ${
-                  allowed
+                className={`mt-3 text-xs ${allowed
                     ? "text-green-400"
                     : "text-zinc-600"
-                }`}
+                  }`}
               >
                 {allowed
                   ? "Available"
@@ -263,11 +261,10 @@ export default function CompanySetup({
             </p>
 
             <p
-              className={`mt-5 text-sm ${
-                organizationExists
+              className={`mt-5 text-sm ${organizationExists
                   ? "text-green-400"
                   : "text-yellow-400"
-              }`}
+                }`}
             >
               {organizationExists
                 ? "Organization exists"
@@ -295,11 +292,10 @@ export default function CompanySetup({
             </p>
 
             <p
-              className={`mt-3 text-sm ${
-                vaultExists
+              className={`mt-3 text-sm ${vaultExists
                   ? "text-green-400"
                   : "text-yellow-400"
-              }`}
+                }`}
             >
               {vaultExists
                 ? "Vault exists"

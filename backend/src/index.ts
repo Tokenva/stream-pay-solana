@@ -729,7 +729,12 @@ app.get(
         organization,
       ];
 
-      if (typeof employee === "string") {
+      if (company.role === "employee") {
+        values.push(wallet);
+        conditions.push(
+          `employee = $${values.length}`,
+        );
+      } else if (typeof employee === "string") {
         values.push(employee);
         conditions.push(
           `employee = $${values.length}`,
@@ -793,8 +798,31 @@ app.get(
     const wallet =
       res.locals.wallet as string;
 
+    const companyId =
+      typeof req.query.companyId === "string"
+        ? req.query.companyId
+        : null;
+
+    if (!companyId) {
+      return res.status(400).json({
+        error: "Company ID is required",
+      });
+    }
+
+    const company =
+      await getCompanyForWalletById(
+        wallet,
+        companyId,
+      );
+
+    if (!company) {
+      return res.status(403).json({
+        error: "Company access required",
+      });
+    }
+
     const organization =
-      await getCustomerOrganization(wallet);
+      company.created_by;
 
     if (!organization) {
       return res.status(403).json({
@@ -822,9 +850,15 @@ app.get(
         updated_at
       FROM streams
       WHERE address = $1
-        AND organization = $2
+  AND organization = $2
+  ${company.role === "employee"
+          ? "AND employee = $3"
+          : ""
+        }
       `,
-        [req.params.address, organization],
+        company.role === "employee"
+          ? [req.params.address, organization, wallet]
+          : [req.params.address, organization],
       );
 
       if (result.rows.length === 0) {

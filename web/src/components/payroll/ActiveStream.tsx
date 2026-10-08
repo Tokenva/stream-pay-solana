@@ -17,7 +17,8 @@ type ActiveStreamProps = {
   streamError: string | null;
   actionLoading: boolean;
   actionErrorStream: string | null;
-  canManageStreams: boolean;
+  canTopUpStream: boolean;
+  canCancelStream: boolean;
   currentRole: string;
   indexedStreams: Array<{
     address: string;
@@ -44,7 +45,8 @@ export default function ActiveStream({
   streamError,
   actionLoading,
   actionErrorStream,
-  canManageStreams,
+  canTopUpStream,
+  canCancelStream,
   currentRole,
   indexedStreams,
   indexedStreamsLoading,
@@ -171,14 +173,16 @@ export default function ActiveStream({
                   </p>
 
                   <p
-                    className={`mt-1 text-sm ${canManageStreams
-                      ? "text-green-400"
-                      : "text-zinc-600"
+                    className={`mt-1 text-sm ${canTopUpStream || canCancelStream
+                        ? "text-green-400"
+                        : "text-zinc-600"
                       }`}
                   >
-                    {canManageStreams
-                      ? `${currentRole} can top up and cancel this stream.`
-                      : `${currentRole} has read-only stream access.`}
+                    {canTopUpStream
+                      ? `${currentRole} can top up this stream.`
+                      : canCancelStream
+                        ? `${currentRole} can cancel this stream.`
+                        : `${currentRole} has read-only stream access.`}
                   </p>
                 </div>
 
@@ -187,7 +191,7 @@ export default function ActiveStream({
                     type="button"
                     disabled={
                       actionLoading ||
-                      !canManageStreams ||
+                      !canTopUpStream ||
                       streamData.canceled
                     }
                     onClick={onTopUp}
@@ -202,7 +206,7 @@ export default function ActiveStream({
                     type="button"
                     disabled={
                       actionLoading ||
-                      !canManageStreams ||
+                      !canCancelStream ||
                       streamData.canceled
                     }
                     onClick={onCancel}
@@ -296,7 +300,7 @@ export default function ActiveStream({
                   </button>
                 </div>
               </div>
-            )} F
+            )}
           </div>
         ) : (
           <div className="mt-6 rounded-xl border border-dashed border-zinc-800 p-8 text-center">
