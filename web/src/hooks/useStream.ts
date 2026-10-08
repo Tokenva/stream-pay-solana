@@ -335,6 +335,16 @@ export function useStream(
         setError(null);
 
         try {
+          const rolesAccount =
+            await connection.getAccountInfo(
+              roles,
+            );
+
+          const policyAccount =
+            await connection.getAccountInfo(
+              policy,
+            );
+
           const signature =
             await program.methods
               .createStream(
@@ -347,8 +357,6 @@ export function useStream(
                 authority:
                   wallet.publicKey,
                 organization,
-                roles,
-                policy,
                 employee,
                 mint,
                 vault,
@@ -358,6 +366,12 @@ export function useStream(
                   escrowPda,
                 tokenProgram:
                   SPL_TOKEN_PROGRAM_ID,
+                ...(rolesAccount
+                  ? { roles }
+                  : {}),
+                ...(policyAccount
+                  ? { policy }
+                  : {}),
               })
               .rpc();
 
