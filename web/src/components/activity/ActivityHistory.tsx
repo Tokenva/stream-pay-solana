@@ -2,6 +2,10 @@
 
 import { useActivities } from "@/hooks/useActivities";
 
+type ActivityHistoryProps = {
+  companyId: string;
+};
+
 function shorten(value: string | null) {
   if (!value) return "—";
 
@@ -66,7 +70,9 @@ function getInstructionTone(
   }
 }
 
-export default function ActivityHistory() {
+export default function ActivityHistory({
+  companyId,
+}: ActivityHistoryProps) {
   const {
     activities,
     loading,
@@ -81,7 +87,7 @@ export default function ActivityHistory() {
     nextPage,
     previousPage,
     changeInstruction,
-  } = useActivities();
+  } = useActivities(companyId);
 
   return (
     <section className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6">

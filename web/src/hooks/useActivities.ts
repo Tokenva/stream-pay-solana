@@ -13,24 +13,31 @@ import {
 
 const PAGE_SIZE = 5;
 
-export function useActivities() {
+export function useActivities(companyId: string) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-
-  const [instruction, setInstruction] =
-    useState<string>("all");
+  const [instruction, setInstruction] = useState("all");
 
   const refresh = useCallback(
     async (nextOffset = 0) => {
+      if (!companyId) {
+        setActivities([]);
+        setTotal(0);
+        setOffset(0);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
 
         const result = await fetchActivities({
+          companyId,
           limit: PAGE_SIZE,
           offset: nextOffset,
         });
@@ -48,7 +55,7 @@ export function useActivities() {
         setLoading(false);
       }
     },
-    [],
+    [companyId],
   );
 
   useEffect(() => {
@@ -76,9 +83,7 @@ export function useActivities() {
     void refresh(Math.max(0, offset - PAGE_SIZE));
   };
 
-  const changeInstruction = (
-    value: string,
-  ) => {
+  const changeInstruction = (value: string) => {
     setInstruction(value);
   };
 

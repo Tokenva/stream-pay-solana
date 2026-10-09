@@ -1123,8 +1123,11 @@ function ProtectedHome({
                             employee claims, and financial reporting in one workspace.
                         </p>
                     </div>
+                    <div className="flex gap-5">
 
-                    <div className="dashboard-wallet"><WalletButton /></div>
+                        <Link href="/" className="rounded-xl border border-zinc-800 px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white" > Home </Link>
+                        <div className="dashboard-wallet"><WalletButton /></div>
+                    </div>
                 </header>
 
                 <nav className="demo-nav" aria-label="Dashboard sections">
@@ -1521,8 +1524,7 @@ function ProtectedHome({
                         Activity
                     </p>
                     <ActivityStats />
-                    <ActivityHistory />
-                </div>
+                    <ActivityHistory companyId={selectedCompany.id} />                </div>
             </div>
         </main>
     );
@@ -1533,6 +1535,7 @@ export default function Home() {
     const {
         connected,
         connecting,
+        publicKey,
     } = useWallet();
 
     const [
@@ -1594,10 +1597,18 @@ export default function Home() {
                 return;
             }
 
-            if (!session?.authenticated) {
+            const connectedWallet = publicKey?.toBase58();
+
+            if (
+                !session?.authenticated ||
+                !connectedWallet ||
+                session.wallet !== connectedWallet
+            ) {
                 setAuthenticated(false);
                 setAuthChecked(true);
                 setCompanyAccess(null);
+                setSelectedCompany(null);
+                setCompanies([]);
                 setCompanyChecked(false);
                 router.replace("/login");
                 return;
@@ -1612,7 +1623,7 @@ export default function Home() {
         return () => {
             cancelled = true;
         };
-    }, [router]);
+    }, [publicKey, router]);
 
     useEffect(() => {
         if (!authChecked || !authenticated) {
@@ -1628,10 +1639,17 @@ export default function Home() {
                 return;
             }
 
-            if (!session?.authenticated) {
+            const connectedWallet = publicKey?.toBase58();
+
+            if (
+                !session?.authenticated ||
+                !connectedWallet ||
+                session.wallet !== connectedWallet
+            ) {
                 setAuthenticated(false);
-                setAuthChecked(true);
                 setCompanyAccess(null);
+                setSelectedCompany(null);
+                setCompanies([]);
                 setCompanyChecked(false);
                 router.replace("/login");
             }
@@ -1666,6 +1684,7 @@ export default function Home() {
     }, [
         authChecked,
         authenticated,
+        publicKey,
         router,
     ]);
 
