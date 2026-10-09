@@ -15,9 +15,6 @@ export type IndexedStream = {
   updated_at: string;
 };
 
-// const API_BASE_URL =
-//   process.env.BACKEND_URL ?? "http://localhost:4000";
-
 export async function fetchIndexedStreams(
   params?: {
     companyId?: string
@@ -50,13 +47,14 @@ export async function fetchIndexedStreams(
 
   const query = searchParams.toString();
 
-const response = await fetch(
-  `/api/backend/api/indexed/streams${query ? `?${query}` : ""}`,
-  {
-    credentials: "include",
-    cache: "no-store",
-  },
-);
+  const response = await fetch(
+    `/api/backend/api/indexed/streams${query ? `?${query}` : ""}`,
+    {
+      credentials: "include",
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    },
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -87,6 +85,7 @@ export type Activity = {
 
 export async function fetchActivities(
   params?: {
+    companyId?: string;
     stream?: string;
     employee?: string;
     organization?: string;
@@ -103,6 +102,13 @@ export async function fetchActivities(
 }> {
   const searchParams =
     new URLSearchParams();
+
+  if (params?.companyId) {
+    searchParams.set(
+      "companyId",
+      params.companyId,
+    );
+  }
 
   if (params?.stream) {
     searchParams.set(

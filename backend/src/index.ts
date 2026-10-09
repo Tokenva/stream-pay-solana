@@ -713,14 +713,21 @@ app.get(
       });
     }
 
-    const organization =
-      company.created_by;
-
-    if (!organization) {
+    if (!company.created_by) {
       return res.status(403).json({
         error: "Company access required",
       });
     }
+
+    const authority = new PublicKey(company.created_by);
+    const [organization] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("organization"),
+        authority.toBuffer(),
+      ],
+      PROGRAM_ID,
+    );
+    const organizationAddress = organization.toBase58();
 
     try {
       const {
@@ -733,7 +740,7 @@ app.get(
       ];
 
       const values: Array<string | number> = [
-        organization,
+        organizationAddress,
       ];
 
       if (company.role === "employee") {
@@ -903,16 +910,39 @@ app.get(
     const wallet =
       res.locals.wallet as string;
 
-    const customerOrganization =
-      await getCustomerOrganization(
-        wallet,
-      );
+    const companyId =
+      typeof req.query.companyId === "string"
+        ? req.query.companyId
+        : null;
 
-    if (!customerOrganization) {
+    if (!companyId) {
+      return res.status(400).json({
+        error: "Company ID is required",
+      });
+    }
+
+    const company = await getCompanyForWalletById(
+      wallet,
+      companyId,
+    );
+
+    if (!company) {
       return res.status(403).json({
         error: "Company access required",
       });
     }
+
+    const authority = new PublicKey(company.created_by);
+
+    const [organization] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("organization"),
+        authority.toBuffer(),
+      ],
+      PROGRAM_ID,
+    );
+
+    const customerOrganization = organization.toBase58();
 
     try {
       const {

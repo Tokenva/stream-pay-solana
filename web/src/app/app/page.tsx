@@ -1757,52 +1757,53 @@ export default function Home() {
         router,
     ]);
 
+    async function handleEmployeeJoin() {
+        const code = invitationCode.trim();
+
+        if (!code) {
+            setInvitationError(
+                "Enter your employee invitation code.",
+            );
+            return;
+        }
+
+        setInvitationLoading(true);
+        setInvitationError("");
+
+        try {
+            await acceptEmployeeInvitation(code);
+
+            const access = await getCompanyAccess();
+
+            setCompanyAccess(access);
+
+            const company = access.company
+                ? [access.company]
+                : [];
+
+            setSelectedCompany(
+                company[0] ?? null,
+            );
+
+            setCompanies(company);
+            setSelectedRole(null);
+            setInvitationCode("");
+        } catch (err) {
+            setInvitationError(
+                err instanceof Error
+                    ? err.message
+                    : "Unable to join the company.",
+            );
+        } finally {
+            setInvitationLoading(false);
+        }
+    }
+
     if (
         !authChecked ||
         !authenticated ||
         !companyChecked
     ) {
-        async function handleEmployeeJoin() {
-            const code = invitationCode.trim();
-
-            if (!code) {
-                setInvitationError(
-                    "Enter your employee invitation code.",
-                );
-                return;
-            }
-
-            setInvitationLoading(true);
-            setInvitationError("");
-
-            try {
-                await acceptEmployeeInvitation(code);
-
-                const access = await getCompanyAccess();
-
-                setCompanyAccess(access);
-
-                const company = access.company
-                    ? [access.company]
-                    : [];
-
-                setSelectedCompany(
-                    company[0] ?? null,
-                );
-
-                setCompanies(company);
-                setSelectedRole(null);
-                setInvitationCode("");
-            } catch (err) {
-                setInvitationError(
-                    err instanceof Error
-                        ? err.message
-                        : "Unable to join the company.",
-                );
-            } finally {
-                setInvitationLoading(false);
-            }
-        }
         return (
             <main className="relative flex min-h-screen overflow-hidden bg-black text-white">
                 {/* Ambient background */}

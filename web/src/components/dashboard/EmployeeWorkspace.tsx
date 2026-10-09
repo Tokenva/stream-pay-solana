@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { logout } from "@/lib/auth";
+import { fetchActivities, type Activity } from "@/lib/backend";
 
 type EmployeeWorkspaceProps = {
   companyId: string;
@@ -61,6 +62,19 @@ export default function EmployeeWorkspace({
   const [selectedStreamId, setSelectedStreamId] =
     useState(0);
 
+  const [claimStatus, setClaimStatus] = useState<
+    "claiming" | "syncing" | null
+  >(null);
+
+  const [claimSyncMessage, setClaimSyncMessage] =
+    useState<string | null>(null);
+
+  const [lastClaimSignature, setLastClaimSignature] =
+    useState<string | null>(null);
+
+  const [claimActivities, setClaimActivities] = useState<Activity[]>([]);
+  const [claimActivitiesLoading, setClaimActivitiesLoading] = useState(true);
+
   const employeeAddress =
     walletAddress ?? "";
 
@@ -83,23 +97,23 @@ export default function EmployeeWorkspace({
         ) === selectedStreamId,
     ) ?? null;
 
-const {
-  data: streamData,
-  claimable,
-  loading: streamLoading,
-  error: streamError,
-  claim,
-} = useStream(
-  mintAddress,
-  selectedStream
-    ? Number.parseInt(
-        selectedStream.stream_id,
-        10,
-      )
-    : null,
-  employeeAddress,
-  companyOwnerAddress,
-);
+  const {
+    data: streamData,
+    claimable,
+    loading: streamLoading,
+    error: streamError,
+    claim,
+  } = useStream(
+    mintAddress,
+    selectedStream
+      ? Number.parseInt(
+          selectedStream.stream_id,
+          10,
+        )
+      : null,
+    employeeAddress,
+    companyOwnerAddress,
+  );
 
   useEffect(() => {
     if (streams.length === 0) {
@@ -124,6 +138,48 @@ const {
       );
     }
   }, [streams, selectedStreamId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadClaimActivities() {
+      setClaimActivitiesLoading(true);
+
+      try {
+        const result = await fetchActivities({
+          companyId,
+          employee: walletAddress ?? undefined,
+          limit: 100,
+          offset: 0,
+        });
+
+        if (!cancelled) {
+          setClaimActivities(
+            result.activities.filter(
+              (activity) =>
+                activity.instruction.toLowerCase() === "claim",
+            ),
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load claim history:", error);
+
+        if (!cancelled) {
+          setClaimActivities([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setClaimActivitiesLoading(false);
+        }
+      }
+    }
+
+    void loadClaimActivities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, walletAddress]);
 
   const totalScheduled = useMemo(
     () =>
@@ -152,11 +208,29 @@ const {
   );
 
   async function handleClaim() {
+    if (!streamData || !selectedStream || claimStatus) {
+      return;
+    }
+
+    setClaimStatus("claiming");
+    setClaimSyncMessage(null);
+    setLastClaimSignature(null);
+
     try {
-      await claim();
-      await refreshIndexedStreams();
-    } catch {
-      // useStream exposes the claim error.
+      const signature = await claim();
+
+      setLastClaimSignature(signature);
+      setClaimSyncMessage(
+        "Claim confirmed. Transaction recorded on Solana.",
+      );
+      setClaimStatus(null);
+      void refreshIndexedStreams();
+    } catch (err) {
+      console.error("Employee claim failed:", err);
+      setClaimSyncMessage(
+        err instanceof Error ? err.message : "Claim failed.",
+      );
+      setClaimStatus(null);
     }
   }
 
@@ -171,6 +245,7 @@ const {
       }
     }
   }
+
   return (
     <main className="dashboard-shell">
       <div className="dashboard-container">
@@ -465,6 +540,62 @@ const {
             </div>
           )}
 
+          {claimStatus && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-5 flex items-center gap-3 rounded-xl border border-blue-900/40 bg-blue-950/20 p-4"
+            >
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
+
+              <div>
+                <p className="text-sm font-medium text-blue-200">
+                  {claimStatus === "claiming"
+                    ? "Confirming payroll claim..."
+                    : "Claim confirmed. Updating payment history..."}
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {claimStatus === "claiming"
+                    ? "Approve the transaction in your wallet if prompted."
+                    : "Checking for the updated claimed amount."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {claimSyncMessage && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-5 rounded-xl border border-zinc-800 bg-white/[0.03] p-4"
+            >
+              <p className="text-sm text-zinc-300">
+                {claimSyncMessage}
+              </p>
+
+              {lastClaimSignature && (
+                <a
+                  href={`https://explorer.solana.com/tx/${lastClaimSignature}?cluster=devnet`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block break-all text-xs text-blue-400 underline"
+                >
+                  View confirmed transaction
+                </a>
+              )}
+
+              {claimStatus === null && (
+                <button
+                  type="button"
+                  onClick={() => void refreshIndexedStreams()}
+                  className="mt-3 block rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:bg-white/5"
+                >
+                  Refresh payment history
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="mt-6 flex flex-col gap-4 rounded-xl border border-zinc-800 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium">
@@ -480,19 +611,20 @@ const {
             <button
               type="button"
               disabled={
+                claimStatus !== null ||
                 streamLoading ||
-                claimable === ZERO ||
-                !streamData ||
-                streamData.canceled
+                claimable <= ZERO
               }
               onClick={() => void handleClaim()}
               className="rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {streamLoading
-                ? "Processing..."
-                : claimable > ZERO
-                  ? `Claim ${formatTokenAmount(claimable)}`
-                  : "Nothing to claim yet"}
+              {claimStatus === "claiming"
+                ? "Confirming claim..."
+                : claimStatus === "syncing"
+                  ? "Updating history..."
+                  : claimable > ZERO
+                    ? `Claim ${formatTokenAmount(claimable)}`
+                    : "Nothing to claim yet"}
             </button>
           </div>
 
@@ -569,54 +701,45 @@ const {
             </div>
           </div>
 
-          {streams.length > 0 ? (
-            <div className="mt-6 space-y-3">
-              {streams.map((item) => (
+          {claimActivitiesLoading ? (
+            <p className="mt-6 py-4 text-sm text-white/60">
+              Loading payment history...
+            </p>
+          ) : claimActivities.length === 0 ? (
+            <p className="mt-6 py-4 text-sm text-white/60">
+              No claim transactions found.
+            </p>
+          ) : (
+            <div className="mt-6 space-y-0">
+              {claimActivities.map((activity) => (
                 <div
-                  key={item.address}
-                  className="rounded-xl border border-zinc-800 bg-black/20 p-5"
+                  key={`${activity.signature}-${activity.instruction_index}`}
+                  className="flex items-center justify-between gap-4 border-b border-white/10 py-4"
                 >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">
-                        Stream #{item.stream_id}
-                      </p>
+                  <div className="min-w-0">
+                    <p className="font-medium text-white">Payment claimed</p>
 
-                      <p className="mt-1 text-xs text-zinc-500">
-                        Updated{" "}
-                        {new Date(
-                          item.updated_at,
-                        ).toLocaleString()}
-                      </p>
-                    </div>
+                    <p className="text-sm text-white/60">
+                      {activity.block_time
+                        ? new Date(Number(activity.block_time) * 1000).toLocaleString()
+                        : new Date(activity.created_at).toLocaleString()}
+                    </p>
 
-                    <div className="text-left sm:text-right">
-                      <p className="text-xs text-zinc-500">
-                        Claimed
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold">
-                        {formatTokenAmount(
-                          BigInt(
-                            item.claimed_amount,
-                          ),
-                        )}
-                      </p>
-                    </div>
+                    <a
+                      href={`https://explorer.solana.com/tx/${activity.signature}?cluster=devnet`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-blue-400 hover:underline"
+                    >
+                      View transaction
+                    </a>
                   </div>
+
+                  <span className="shrink-0 text-sm text-emerald-400">
+                    Confirmed
+                  </span>
                 </div>
               ))}
-            </div>
-          ) : (
-            <div className="mt-6 rounded-xl border border-dashed border-zinc-800 p-8 text-center">
-              <p className="text-sm font-medium">
-                No payment history available
-              </p>
-
-              <p className="mt-2 text-sm text-zinc-500">
-                Completed and claimed payroll amounts will appear
-                here.
-              </p>
             </div>
           )}
         </section>

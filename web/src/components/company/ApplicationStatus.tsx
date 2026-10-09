@@ -69,28 +69,6 @@ export default function ApplicationStatus({
   const isApproved =
     application.status === "approved";
 
-  async function refresh() {
-    setLoading(true);
-    setError("");
-
-    try {
-      const result =
-        await getApplication();
-
-      if (result.application) {
-        onRefresh(result.application);
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to refresh application status.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function switchWallet() {
   setSwitchingWallet(true);
   setError("");

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -14,7 +15,7 @@ export function useIndexedStreams(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<IndexedStream[] | null> => {
     try {
       setLoading(true);
       setError(null);
@@ -22,19 +23,21 @@ export function useIndexedStreams(
       const data = await fetchIndexedStreams({
         companyId,
         employee,
-      });;
+      });
 
       setStreams(data);
+      return data;
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Failed to load streams",
       );
+      return null;
     } finally {
       setLoading(false);
     }
- }, [companyId, employee]);
+  }, [companyId, employee]);
 
   useEffect(() => {
     void refresh();

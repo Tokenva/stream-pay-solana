@@ -5,12 +5,18 @@ import {
   useEffect,
   useState,
 } from "react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import BN from "bn.js";
 import {
   useAnchorWallet,
   useConnection,
 } from "@solana/wallet-adapter-react";
+
+import {
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 
 import { getProgram } from "@/lib/anchor";
 import {
@@ -269,6 +275,10 @@ export function useStream(
           );
         }
 
+        if (streamId === null) {
+          throw new Error("Stream ID is required");
+        }
+
         const employee =
           new PublicKey(employeeAddress);
 
@@ -437,34 +447,69 @@ export function useStream(
       const mint =
         new PublicKey(mintAddress);
 
-      const tokenAccounts =
-        await connection.getTokenAccountsByOwner(
-          wallet.publicKey,
-          { mint },
-        );
-
-      if (
-        tokenAccounts.value.length ===
-        0
-      ) {
-        throw new Error(
-          "Employee token account not found",
-        );
-      }
-
-      const employeeTokenAccount =
-        tokenAccounts.value[0].pubkey;
-
-      const program =
-        getProgram(
-          connection,
-          wallet,
-        );
-
       setLoading(true);
       setError(null);
 
       try {
+        const employeeTokenAccount =
+          await getAssociatedTokenAddress(
+            mint,
+            wallet.publicKey,
+            false,
+            SPL_TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID,
+          );
+
+        const tokenAccountInfo =
+          await connection.getAccountInfo(
+            employeeTokenAccount,
+            "confirmed",
+          );
+
+        if (!tokenAccountInfo) {
+          const transaction = new Transaction().add(
+            createAssociatedTokenAccountInstruction(
+              wallet.publicKey,
+              employeeTokenAccount,
+              wallet.publicKey,
+              mint,
+              SPL_TOKEN_PROGRAM_ID,
+              ASSOCIATED_TOKEN_PROGRAM_ID,
+            ),
+          );
+
+          const latestBlockhash =
+            await connection.getLatestBlockhash(
+              "confirmed",
+            );
+
+          transaction.feePayer = wallet.publicKey;
+          transaction.recentBlockhash =
+            latestBlockhash.blockhash;
+
+          const signedTransaction =
+            await wallet.signTransaction(transaction);
+
+          const createAccountSignature =
+            await connection.sendRawTransaction(
+              signedTransaction.serialize(),
+            );
+
+          await connection.confirmTransaction(
+            {
+              signature: createAccountSignature,
+              ...latestBlockhash,
+            },
+            "confirmed",
+          );
+        }
+
+        const program =
+          getProgram(
+            connection,
+            wallet,
+          );
+
         const signature =
           await program.methods
             .claim()

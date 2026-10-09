@@ -84,6 +84,27 @@ async function indexActivity(
       break;
   }
 
+  // Resolve organization and employee from the indexed stream.
+  // Claim instructions do not directly populate organization.
+  if (streamAddress) {
+    const streamResult = await pool.query(
+      `
+      SELECT organization, employee
+      FROM streams
+      WHERE address = $1
+      LIMIT 1
+      `,
+      [streamAddress],
+    );
+
+    const indexedStream = streamResult.rows[0];
+
+    if (indexedStream) {
+      organization ??= indexedStream.organization;
+      employee ??= indexedStream.employee;
+    }
+  }
+
   const result = await pool.query(
     `
     INSERT INTO activities (
