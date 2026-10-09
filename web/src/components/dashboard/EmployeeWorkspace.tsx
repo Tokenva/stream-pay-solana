@@ -74,6 +74,18 @@ export default function EmployeeWorkspace({
 
   const [claimActivities, setClaimActivities] = useState<Activity[]>([]);
   const [claimActivitiesLoading, setClaimActivitiesLoading] = useState(true);
+  const [claimHistoryPage, setClaimHistoryPage] = useState(1);
+  const CLAIM_HISTORY_PAGE_SIZE = 5;
+
+  const totalClaimHistoryPages = Math.max(
+    1,
+    Math.ceil(claimActivities.length / CLAIM_HISTORY_PAGE_SIZE),
+  );
+
+  const paginatedClaimActivities = claimActivities.slice(
+    (claimHistoryPage - 1) * CLAIM_HISTORY_PAGE_SIZE,
+    claimHistoryPage * CLAIM_HISTORY_PAGE_SIZE,
+  );
 
   const employeeAddress =
     walletAddress ?? "";
@@ -160,12 +172,14 @@ export default function EmployeeWorkspace({
                 activity.instruction.toLowerCase() === "claim",
             ),
           );
+          setClaimHistoryPage(1);
         }
       } catch (error) {
         console.error("Failed to load claim history:", error);
 
         if (!cancelled) {
           setClaimActivities([]);
+          setClaimHistoryPage(1);
         }
       } finally {
         if (!cancelled) {
@@ -179,6 +193,10 @@ export default function EmployeeWorkspace({
     return () => {
       cancelled = true;
     };
+  }, [companyId, walletAddress]);
+
+  useEffect(() => {
+    setClaimHistoryPage(1);
   }, [companyId, walletAddress]);
 
   const totalScheduled = useMemo(
@@ -459,7 +477,7 @@ export default function EmployeeWorkspace({
                         </div>
 
                         <div className="flex items-center gap-4">
-                          <div className="flex gap-5">
+                          <div className="text-right">
                             <p className="text-xs text-zinc-500">
                               Amount
                             </p>
@@ -710,47 +728,86 @@ export default function EmployeeWorkspace({
               No claim transactions found.
             </p>
           ) : (
-            <div className="mt-6 space-y-0">
-              {claimActivities.map((activity, index) => (
-                <div
-                  key={`${activity.signature}-${activity.instruction_index}`}
-                  className="flex items-center justify-between gap-4 border-b border-white/10 py-4"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium text-white">
-                      #{index + 1} · Payment claimed
-                    </p>
+            <>
+              <div className="mt-6 space-y-0">
+                {paginatedClaimActivities.map((activity, index) => (
+                  <div
+                    key={`${activity.signature}-${activity.instruction_index}`}
+                    className="flex items-center justify-between gap-4 border-b border-white/10 py-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-white">
+                        #{(claimHistoryPage - 1) * CLAIM_HISTORY_PAGE_SIZE + index + 1}
+                        {" · "}Payment claimed
+                      </p>
 
-                    <p className="mt-1 text-sm text-white/80">
-                      Amount received:{" "}
-                      {activity.amount_received !== null &&
+                      <p className="mt-1 text-sm text-white/80">
+                        Amount received:{" "}
+                        {activity.amount_received !== null &&
                         activity.amount_received !== undefined
-                        ? `${formatTokenAmount(BigInt(activity.amount_received))} tokens`
-                        : "Pending amount indexing"}
-                    </p>
+                          ? `${formatTokenAmount(BigInt(activity.amount_received))} tokens`
+                          : "Pending amount indexing"}
+                      </p>
 
-                    <p className="text-sm text-white/60">
-                      {activity.block_time
-                        ? new Date(Number(activity.block_time) * 1000).toLocaleString()
-                        : new Date(activity.created_at).toLocaleString()}
-                    </p>
+                      <p className="text-sm text-white/60">
+                        {activity.block_time
+                          ? new Date(Number(activity.block_time) * 1000).toLocaleString()
+                          : new Date(activity.created_at).toLocaleString()}
+                      </p>
 
-                    <a
-                      href={`https://explorer.solana.com/tx/${activity.signature}?cluster=devnet`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm text-blue-400 hover:underline"
-                    >
-                      View transaction
-                    </a>
+                      <a
+                        href={`https://explorer.solana.com/tx/${activity.signature}?cluster=devnet`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-blue-400 hover:underline"
+                      >
+                        View transaction
+                      </a>
+                    </div>
+
+                    <span className="shrink-0 text-sm text-emerald-400">
+                      Confirmed
+                    </span>
                   </div>
+                ))}
+              </div>
 
-                  <span className="shrink-0 text-sm text-emerald-400">
-                    Confirmed
-                  </span>
+              {claimActivities.length > CLAIM_HISTORY_PAGE_SIZE && (
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-white/60">
+                    Page {claimHistoryPage} of {totalClaimHistoryPages}
+                    {" · "}
+                    {claimActivities.length} claims
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={claimHistoryPage === 1}
+                      onClick={() =>
+                        setClaimHistoryPage((page) => Math.max(1, page - 1))
+                      }
+                      className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={claimHistoryPage === totalClaimHistoryPages}
+                      onClick={() =>
+                        setClaimHistoryPage((page) =>
+                          Math.min(totalClaimHistoryPages, page + 1),
+                        )
+                      }
+                      className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </section>
       </div>
