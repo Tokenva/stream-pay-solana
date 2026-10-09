@@ -29,6 +29,7 @@ const ALLOWED_PATHS = new Set([
 
   "/api/application",
   "/api/faucet/claim",
+  "/api/faucet/status",
 
   "/api/activities",
   "/api/activities/stats",

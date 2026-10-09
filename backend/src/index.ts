@@ -5325,6 +5325,85 @@ const FAUCET_MINT_ADDRESS =
 const FAUCET_WALLET_ADDRESS =
   "3vHSQui5ahNUHebERWLffiSw1yHVatbBAMdDW9V4BWpZ";
 
+
+app.get(
+  "/api/faucet/status",
+  requireCustomerSession,
+  async (_req, res) => {
+    try {
+      if (process.env.SOLANA_NETWORK !== "devnet") {
+        return res.status(503).json({
+          error: "Faucet status is only available on Solana Devnet.",
+        });
+      }
+
+      const rpcUrl = process.env.SOLANA_RPC_URL?.trim();
+      if (!rpcUrl) {
+        return res.status(503).json({
+          error: "Faucet RPC configuration is incomplete.",
+        });
+      }
+
+      const mintAddress = new PublicKey(FAUCET_MINT_ADDRESS);
+      const connection = new Connection(rpcUrl, "confirmed");
+      const mint = await getMint(
+        connection,
+        mintAddress,
+        "confirmed",
+        TOKEN_PROGRAM_ID,
+      );
+
+      const faucetAddress = new PublicKey(FAUCET_WALLET_ADDRESS);
+      const sourceAta = await getAssociatedTokenAddress(
+        mintAddress,
+        faucetAddress,
+        false,
+        TOKEN_PROGRAM_ID,
+      );
+
+      let balance = 0n;
+      try {
+        const account = await getAccount(
+          connection,
+          sourceAta,
+          "confirmed",
+          TOKEN_PROGRAM_ID,
+        );
+        balance = account.amount;
+      } catch {
+        // No token account means no faucet inventory.
+      }
+
+      const divisor = 10n ** BigInt(mint.decimals);
+      const wholeTokens = balance / divisor;
+      const fractional = (balance % divisor)
+        .toString()
+        .padStart(mint.decimals, "0")
+        .replace(/0+$/, "");
+      const balanceText = fractional
+        ? `${wholeTokens.toString()}.${fractional}`
+        : wholeTokens.toString();
+
+      return res.json({
+        mint: FAUCET_MINT_ADDRESS,
+        balance: balanceText,
+        decimals: mint.decimals,
+        claimAmount: FAUCET_CLAIM_AMOUNT,
+        claimsRemaining: Number(
+          balance / (BigInt(FAUCET_CLAIM_AMOUNT) * divisor),
+        ),
+        lowBalance: balance < 100n * divisor,
+        empty: balance < BigInt(FAUCET_CLAIM_AMOUNT) * divisor,
+        enabled: process.env.FAUCET_ENABLED === "true",
+      });
+    } catch {
+      return res.status(503).json({
+        error: "Unable to read faucet inventory right now.",
+      });
+    }
+  },
+);
+
 const FAUCET_CLAIM_AMOUNT = 10;
 const FAUCET_COOLDOWN_HOURS = 24;
 

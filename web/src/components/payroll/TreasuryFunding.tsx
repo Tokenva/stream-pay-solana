@@ -1,6 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+type FaucetStatus = {
+  mint: string;
+  balance: string | number;
+  decimals: number;
+  claimAmount: number;
+  claimsRemaining: number;
+  lowBalance: boolean;
+  empty: boolean;
+  enabled: boolean;
+};
 
 type TreasuryFundingProps = {
   depositAmount: string;
@@ -35,6 +46,40 @@ export default function TreasuryFunding({
   const [faucetMessage, setFaucetMessage] = useState<string | null>(null);
   const [faucetSignature, setFaucetSignature] = useState<string | null>(null);
 
+  const [faucetStatus, setFaucetStatus] =
+    useState<FaucetStatus | null>(null);
+  const [faucetStatusLoading, setFaucetStatusLoading] = useState(false);
+  const [faucetStatusError, setFaucetStatusError] = useState<string | null>(null);
+
+  async function refreshFaucetStatus() {
+    setFaucetStatusLoading(true);
+    setFaucetStatusError(null);
+
+    try {
+      const response = await fetch("/api/backend/api/faucet/status", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "Unable to load faucet inventory.");
+      }
+
+      setFaucetStatus(result as FaucetStatus);
+    } catch (error) {
+      setFaucetStatusError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load faucet inventory.",
+      );
+    } finally {
+      setFaucetStatusLoading(false);
+    }
+  }
+
   async function claimTestStream() {
     setFaucetLoading(true);
     setFaucetMessage(null);
@@ -57,6 +102,7 @@ export default function TreasuryFunding({
       setFaucetMessage("Successfully claimed 10 STREAM.");
       setFaucetSignature(result.signature ?? null);
       onRefreshBalance();
+      void refreshFaucetStatus();
     } catch (error) {
       setFaucetMessage(
         error instanceof Error
@@ -67,6 +113,13 @@ export default function TreasuryFunding({
       setFaucetLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (canManageTreasury) {
+      void refreshFaucetStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManageTreasury]);
 
   async function copyValue(value: string, field: "mint" | "wallet") {
     if (!value) return;
@@ -127,7 +180,96 @@ export default function TreasuryFunding({
 
           <p className="mt-1 text-sm text-zinc-500">
             Claim 10 existing test STREAM. One claim per wallet every 24 hours.
+            These are existing Devnet tokens; claiming does not mint new supply.
           </p>
+
+          {canManageTreasury && (
+            <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/70 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">
+                    Faucet inventory · Devnet
+                  </p>
+
+                  {faucetStatusLoading && !faucetStatus ? (
+                    <p className="mt-2 text-sm text-zinc-400">
+                      Loading inventory…
+                    </p>
+                  ) : faucetStatus ? (
+                    <>
+                      <p className="mt-2 text-2xl font-semibold text-white">
+                        {Number(faucetStatus.balance).toLocaleString(undefined, {
+                          maximumFractionDigits: faucetStatus.decimals,
+                        })}{" "}
+                        <span className="text-sm font-medium text-zinc-400">
+                          STREAM left
+                        </span>
+                      </p>
+
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Approximately{" "}
+                        {Math.max(
+                          0,
+                          Math.floor(Number(faucetStatus.claimsRemaining) || 0),
+                        ).toLocaleString()}{" "}
+                        full claims of {faucetStatus.claimAmount} STREAM remaining.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm text-zinc-400">
+                      Inventory is not available yet.
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void refreshFaucetStatus()}
+                  disabled={faucetStatusLoading}
+                  className="rounded-lg border border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-zinc-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {faucetStatusLoading ? "Refreshing…" : "Refresh inventory"}
+                </button>
+              </div>
+
+              {faucetStatusError && (
+                <p role="alert" className="mt-3 break-words text-sm text-red-400">
+                  {faucetStatusError}
+                </p>
+              )}
+
+              {faucetStatus?.empty && (
+                <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/[0.06] p-3">
+                  <p className="text-sm font-semibold text-red-300">
+                    Faucet temporarily out of inventory
+                  </p>
+                  <p className="mt-1 text-sm leading-5 text-zinc-400">
+                    There are not enough STREAM tokens for a full claim. No new tokens
+                    will be minted. Contact the administrator to replenish the Devnet
+                    faucet.
+                  </p>
+                </div>
+              )}
+
+              {!faucetStatus?.empty && faucetStatus?.lowBalance && (
+                <div className="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-500/[0.05] p-3">
+                  <p className="text-sm font-semibold text-yellow-300">
+                    Faucet inventory is running low
+                  </p>
+                  <p className="mt-1 text-sm leading-5 text-zinc-400">
+                    Less than 100 STREAM remains. Replenish the faucet before it runs
+                    out.
+                  </p>
+                </div>
+              )}
+
+              {faucetStatus && !faucetStatus.enabled && (
+                <p className="mt-3 text-sm text-yellow-300">
+                  Claims are currently disabled by the administrator.
+                </p>
+              )}
+            </div>
+          )}
 
           <button
             type="button"
