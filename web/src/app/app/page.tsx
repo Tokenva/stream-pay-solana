@@ -36,6 +36,7 @@ import ActivityStats from "@/components/activity/ActivityStats";
 import ActivityHistory from "@/components/activity/ActivityHistory";
 
 import { useOrganization } from "@/hooks/useOrganization";
+import { useOrganizationPolicy } from "@/hooks/useOrganizationPolicy";
 import { useVault } from "@/hooks/useVault";
 import { useDeposit } from "@/hooks/useDeposit";
 import { useStream } from "@/hooks/useStream";
@@ -343,6 +344,13 @@ function ProtectedHome({
     } = useOrganization();
 
     const {
+        organizationPolicy,
+        exists: policyExists,
+        loading: policyLoading,
+        updatePolicy,
+    } = useOrganizationPolicy(selectedCompany.created_by);
+
+    const {
         vault,
         exists: vaultExists,
         balance: vaultBalance,
@@ -358,6 +366,7 @@ function ProtectedHome({
         tokenBalance,
         deposit,
         loading: depositLoading,
+        refresh: refreshTokenBalance,
     } = useDeposit(
         mint,
         refreshVault,
@@ -638,6 +647,7 @@ function ProtectedHome({
         }
     }
 
+
     async function handleCompanySetup() {
         try {
             setMessage(null);
@@ -645,13 +655,50 @@ function ProtectedHome({
             setOnboardingLoading(true);
 
             if (!publicKey) {
-                throw new Error(
-                    "Connect your treasury wallet first",
-                );
+                throw new Error("Connect your treasury wallet first");
             }
+
+            if (!mint.trim()) {
+                throw new Error("STREAM mint configuration is missing");
+            }
+
+            const approvedMint = new PublicKey(mint);
 
             if (!organizationExists) {
                 await createOrganization();
+            }
+
+            if (policyLoading) {
+                throw new Error(
+                    "Organization policy is still loading. Please retry setup."
+                );
+            }
+
+            if (policyExists) {
+                if (!organizationPolicy) {
+                    throw new Error(
+                        "Organization policy could not be loaded"
+                    );
+                }
+
+                const policy = organizationPolicy;
+
+                if (!policy.approvedMint.equals(approvedMint)) {
+                    await updatePolicy(
+                        approvedMint,
+                        formatTokenAmount(
+                            BigInt(policy.maxTransactionAmount.toString())
+                        ),
+                        formatTokenAmount(
+                            BigInt(policy.maxPayrollAmount.toString())
+                        ),
+                        formatTokenAmount(
+                            BigInt(policy.maxEmployeeAmount.toString())
+                        ),
+                        policy.requireApproval,
+                        policy.paused,
+                    );
+                }
             }
 
             if (!vaultExists) {
@@ -669,9 +716,7 @@ function ProtectedHome({
 
             await refreshVault();
 
-            setMessage(
-                "Company setup complete",
-            );
+            setMessage("Company setup complete");
         } catch (err) {
             setActionError(
                 err instanceof Error
@@ -682,6 +727,7 @@ function ProtectedHome({
             setOnboardingLoading(false);
         }
     }
+
 
     function handleVerifyEmployeeWallet() {
         try {
@@ -1333,6 +1379,18 @@ function ProtectedHome({
                         }
                         depositLoading={
                             depositLoading
+                        }
+                        tokenBalance={
+                            tokenBalance ?? "0"
+                        }
+                        mintAddress={
+                            mint
+                        }
+                        walletAddress={
+                            publicKey?.toBase58() ?? ""
+                        }
+                        onRefreshBalance={
+                            () => void refreshTokenBalance()
                         }
                         canManageTreasury={
                             canManageTreasury
