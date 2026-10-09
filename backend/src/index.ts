@@ -1011,6 +1011,7 @@ app.get(
         stream_address,
         organization,
         employee,
+        amount_received,
         created_at,
         COUNT(*) OVER() AS total_count
       FROM activities

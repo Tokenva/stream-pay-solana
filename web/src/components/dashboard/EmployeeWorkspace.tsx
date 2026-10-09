@@ -107,9 +107,9 @@ export default function EmployeeWorkspace({
     mintAddress,
     selectedStream
       ? Number.parseInt(
-          selectedStream.stream_id,
-          10,
-        )
+        selectedStream.stream_id,
+        10,
+      )
       : null,
     employeeAddress,
     companyOwnerAddress,
@@ -711,13 +711,23 @@ export default function EmployeeWorkspace({
             </p>
           ) : (
             <div className="mt-6 space-y-0">
-              {claimActivities.map((activity) => (
+              {claimActivities.map((activity, index) => (
                 <div
                   key={`${activity.signature}-${activity.instruction_index}`}
                   className="flex items-center justify-between gap-4 border-b border-white/10 py-4"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-white">Payment claimed</p>
+                    <p className="font-medium text-white">
+                      #{index + 1} · Payment claimed
+                    </p>
+
+                    <p className="mt-1 text-sm text-white/80">
+                      Amount received:{" "}
+                      {activity.amount_received !== null &&
+                        activity.amount_received !== undefined
+                        ? `${formatTokenAmount(BigInt(activity.amount_received))} tokens`
+                        : "Pending amount indexing"}
+                    </p>
 
                     <p className="text-sm text-white/60">
                       {activity.block_time

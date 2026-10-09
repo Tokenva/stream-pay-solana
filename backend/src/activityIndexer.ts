@@ -9,6 +9,72 @@ let activitySubscriptionId: number | null = null;
 const INVALID_SIGNATURE =
   "1111111111111111111111111111111111111111111111111111111111111111";
 
+type TokenBalanceEntry = {
+  accountIndex: number;
+  mint: string;
+  owner?: string;
+  uiTokenAmount: {
+    amount: string;
+    decimals: number;
+  };
+};
+
+function calculateAmountReceived(
+  employee: string,
+  mint: string,
+  preBalances: TokenBalanceEntry[],
+  postBalances: TokenBalanceEntry[],
+): string | null {
+  const accountIndexes = new Set([
+    ...preBalances
+      .filter(
+        (balance) =>
+          balance.owner === employee &&
+          balance.mint === mint,
+      )
+      .map((balance) => balance.accountIndex),
+    ...postBalances
+      .filter(
+        (balance) =>
+          balance.owner === employee &&
+          balance.mint === mint,
+      )
+      .map((balance) => balance.accountIndex),
+  ]);
+
+  let received = 0n;
+
+  for (const accountIndex of accountIndexes) {
+    const pre = preBalances.find(
+      (balance) =>
+        balance.accountIndex === accountIndex &&
+        balance.owner === employee &&
+        balance.mint === mint,
+    );
+
+    const post = postBalances.find(
+      (balance) =>
+        balance.accountIndex === accountIndex &&
+        balance.owner === employee &&
+        balance.mint === mint,
+    );
+
+    const before = BigInt(
+      pre?.uiTokenAmount.amount ?? "0",
+    );
+
+    const after = BigInt(
+      post?.uiTokenAmount.amount ?? "0",
+    );
+
+    if (after > before) {
+      received += after - before;
+    }
+  }
+
+  return received > 0n ? received.toString() : null;
+}
+
 function extractInstructions(logs: string[]) {
   return logs
     .filter((log) =>
@@ -32,6 +98,8 @@ async function indexActivity(
   instruction: string,
   instructionIndex: number,
   accounts: string[],
+  preTokenBalances: TokenBalanceEntry[],
+  postTokenBalances: TokenBalanceEntry[],
 ) {
   let streamAddress: string | null = null;
   let organization: string | null = null;
@@ -86,10 +154,16 @@ async function indexActivity(
 
   // Resolve organization and employee from the indexed stream.
   // Claim instructions do not directly populate organization.
+  let indexedStream: {
+    organization: string | null;
+    employee: string | null;
+    mint: string | null;
+  } | null = null;
+
   if (streamAddress) {
     const streamResult = await pool.query(
       `
-      SELECT organization, employee
+      SELECT organization, employee, mint
       FROM streams
       WHERE address = $1
       LIMIT 1
@@ -97,12 +171,28 @@ async function indexActivity(
       [streamAddress],
     );
 
-    const indexedStream = streamResult.rows[0];
+    indexedStream = streamResult.rows[0] ?? null;
 
     if (indexedStream) {
       organization ??= indexedStream.organization;
       employee ??= indexedStream.employee;
     }
+  }
+
+  let amountReceived: string | null = null;
+
+  if (
+    (instruction === "Claim" ||
+      instruction === "claim") &&
+    employee &&
+    indexedStream?.mint
+  ) {
+    amountReceived = calculateAmountReceived(
+      employee,
+      indexedStream.mint,
+      preTokenBalances,
+      postTokenBalances,
+    );
   }
 
   const result = await pool.query(
@@ -115,7 +205,8 @@ async function indexActivity(
       block_time,
       stream_address,
       organization,
-      employee
+      employee,
+      amount_received
     )
     VALUES (
       $1,
@@ -125,7 +216,8 @@ async function indexActivity(
       $5,
       $6,
       $7,
-      $8
+      $8,
+      $9
     )
     ON CONFLICT (
       signature,
@@ -137,7 +229,11 @@ async function indexActivity(
       block_time = EXCLUDED.block_time,
       stream_address = EXCLUDED.stream_address,
       organization = EXCLUDED.organization,
-      employee = EXCLUDED.employee
+      employee = EXCLUDED.employee,
+      amount_received = COALESCE(
+        EXCLUDED.amount_received,
+        activities.amount_received
+      )
     RETURNING id
     `,
     [
@@ -149,6 +245,7 @@ async function indexActivity(
       streamAddress,
       organization,
       employee,
+      amountReceived,
     ],
   );
 
@@ -249,6 +346,10 @@ export function startActivitySubscription() {
             instructionName,
             instructionIndex,
             accounts,
+            (transaction.meta?.preTokenBalances ??
+              []) as TokenBalanceEntry[],
+            (transaction.meta?.postTokenBalances ??
+              []) as TokenBalanceEntry[],
           );
         }
 

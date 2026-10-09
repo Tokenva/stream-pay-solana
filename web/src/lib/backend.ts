@@ -81,6 +81,7 @@ export type Activity = {
   organization: string | null;
   employee: string | null;
   created_at: string;
+  amount_received: string | null;
 };
 
 export async function fetchActivities(
@@ -158,8 +159,10 @@ export async function fetchActivities(
   );
 
   if (!response.ok) {
+    const body = await response.text();
+
     throw new Error(
-      "Failed to fetch activities",
+      `Failed to fetch activities (${response.status}): ${body}`,
     );
   }
 

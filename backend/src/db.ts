@@ -55,6 +55,7 @@ export async function initializeDatabase() {
       stream_address TEXT,
       organization TEXT,
       employee TEXT,
+      amount_received BIGINT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
       UNIQUE (signature, instruction_index)
