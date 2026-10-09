@@ -455,3 +455,15 @@ await pool.query(`
   CREATE INDEX IF NOT EXISTS idx_employee_invitations_expires
   ON employee_invitations (expires_at);
 `);
+
+  // Devnet faucet claim cooldowns
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS faucet_claims (
+      wallet TEXT PRIMARY KEY,
+      last_claim_at TIMESTAMPTZ,
+      signature TEXT,
+      status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'confirmed', 'failed')),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);

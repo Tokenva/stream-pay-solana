@@ -46,7 +46,22 @@ import {
   startActivitySubscription,
 } from "./activityIndexer.js";
 
-import { PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
+  sendAndConfirmTransaction,
+} from "@solana/web3.js";
+
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  createTransferCheckedInstruction,
+  getAccount,
+  getAssociatedTokenAddress,
+  getMint,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 
 import {
   withRpcFailover,
@@ -5304,6 +5319,277 @@ app.post(
   },
 );
 
+const FAUCET_MINT_ADDRESS =
+  "3AmVSgEbmNbzVHeKvsVw6ACffsdLFoNPdMiX26xKkrMn";
+
+const FAUCET_WALLET_ADDRESS =
+  "3vHSQui5ahNUHebERWLffiSw1yHVatbBAMdDW9V4BWpZ";
+
+const FAUCET_CLAIM_AMOUNT = 10;
+const FAUCET_COOLDOWN_HOURS = 24;
+
+app.post(
+  "/api/faucet/claim",
+  requireCustomerSession,
+  async (req, res) => {
+    const wallet = res.locals.wallet as string;
+    let reserved = false;
+
+    try {
+      if (process.env.FAUCET_ENABLED !== "true") {
+        return res.status(503).json({
+          error: "The Devnet faucet is currently disabled.",
+        });
+      }
+
+      if (process.env.SOLANA_NETWORK !== "devnet") {
+        return res.status(503).json({
+          error: "The faucet is only available on Solana Devnet.",
+        });
+      }
+
+      const rpcUrl = process.env.SOLANA_RPC_URL?.trim();
+      const encodedKeypair =
+        process.env.FAUCET_KEYPAIR_BASE58?.trim();
+
+      if (!rpcUrl || !encodedKeypair) {
+        return res.status(503).json({
+          error: "Faucet configuration is incomplete.",
+        });
+      }
+
+      let recipient: PublicKey;
+      let faucetKeypair: Keypair;
+
+      try {
+        recipient = new PublicKey(wallet);
+        faucetKeypair = Keypair.fromSecretKey(
+          bs58.decode(encodedKeypair),
+        );
+      } catch {
+        return res.status(503).json({
+          error: "Faucet wallet configuration is invalid.",
+        });
+      }
+
+      if (
+        faucetKeypair.publicKey.toBase58() !==
+        FAUCET_WALLET_ADDRESS
+      ) {
+        return res.status(503).json({
+          error: "Configured faucet wallet does not match.",
+        });
+      }
+
+      const mintAddress = new PublicKey(FAUCET_MINT_ADDRESS);
+      const connection = new Connection(rpcUrl, "confirmed");
+
+      // Reserve this wallet's claim atomically. Only one concurrent
+      // request can reserve a claim during the cooldown.
+      const reservation = await pool.query(
+        `
+        INSERT INTO faucet_claims (
+          wallet,
+          last_claim_at,
+          signature,
+          status,
+          updated_at
+        )
+        VALUES ($1, NOW(), NULL, 'pending', NOW())
+        ON CONFLICT (wallet) DO UPDATE
+        SET
+          last_claim_at = NOW(),
+          signature = NULL,
+          status = 'pending',
+          updated_at = NOW()
+        WHERE
+          faucet_claims.status = 'failed'
+          OR (
+            faucet_claims.status = 'confirmed'
+            AND faucet_claims.last_claim_at <=
+              NOW() - ($2 * INTERVAL '1 hour')
+          )
+        RETURNING wallet
+        `,
+        [wallet, FAUCET_COOLDOWN_HOURS],
+      );
+
+      if (reservation.rowCount !== 1) {
+        const existing = await pool.query(
+          `
+          SELECT status, last_claim_at
+          FROM faucet_claims
+          WHERE wallet = $1
+          `,
+          [wallet],
+        );
+
+        const claim = existing.rows[0];
+
+        if (claim?.status === "pending") {
+          return res.status(409).json({
+            error: "A claim is already being processed. Please try again shortly.",
+          });
+        }
+
+        const lastClaimAt = claim?.last_claim_at
+          ? new Date(claim.last_claim_at).getTime()
+          : Date.now();
+
+        const retryAt =
+          lastClaimAt + FAUCET_COOLDOWN_HOURS * 60 * 60 * 1000;
+
+        const retryAfterSeconds = Math.max(
+          1,
+          Math.ceil((retryAt - Date.now()) / 1000),
+        );
+
+        return res.status(429).json({
+          error: "You have already claimed test STREAM. Please try again after the 24-hour cooldown.",
+          retryAfterSeconds,
+        });
+      }
+
+      reserved = true;
+
+      const mint = await getMint(
+        connection,
+        mintAddress,
+        "confirmed",
+        TOKEN_PROGRAM_ID,
+      );
+
+      const sourceAta = await getAssociatedTokenAddress(
+        mintAddress,
+        faucetKeypair.publicKey,
+        false,
+        TOKEN_PROGRAM_ID,
+      );
+
+      const recipientAta = await getAssociatedTokenAddress(
+        mintAddress,
+        recipient,
+        false,
+        TOKEN_PROGRAM_ID,
+      );
+
+      // Do not mint tokens or silently use the company treasury.
+      // The faucet must already hold enough of the existing supply.
+      let sourceAccount;
+
+      try {
+        sourceAccount = await getAccount(
+          connection,
+          sourceAta,
+          "confirmed",
+          TOKEN_PROGRAM_ID,
+        );
+      } catch {
+        throw new Error(
+          "Faucet has no funded STREAM token account. Please contact the administrator.",
+        );
+      }
+
+      const amount =
+        BigInt(FAUCET_CLAIM_AMOUNT) *
+        10n ** BigInt(mint.decimals);
+
+      if (sourceAccount.amount < amount) {
+        throw new Error(
+          "Faucet is temporarily out of STREAM inventory.",
+        );
+      }
+
+      const transaction = new Transaction().add(
+        createAssociatedTokenAccountIdempotentInstruction(
+          faucetKeypair.publicKey,
+          recipientAta,
+          recipient,
+          mintAddress,
+          TOKEN_PROGRAM_ID,
+        ),
+        createTransferCheckedInstruction(
+          sourceAta,
+          mintAddress,
+          recipientAta,
+          faucetKeypair.publicKey,
+          amount,
+          mint.decimals,
+          [],
+          TOKEN_PROGRAM_ID,
+        ),
+      );
+
+      const signature = await sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [faucetKeypair],
+        {
+          commitment: "confirmed",
+          maxRetries: 3,
+        },
+      );
+
+      await pool.query(
+        `
+        UPDATE faucet_claims
+        SET
+          status = 'confirmed',
+          signature = $2,
+          updated_at = NOW()
+        WHERE wallet = $1
+        `,
+        [wallet, signature],
+      );
+
+      return res.json({
+        success: true,
+        amount: FAUCET_CLAIM_AMOUNT,
+        token: "STREAM",
+        signature,
+      });
+    } catch (error) {
+      if (reserved) {
+        try {
+          await pool.query(
+            `
+            UPDATE faucet_claims
+            SET
+              status = 'failed',
+              last_claim_at = NULL,
+              signature = NULL,
+              updated_at = NOW()
+            WHERE wallet = $1 AND status = 'pending'
+            `,
+            [wallet],
+          );
+        } catch (databaseError) {
+          log("error", "faucet_claim_cleanup_failed", {
+            wallet,
+            error:
+              databaseError instanceof Error
+                ? databaseError.message
+                : String(databaseError),
+          });
+        }
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Faucet claim failed.";
+
+      log("error", "faucet_claim_failed", {
+        wallet,
+        error: message,
+      });
+
+      return res.status(503).json({
+        error: message,
+      });
+    }
+  },
+);
 
 async function startServer() {
   await initializeDatabase();

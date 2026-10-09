@@ -31,6 +31,42 @@ export default function TreasuryFunding({
 }: TreasuryFundingProps) {
   const [fundingHelpOpen, setFundingHelpOpen] = useState(false);
   const [copiedField, setCopiedField] = useState<"mint" | "wallet" | null>(null);
+  const [faucetLoading, setFaucetLoading] = useState(false);
+  const [faucetMessage, setFaucetMessage] = useState<string | null>(null);
+  const [faucetSignature, setFaucetSignature] = useState<string | null>(null);
+
+  async function claimTestStream() {
+    setFaucetLoading(true);
+    setFaucetMessage(null);
+    setFaucetSignature(null);
+
+    try {
+      const response = await fetch("/api/backend/api/faucet/claim", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({}),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "Faucet claim failed.");
+      }
+
+      setFaucetMessage("Successfully claimed 10 STREAM.");
+      setFaucetSignature(result.signature ?? null);
+      onRefreshBalance();
+    } catch (error) {
+      setFaucetMessage(
+        error instanceof Error
+          ? error.message
+          : "Faucet claim failed.",
+      );
+    } finally {
+      setFaucetLoading(false);
+    }
+  }
 
   async function copyValue(value: string, field: "mint" | "wallet") {
     if (!value) return;
@@ -81,6 +117,43 @@ export default function TreasuryFunding({
           </p>
 
           <p className="mt-2 text-2xl font-semibold">{tokenBalance} STREAM</p>
+        </div>
+
+        {/* Devnet test tokens faucet */}
+        <div className="mb-5 rounded-xl border border-zinc-800 bg-black/20 p-4">
+          <p className="text-sm font-medium text-white">
+            Devnet test tokens
+          </p>
+
+          <p className="mt-1 text-sm text-zinc-500">
+            Claim 10 existing test STREAM. One claim per wallet every 24 hours.
+          </p>
+
+          <button
+            type="button"
+            disabled={faucetLoading || !walletAddress}
+            onClick={() => void claimTestStream()}
+            className="mt-4 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {faucetLoading ? "Claiming..." : "Get 10 test STREAM"}
+          </button>
+
+          {faucetMessage && (
+            <p className="mt-3 break-words text-sm text-zinc-300">
+              {faucetMessage}
+            </p>
+          )}
+
+          {faucetSignature && (
+            <a
+              href={`https://explorer.solana.com/tx/${faucetSignature}?cluster=devnet`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block break-all text-sm text-blue-400 underline"
+            >
+              View transaction on Solana Explorer
+            </a>
+          )}
         </div>
 
         {/* Zero / insufficient balance warning */}

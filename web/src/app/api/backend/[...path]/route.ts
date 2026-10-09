@@ -28,6 +28,7 @@ const ALLOWED_PATHS = new Set([
   "/api/indexed/streams",
 
   "/api/application",
+  "/api/faucet/claim",
 
   "/api/activities",
   "/api/activities/stats",
