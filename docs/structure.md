@@ -1,18 +1,17 @@
 # StreamPay Solana Project Structure
 
-This repository combines the Solana Anchor program, an EVM gateway, a TypeScript backend, and a Next.js frontend. The tree below reflects the current source layout in this workspace and intentionally excludes generated dependency/build artifacts such as `target/`, `node_modules/`, `.next/`, and cache output.
+This repository combines the Solana Anchor program, the EVM gateway, a TypeScript backend, and a Next.js frontend. The tree below reflects the current live source layout in this workspace and intentionally omits generated dependency/build output such as `target/`, `node_modules/`, `.next/`, and cache directories.
 
 ```text
 stream-pay-solana/
+├── .anchor/
+├── .backups/
 ├── .gitignore
 ├── .prettierignore
 ├── Anchor.toml
 ├── Cargo.lock
 ├── Cargo.toml
-├── deployment.json
-├── readme.md
-├── rust-toolchain.toml
-├── app/                                  # workspace scaffold / placeholder
+├── app/                                  # wrapper workspace / scaffold
 ├── backend/
 │   ├── .env
 │   ├── .env.example
@@ -29,6 +28,7 @@ stream-pay-solana/
 │       ├── company.ts
 │       ├── crossChain.ts
 │       ├── db.ts
+│       ├── employeeInvitations.ts
 │       ├── idl/
 │       │   └── stream_pay_solana.json
 │       ├── index.ts
@@ -36,6 +36,7 @@ stream-pay-solana/
 │       ├── logger.ts
 │       ├── solana.ts
 │       └── webhooks.ts
+├── deployment.json
 ├── docs/
 │   ├── M12_REPRODUCIBLE_DEMO.md
 │   ├── P1_PRODUCT_DEFINITION.md
@@ -52,8 +53,11 @@ stream-pay-solana/
 │   ├── deployment.json
 │   ├── hardhat.config.ts
 │   ├── package.json
+│   ├── package-lock.json
 │   ├── remappings.txt
 │   ├── tsconfig.json
+│   ├── artifacts/
+│   ├── cache/
 │   ├── contracts/
 │   │   ├── StreamPayEvmGateway.sol
 │   │   ├── StreamPayM11Token.sol
@@ -61,6 +65,8 @@ stream-pay-solana/
 │   │   │   └── IWormhole.sol
 │   │   └── mocks/
 │   │       └── MockWormhole.sol
+│   ├── ignition/
+│   ├── node_modules/
 │   ├── scripts/
 │   │   ├── check-protocol-config.ts
 │   │   ├── close-vaa-signatures.ts
@@ -118,6 +124,8 @@ stream-pay-solana/
 │           ├── security.rs
 │           ├── stream.rs
 │           └── vault.rs
+├── readme.md
+├── rust-toolchain.toml
 ├── web/
 │   ├── .env
 │   ├── .env.example
@@ -157,9 +165,13 @@ stream-pay-solana/
 │       │   │   └── page.tsx
 │       │   ├── favicon.ico
 │       │   ├── globals.css
+│       │   ├── join/
+│       │   │   └── [code]/
+│       │   │       └── page.tsx
 │       │   ├── layout.tsx
 │       │   ├── login/
 │       │   │   └── page.tsx
+│       │   ├── not-found.tsx
 │       │   ├── ops/
 │       │   │   └── page.tsx
 │       │   └── page.tsx
@@ -175,6 +187,7 @@ stream-pay-solana/
 │       │   │   └── PilotStatus.tsx
 │       │   ├── dashboard/
 │       │   │   ├── CompanyOverview.tsx
+│       │   │   ├── EmployeeWorkspace.tsx
 │       │   │   └── OperationalDashboard.tsx
 │       │   ├── payroll/
 │       │   │   ├── ActiveStream.tsx
@@ -212,9 +225,10 @@ stream-pay-solana/
 
 - `programs/stream-pay-solana/`: Solana Anchor program and Rust test suite.
 - `evm-gateway/`: Solidity smart contracts, deployment config, and Hardhat scripts.
-- `backend/`: TypeScript services for indexing, auth, company logic, and cross-chain processing.
-- `web/`: Next.js app with pages, API routes, dashboard components, hooks, IDL bindings, and wallet logic.
-- `docs/`: product, roadmap, security, and project context documentation.
+- `backend/`: TypeScript services for indexing, auth, company logic, employee invitation logic, and cross-chain processing.
+- `web/`: Next.js app with pages, API routes, dashboard views, hooks, IDL bindings, join flow, and wallet logic.
+- `docs/`: product, roadmap, threat-model, and project context documentation.
 - `idls/`: Wormhole verification interface definitions used across stacks.
+- `app/`: workspace wrapper and container scaffold.
 
-This structure intentionally excludes generated output such as `target/`, `node_modules/`, `.next/`, build caches, and other transient artifacts, while keeping the current source-relevant project files visible.
+This structure intentionally excludes generated output such as `target/`, `node_modules/`, `.next/`, build caches, and other transient artifacts while keeping the source-relevant project files visible.

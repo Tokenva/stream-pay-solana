@@ -1880,7 +1880,7 @@ export default function Home() {
                     {/* Footer */}
                     <footer className="flex min-h-16 items-center justify-between border-t border-white/[0.07] py-5 text-[10px] uppercase tracking-[0.16em] text-white/20">
                         <span>TokenvaPay</span>
-                        <span>© 2026 Tokenva</span>
+                        <span>© {new Date().getFullYear()} Tokenva</span>
                     </footer>
                 </div>
             </main>
