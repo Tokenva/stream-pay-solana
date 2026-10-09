@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type ActiveStreamProps = {
   streamData: {
     totalAmount: bigint | { toString(): string };
@@ -58,6 +60,22 @@ export default function ActiveStream({
   shortenAddress,
   formatTokenAmount,
 }: ActiveStreamProps) {
+  const STREAMS_PER_PAGE = 5;
+
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(indexedStreams.length / STREAMS_PER_PAGE),
+  );
+
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedStreams = indexedStreams.slice(
+    (safePage - 1) * STREAMS_PER_PAGE,
+    safePage * STREAMS_PER_PAGE,
+  );
+
   const activeIndexedStreams =
     indexedStreams.filter(
       (item) => !item.canceled,
@@ -174,8 +192,8 @@ export default function ActiveStream({
 
                   <p
                     className={`mt-1 text-sm ${canTopUpStream || canCancelStream
-                        ? "text-green-400"
-                        : "text-zinc-600"
+                      ? "text-green-400"
+                      : "text-zinc-600"
                       }`}
                   >
                     {canTopUpStream
@@ -329,7 +347,7 @@ export default function ActiveStream({
               </h2>
 
               <p className="mt-2 text-sm text-zinc-500">
-                Streams indexed by the Tokenva backend.
+                Streams indexed by the TokenvaPay backend.
               </p>
             </div>
           </div>
@@ -419,37 +437,77 @@ export default function ActiveStream({
         {!indexedStreamsLoading &&
           !indexedStreamsError &&
           indexedStreams.length > 0 && (
-            <div className="mt-6 space-y-3">
-              {indexedStreams.map((item) => (
-                <div
-                  key={item.address}
-                  className="rounded-xl border border-zinc-800 bg-black/20 p-4"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-medium">
-                        Stream #{item.stream_id}
-                      </p>
+            <>
+              <div className="mt-6 space-y-3">
+                {paginatedStreams.map((item) => (
+                  <div
+                    key={item.address}
+                    className="rounded-xl border border-zinc-800 bg-black/20 p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium">
+                          Stream #{item.stream_id}
+                        </p>
 
-                      <p className="mt-1 break-all text-xs text-zinc-600">
-                        {item.address}
-                      </p>
+                        <p className="mt-1 break-all text-xs text-zinc-600">
+                          {item.address}
+                        </p>
+                      </div>
+
+                      <span
+                        className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${item.canceled
+                          ? "bg-red-500/10 text-red-400"
+                          : "bg-green-500/10 text-green-400"
+                          }`}
+                      >
+                        {item.canceled
+                          ? "Canceled"
+                          : "Active"}
+                      </span>
                     </div>
-
-                    <span
-                      className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${item.canceled
-                        ? "bg-red-500/10 text-red-400"
-                        : "bg-green-500/10 text-green-400"
-                        }`}
-                    >
-                      {item.canceled
-                        ? "Canceled"
-                        : "Active"}
-                    </span>
                   </div>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-col gap-3 border-t border-zinc-800 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-zinc-500">
+                  Showing {(safePage - 1) * STREAMS_PER_PAGE + 1}–
+                  {Math.min(safePage * STREAMS_PER_PAGE, indexedStreams.length)} of{" "}
+                  {indexedStreams.length} streams
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((page) => Math.max(1, page - 1))
+                    }
+                    disabled={safePage === 1}
+                    className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+
+                  <span className="px-2 text-xs text-zinc-500">
+                    Page {safePage} of {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((page) =>
+                        Math.min(totalPages, page + 1),
+                      )
+                    }
+                    disabled={safePage === totalPages}
+                    className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            </>
           )}
       </section>
     </>
