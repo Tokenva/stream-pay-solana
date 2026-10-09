@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -151,29 +152,33 @@ export default function EmployeeWorkspace({
     }
   }, [streams, selectedStreamId]);
 
+  const loadClaimActivities = useCallback(async () => {
+    const result = await fetchActivities({
+      companyId,
+      employee: walletAddress ?? undefined,
+      limit: 100,
+      offset: 0,
+    });
+
+    const claims = result.activities.filter(
+      (activity) =>
+        activity.instruction.toLowerCase() === "claim",
+    );
+
+    setClaimActivities(claims);
+    setClaimHistoryPage(1);
+
+    return claims;
+  }, [companyId, walletAddress]);
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadClaimActivities() {
+    async function load() {
       setClaimActivitiesLoading(true);
 
       try {
-        const result = await fetchActivities({
-          companyId,
-          employee: walletAddress ?? undefined,
-          limit: 100,
-          offset: 0,
-        });
-
-        if (!cancelled) {
-          setClaimActivities(
-            result.activities.filter(
-              (activity) =>
-                activity.instruction.toLowerCase() === "claim",
-            ),
-          );
-          setClaimHistoryPage(1);
-        }
+        await loadClaimActivities();
       } catch (error) {
         console.error("Failed to load claim history:", error);
 
@@ -188,16 +193,12 @@ export default function EmployeeWorkspace({
       }
     }
 
-    void loadClaimActivities();
+    void load();
 
     return () => {
       cancelled = true;
     };
-  }, [companyId, walletAddress]);
-
-  useEffect(() => {
-    setClaimHistoryPage(1);
-  }, [companyId, walletAddress]);
+  }, [loadClaimActivities]);
 
   const totalScheduled = useMemo(
     () =>
@@ -239,15 +240,45 @@ export default function EmployeeWorkspace({
 
       setLastClaimSignature(signature);
       setClaimSyncMessage(
-        "Claim confirmed. Transaction recorded on Solana.",
+        "Claim confirmed on Solana. Updating payment history...",
       );
-      setClaimStatus(null);
+      setClaimStatus("syncing");
+
       void refreshIndexedStreams();
+
+      let historyUpdated = false;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+
+        try {
+          const claims = await loadClaimActivities();
+          if (claims.some((activity) => activity.signature === signature)) {
+            historyUpdated = true;
+            break;
+          }
+        } catch (error) {
+          console.error("Failed to refresh claim history:", error);
+        }
+      }
+
+      if (historyUpdated) {
+        setClaimSyncMessage(
+          "Claim confirmed on Solana. Payment history updated.",
+        );
+      } else {
+        setClaimSyncMessage(
+          "Claim confirmed on Solana. Payment history may take a moment to appear.",
+        );
+      }
     } catch (err) {
       console.error("Employee claim failed:", err);
       setClaimSyncMessage(
         err instanceof Error ? err.message : "Claim failed.",
       );
+    } finally {
       setClaimStatus(null);
     }
   }

@@ -118,7 +118,6 @@ export default function TreasuryFunding({
     if (canManageTreasury) {
       void refreshFaucetStatus();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManageTreasury]);
 
   async function copyValue(value: string, field: "mint" | "wallet") {
