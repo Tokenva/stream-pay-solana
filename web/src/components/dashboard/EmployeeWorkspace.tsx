@@ -459,7 +459,7 @@ export default function EmployeeWorkspace({
                         </div>
 
                         <div className="flex items-center gap-4">
-                          <div className="text-right">
+                          <div className="flex gap-5">
                             <p className="text-xs text-zinc-500">
                               Amount
                             </p>
