@@ -1,4 +1,4 @@
-# Tokenva
+# TokenvaPay
 
 **Trustless Cross-Chain Asset Streaming & Payroll Protocol**
 
