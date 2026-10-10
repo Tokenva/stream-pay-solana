@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function NotFound() {
@@ -5,12 +6,9 @@ export default function NotFound() {
     <main className="min-h-screen bg-black text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 sm:px-8">
         <header className="flex h-20 items-center justify-between border-b border-white/[0.08]">
-          <Link
-            href="/"
-            className="text-sm font-semibold tracking-[-0.02em] text-white"
-          >
-            TokenvaPay
-          </Link>
+            <Link href="/" className="group flex items-center gap-2.5">
+              <Image src='/logo.svg' alt='logo' width='200' height='200' />
+            </Link>
 
           <span className="text-xs uppercase tracking-[0.2em] text-white/30">
             Tokenva

@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { logout } from "@/lib/auth";
 import { fetchActivities, type Activity } from "@/lib/backend";
+import Image from "next/image";
 
 type EmployeeWorkspaceProps = {
   companyId: string;
@@ -305,7 +306,9 @@ export default function EmployeeWorkspace({
             </p>
 
             <h1 className="dashboard-title">
-              TokenvaPay
+              <Link href='/'>
+                <Image src='/logo.svg' alt='logo' width='200' height='200' />
+              </Link>
             </h1>
 
             <p className="dashboard-subtitle">
@@ -775,7 +778,7 @@ export default function EmployeeWorkspace({
                       <p className="mt-1 text-sm text-white/80">
                         Amount received:{" "}
                         {activity.amount_received !== null &&
-                        activity.amount_received !== undefined
+                          activity.amount_received !== undefined
                           ? `${formatTokenAmount(BigInt(activity.amount_received))} tokens`
                           : "Pending amount indexing"}
                       </p>

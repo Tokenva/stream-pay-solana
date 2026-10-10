@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import Image from "next/image";
 
 /* ═══════════════════════════════════════════════
    DATA
@@ -1097,44 +1098,73 @@ export default function LandingPage() {
     };
   }, []);
 
-  // Scroll-spy: highlight the nav item for the section in view
+  // Scroll-spy: active = last section whose top has crossed below the fixed nav
   useEffect(() => {
     const ids = NAV_SECTIONS.map(([href]) => href.slice(1));
-    const elements = ids
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => Boolean(el));
+    // Offset: fixed nav height (~64px) + a little breathing room
+    const OFFSET = 96;
+    let ticking = false;
+    let lockedUntil = 0; // ignore scroll updates briefly after click
 
-    if (elements.length === 0) return;
+    const updateActive = () => {
+      if (Date.now() < lockedUntil) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Prefer the topmost intersecting section
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort(
-            (a, b) =>
-              a.boundingClientRect.top - b.boundingClientRect.top
-          );
-
-        if (visible.length > 0) {
-          setActiveSection(`#${visible[0].target.id}`);
+      let current = "";
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        // Section has reached / passed the nav line
+        if (el.getBoundingClientRect().top <= OFFSET) {
+          current = `#${id}`;
         }
-      },
-      {
-        // Offset for fixed nav (~64px) + some lead-in
-        rootMargin: "-80px 0px -45% 0px",
-        threshold: [0, 0.15, 0.35, 0.55],
       }
-    );
 
-    elements.forEach((el) => observer.observe(el));
+      // Near bottom of page → force last section active
+      const nearBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 48;
+      if (nearBottom && ids.length > 0) {
+        current = `#${ids[ids.length - 1]}`;
+      }
 
-    // Sync with initial hash if present
-    if (typeof window !== "undefined" && window.location.hash) {
+      setActiveSection((prev) => (prev === current ? prev : current));
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        updateActive();
+        ticking = false;
+      });
+    };
+
+    // Hold highlight while smooth-scroll runs after a nav click
+    const onNavClick = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail) {
+        setActiveSection(detail);
+        lockedUntil = Date.now() + 700;
+      }
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    window.addEventListener("tvp-nav-click", onNavClick);
+
+    // Initial: hash wins, else compute from scroll position
+    if (window.location.hash && ids.includes(window.location.hash.slice(1))) {
       setActiveSection(window.location.hash);
+      lockedUntil = Date.now() + 700;
+    } else {
+      updateActive();
     }
 
-    return () => observer.disconnect();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("tvp-nav-click", onNavClick);
+    };
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -1146,6 +1176,11 @@ export default function LandingPage() {
   const accessHref = authenticated ? "/app" : "/login";
   const accessLabel = authenticated ? "Dashboard" : "Get started";
 
+  const handleNavClick = useCallback((href: string) => {
+    setActiveSection(href);
+    window.dispatchEvent(new CustomEvent("tvp-nav-click", { detail: href }));
+  }, []);
+
   return (
     <main className="relative min-h-screen scroll-smooth overflow-x-clip bg-black text-white">
       <GrainOverlay />
@@ -1155,12 +1190,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <Link href="/" className="group flex items-center gap-2.5">
-              <span className="relative flex h-6 w-6 items-center justify-center">
-                <span className="absolute inset-0 rounded-md border border-[#8ff5aa]/30" />
-                <span className="absolute inset-0 rounded-md border border-[#8ff5aa]/15" style={{ transform: "rotate(45deg)" }} />
-                <span className="relative h-1.5 w-1.5 rounded-full bg-[#8ff5aa]" />
-              </span>
-              <span className="text-lg font-semibold tracking-[-0.03em]">TokenvaPay</span>
+              <Image src='/logo.svg' alt='logo' width='200' height='200' />
             </Link>
 
             <div className="hidden items-center gap-8 text-sm md:flex">
@@ -1170,20 +1200,18 @@ export default function LandingPage() {
                   <Link
                     key={href}
                     href={href}
-                    onClick={() => setActiveSection(href)}
-                    className={`relative transition ${
-                      isActive
-                        ? "text-white"
-                        : "text-white/45 hover:text-white/85"
-                    }`}
+                    onClick={() => handleNavClick(href)}
+                    className={`relative transition ${isActive
+                      ? "text-white"
+                      : "text-white/45 hover:text-white/85"
+                      }`}
                   >
                     {label}
                     <span
-                      className={`absolute -bottom-1 left-0 h-px w-full origin-left transition-transform duration-300 ${
-                        isActive
-                          ? "scale-x-100 bg-[#8ff5aa]"
-                          : "scale-x-0 bg-white/40"
-                      }`}
+                      className={`absolute -bottom-1 left-0 h-px w-full origin-left transition-transform duration-300 ${isActive
+                        ? "scale-x-100 bg-[#8ff5aa]"
+                        : "scale-x-0 bg-white/40"
+                        }`}
                       aria-hidden="true"
                     />
                   </Link>
@@ -1231,12 +1259,11 @@ export default function LandingPage() {
                       <Link
                         key={href}
                         href={href}
-                        onClick={() => setActiveSection(href)}
-                        className={`block rounded-xl px-4 py-3 text-sm transition ${
-                          isActive
-                            ? "bg-white/5 text-white"
-                            : "text-white/55 hover:bg-white/5 hover:text-white"
-                        }`}
+                        onClick={() => handleNavClick(href)}
+                        className={`block rounded-xl px-4 py-3 text-sm transition ${isActive
+                          ? "bg-white/5 text-white"
+                          : "text-white/55 hover:bg-white/5 hover:text-white"
+                          }`}
                       >
                         {label}
                       </Link>
@@ -1908,11 +1935,9 @@ export default function LandingPage() {
           <div className="grid gap-14 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
             <div>
               <div className="flex items-center gap-2.5">
-                <span className="relative flex h-5 w-5 items-center justify-center">
-                  <span className="absolute inset-0 rounded-md border border-[#8ff5aa]/30" />
-                  <span className="relative h-1 w-1 rounded-full bg-[#8ff5aa]" />
-                </span>
-                <span className="text-lg font-semibold tracking-[-0.03em]">TokenvaPay</span>
+                <Link href='/'>
+                  <Image src='/logo.svg' alt='logo' width='200' height='200' />
+                </Link>
               </div>
 
               <p className="mt-5 max-w-xs text-sm leading-6 text-white/35">
@@ -2100,11 +2125,10 @@ function PartnerCard() {
           ].map(([label, done], i) => (
             <div key={i} className="flex items-center gap-3 border-b border-white/6 pb-3 last:border-0">
               <div
-                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                  done
-                    ? "border-[#8ff5aa]/40 bg-[#8ff5aa]/10"
-                    : "border-white/15"
-                }`}
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${done
+                  ? "border-[#8ff5aa]/40 bg-[#8ff5aa]/10"
+                  : "border-white/15"
+                  }`}
               >
                 {done && (
                   <svg className="h-2 w-2" viewBox="0 0 8 8" fill="none" stroke="#8ff5aa" strokeWidth="1.6">

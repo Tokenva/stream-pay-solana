@@ -23,6 +23,7 @@ import {
   logout,
 } from "@/lib/auth";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -119,11 +120,8 @@ export default function LoginPage() {
       <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 sm:px-8">
         {/* Header */}
         <header className="flex h-20 items-center justify-between border-b border-white/[0.08]">
-          <Link
-            href="/"
-            className="text-sm font-semibold tracking-[-0.02em] text-white"
-          >
-            TokenvaPay
+          <Link href='/'>
+            <Image src='/logo.svg' alt='logo' width='200' height='200' />
           </Link>
 
           <Link

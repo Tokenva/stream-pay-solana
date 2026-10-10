@@ -384,7 +384,7 @@ export default function OpsPage() {
                     <header className="flex items-center justify-between border-b border-white/10 pb-6">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">
-                                TOKENVA
+                                TOKENVAPAY
                             </p>
 
                             <p className="mt-2 text-sm font-medium text-white/70">

@@ -43,6 +43,7 @@ import { useStream } from "@/hooks/useStream";
 import { useStreamActions } from "@/hooks/useStreamActions";
 import { useIndexedStreams } from "@/hooks/useIndexedStreams";
 import Link from "next/link";
+import Image from "next/image";
 
 const EMPTY_MINT = "";
 
@@ -1112,11 +1113,11 @@ function ProtectedHome({
                             Programmable payment infrastructure
                         </p>
 
-                        <h1 className="dashboard-title">
-                            <Link href="/">
-                                TokenvaPay
+                        <div>
+                            <Link href='/'>
+                                <Image src='/logo.svg' alt='logo' width='200' height='200' />
                             </Link>
-                        </h1>
+                        </div>
 
                         <p className="dashboard-subtitle">
                             Payroll operations for global teams — treasury, payment streams,
@@ -1837,8 +1838,10 @@ export default function Home() {
                 <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 sm:px-8">
                     {/* Header */}
                     <header className="flex h-20 items-center justify-between border-b border-white/[0.08]">
-                        <div className="text-sm font-semibold tracking-[-0.02em]">
-                            TokenvaPay
+                        <div>
+                            <Link href='/'>
+                                <Image src='/logo.svg' alt='logo' width='200' height='200' />
+                            </Link>
                         </div>
 
                         <div className="text-[10px] uppercase tracking-[0.22em] text-white/25">
@@ -1893,11 +1896,8 @@ export default function Home() {
                 return (
                     <main className="min-h-screen bg-black text-white">
                         <header className="mx-auto flex h-20 w-full max-w-5xl items-center px-5 sm:px-8">
-                            <Link
-                                href="/"
-                                className="text-sm font-semibold tracking-[-0.02em] text-white/80 transition hover:text-white"
-                            >
-                                TokenvaPay
+                            <Link href='/'>
+                                <Image src='/logo.svg' alt='logo' width='200' height='200' />
                             </Link>
                         </header>
                         <div className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-5 py-16 sm:px-8">
