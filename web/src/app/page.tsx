@@ -1073,8 +1073,17 @@ function SecurityShield() {
    MAIN
    ═══════════════════════════════════════════════ */
 
+const NAV_SECTIONS = [
+  ["#product", "Product"],
+  ["#how-it-works", "How it works"],
+  ["#technology", "Technology"],
+  ["#security", "Security"],
+  ["#design-partners", "Design partners"],
+] as const;
+
 export default function LandingPage() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [activeSection, setActiveSection] = useState("");
   const heroRef = useRef<HTMLElement>(null);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
@@ -1088,6 +1097,46 @@ export default function LandingPage() {
     };
   }, []);
 
+  // Scroll-spy: highlight the nav item for the section in view
+  useEffect(() => {
+    const ids = NAV_SECTIONS.map(([href]) => href.slice(1));
+    const elements = ids
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => Boolean(el));
+
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Prefer the topmost intersecting section
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort(
+            (a, b) =>
+              a.boundingClientRect.top - b.boundingClientRect.top
+          );
+
+        if (visible.length > 0) {
+          setActiveSection(`#${visible[0].target.id}`);
+        }
+      },
+      {
+        // Offset for fixed nav (~64px) + some lead-in
+        rootMargin: "-80px 0px -45% 0px",
+        threshold: [0, 0.15, 0.35, 0.55],
+      }
+    );
+
+    elements.forEach((el) => observer.observe(el));
+
+    // Sync with initial hash if present
+    if (typeof window !== "undefined" && window.location.hash) {
+      setActiveSection(window.location.hash);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = heroRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -1098,11 +1147,11 @@ export default function LandingPage() {
   const accessLabel = authenticated ? "Dashboard" : "Get started";
 
   return (
-    <main className="relative min-h-screen scroll-smooth overflow-x-hidden bg-black text-white">
+    <main className="relative min-h-screen scroll-smooth overflow-x-clip bg-black text-white">
       <GrainOverlay />
 
       {/* ═══════════════ NAV ═══════════════ */}
-      <nav className="sticky top-0 z-50 border-b border-white/8 bg-black/70 backdrop-blur-2xl">
+      <nav className="fixed inset-x-0 top-0 z-50 border-b border-white/8 bg-black/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-black/70">
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <Link href="/" className="group flex items-center gap-2.5">
@@ -1114,22 +1163,32 @@ export default function LandingPage() {
               <span className="text-lg font-semibold tracking-[-0.03em]">TokenvaPay</span>
             </Link>
 
-            <div className="hidden items-center gap-8 text-sm text-white/45 md:flex">
-              {[
-                ["#product", "Product"],
-                ["#how-it-works", "How it works"],
-                ["#technology", "Technology"],
-                ["#security", "Security"],
-                ["#design-partners", "Design partners"],
-              ].map(([href, label]) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="relative transition hover:text-white/85"
-                >
-                  {label}
-                </Link>
-              ))}
+            <div className="hidden items-center gap-8 text-sm md:flex">
+              {NAV_SECTIONS.map(([href, label]) => {
+                const isActive = activeSection === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setActiveSection(href)}
+                    className={`relative transition ${
+                      isActive
+                        ? "text-white"
+                        : "text-white/45 hover:text-white/85"
+                    }`}
+                  >
+                    {label}
+                    <span
+                      className={`absolute -bottom-1 left-0 h-px w-full origin-left transition-transform duration-300 ${
+                        isActive
+                          ? "scale-x-100 bg-[#8ff5aa]"
+                          : "scale-x-0 bg-white/40"
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </Link>
+                );
+              })}
             </div>
 
             <div className="flex items-center gap-2">
@@ -1166,17 +1225,23 @@ export default function LandingPage() {
                 </summary>
 
                 <div className="absolute right-0 top-12 w-56 overflow-hidden rounded-2xl border border-white/8 bg-zinc-950/95 p-2 shadow-2xl backdrop-blur-2xl">
-                  {[
-                    ["#product", "Product"],
-                    ["#how-it-works", "How it works"],
-                    ["#technology", "Technology"],
-                    ["#security", "Security"],
-                    ["#design-partners", "Design partners"],
-                  ].map(([href, label]) => (
-                    <Link key={href} href={href} className="block rounded-xl px-4 py-3 text-sm text-white/55 transition hover:bg-white/5 hover:text-white">
-                      {label}
-                    </Link>
-                  ))}
+                  {NAV_SECTIONS.map(([href, label]) => {
+                    const isActive = activeSection === href;
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={() => setActiveSection(href)}
+                        className={`block rounded-xl px-4 py-3 text-sm transition ${
+                          isActive
+                            ? "bg-white/5 text-white"
+                            : "text-white/55 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {label}
+                      </Link>
+                    );
+                  })}
                   <div className="my-2 border-t border-white/8" />
                   <Link
                     href={authenticated ? "/app" : "/login"}
