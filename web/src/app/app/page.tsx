@@ -1133,9 +1133,9 @@ function ProtectedHome({
 
                 <nav className="demo-nav" aria-label="Dashboard sections">
                     <a href="#overview">Overview</a>
-                    <a href="#payroll">Payroll</a>
                     <a href="#treasury">Treasury</a>
                     <a href="#employees">Employees</a>
+                    <a href="#payroll">Payroll</a>
                     <a href="#reports">Reports</a>
                     <a href="#activity">Activity</a>
                 </nav>
@@ -1184,7 +1184,7 @@ function ProtectedHome({
                     />
                 </div>
 
-                <div id="payroll">
+                <div>
                     <p className="demo-section-label">
                         Payroll Operations
                     </p>
@@ -1241,6 +1241,88 @@ function ProtectedHome({
                             shortenAddress
                         }
                     />
+                </div>
+
+                <div id="treasury">
+                    <TreasuryFunding
+                        depositAmount={
+                            depositAmount
+                        }
+                        setDepositAmount={
+                            setDepositAmount
+                        }
+                        depositLoading={
+                            depositLoading
+                        }
+                        tokenBalance={
+                            tokenBalance ?? "0"
+                        }
+                        mintAddress={
+                            mint
+                        }
+                        walletAddress={
+                            publicKey?.toBase58() ?? ""
+                        }
+                        onRefreshBalance={
+                            () => void refreshTokenBalance()
+                        }
+                        canManageTreasury={
+                            canManageTreasury
+                        }
+                        vaultExists={
+                            vaultExists
+                        }
+                        tokenAccount={
+                            !!tokenAccount
+                        }
+                        onDeposit={
+                            handleDeposit
+                        }
+                    />
+                </div>
+
+                <div id="employees">
+                    <EmployeeDirectory
+                        employeeAddress={
+                            employeeAddress
+                        }
+                        setEmployeeAddress={
+                            setEmployeeAddress
+                        }
+                        employeeWalletValid={
+                            employeeWalletValid
+                        }
+                        setEmployeeWalletValid={
+                            setEmployeeWalletValid
+                        }
+                        employeeDirectory={
+                            employeeDirectory
+                        }
+                        onVerify={
+                            handleVerifyEmployeeWallet
+                        }
+                        onSelect={
+                            handleSelectEmployee
+                        }
+                        shortenAddress={
+                            shortenAddress
+                        }
+                        onInvite={
+                            handleCreateEmployeeInvitation
+                        }
+                        invitationLoading={
+                            invitationLoading
+                        }
+                        invitationCode={
+                            invitationCode
+                        }
+                        invitationPath={
+                            invitationPath
+                        }
+                    />
+                </div>
+
+                <div id="payroll">
                     <CreatePayroll
                         payrollTemplate={
                             payrollTemplate
@@ -1372,86 +1454,6 @@ function ProtectedHome({
                         }
                     />
                 </div>
-
-                <div id="treasury">
-                    <TreasuryFunding
-                        depositAmount={
-                            depositAmount
-                        }
-                        setDepositAmount={
-                            setDepositAmount
-                        }
-                        depositLoading={
-                            depositLoading
-                        }
-                        tokenBalance={
-                            tokenBalance ?? "0"
-                        }
-                        mintAddress={
-                            mint
-                        }
-                        walletAddress={
-                            publicKey?.toBase58() ?? ""
-                        }
-                        onRefreshBalance={
-                            () => void refreshTokenBalance()
-                        }
-                        canManageTreasury={
-                            canManageTreasury
-                        }
-                        vaultExists={
-                            vaultExists
-                        }
-                        tokenAccount={
-                            !!tokenAccount
-                        }
-                        onDeposit={
-                            handleDeposit
-                        }
-                    />
-                </div>
-
-                <div id="employees">
-                    <EmployeeDirectory
-                        employeeAddress={
-                            employeeAddress
-                        }
-                        setEmployeeAddress={
-                            setEmployeeAddress
-                        }
-                        employeeWalletValid={
-                            employeeWalletValid
-                        }
-                        setEmployeeWalletValid={
-                            setEmployeeWalletValid
-                        }
-                        employeeDirectory={
-                            employeeDirectory
-                        }
-                        onVerify={
-                            handleVerifyEmployeeWallet
-                        }
-                        onSelect={
-                            handleSelectEmployee
-                        }
-                        shortenAddress={
-                            shortenAddress
-                        }
-                        onInvite={
-                            handleCreateEmployeeInvitation
-                        }
-                        invitationLoading={
-                            invitationLoading
-                        }
-                        invitationCode={
-                            invitationCode
-                        }
-                        invitationPath={
-                            invitationPath
-                        }
-                    />
-                </div>
-
 
                 <div id="reports">
                     <PayrollReports
