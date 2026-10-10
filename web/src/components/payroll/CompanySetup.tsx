@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type CompanySetupProps = {
   organizationExists: boolean;
   vaultExists: boolean;
@@ -21,6 +23,69 @@ type CompanySetupProps = {
   onSetup: () => void;
   shortenAddress: (address: string) => string;
 };
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    if (!value || copied) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch (error) {
+      console.error("Failed to copy address:", error);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleCopy()}
+      disabled={!value}
+      aria-label={copied ? "Copied" : "Copy address"}
+      title={copied ? "Copied" : "Copy full address"}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition disabled:opacity-30 ${
+        copied
+          ? "text-green-400"
+          : "text-zinc-400 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {copied ? (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      ) : (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="8" y="8" width="13" height="13" rx="2" />
+          <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+        </svg>
+      )}
+    </button>
+  );
+}
 
 export default function CompanySetup({
   organizationExists,
@@ -234,11 +299,14 @@ export default function CompanySetup({
               Treasury wallet
             </p>
 
-            <p className="mt-3 break-all text-sm">
-              {publicKey
-                ? shortenAddress(publicKey)
-                : "Not connected"}
-            </p>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="min-w-0 break-all text-sm">
+                {publicKey
+                  ? shortenAddress(publicKey)
+                  : "Not connected"}
+              </p>
+              {publicKey && <CopyButton value={publicKey} />}
+            </div>
 
             <p className="mt-5 text-xs text-zinc-500">
               Token balance
@@ -254,11 +322,16 @@ export default function CompanySetup({
               Organization
             </p>
 
-            <p className="mt-3 break-all text-sm">
-              {organizationAddress
-                ? shortenAddress(organizationAddress)
-                : "—"}
-            </p>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="min-w-0 break-all text-sm">
+                {organizationAddress
+                  ? shortenAddress(organizationAddress)
+                  : "—"}
+              </p>
+              {organizationAddress && (
+                <CopyButton value={organizationAddress} />
+              )}
+            </div>
 
             <p
               className={`mt-5 text-sm ${organizationExists
@@ -277,11 +350,14 @@ export default function CompanySetup({
               Payroll vault
             </p>
 
-            <p className="mt-3 break-all text-sm">
-              {vaultAddress
-                ? shortenAddress(vaultAddress)
-                : "—"}
-            </p>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="min-w-0 break-all text-sm">
+                {vaultAddress
+                  ? shortenAddress(vaultAddress)
+                  : "—"}
+              </p>
+              {vaultAddress && <CopyButton value={vaultAddress} />}
+            </div>
 
             <p className="mt-5 text-xs text-zinc-500">
               Vault balance
@@ -309,9 +385,12 @@ export default function CompanySetup({
             Token mint
           </p>
 
-          <p className="mt-3 break-all text-sm text-zinc-300">
-            {mint}
-          </p>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <p className="min-w-0 break-all text-sm text-zinc-300">
+              {mint || "—"}
+            </p>
+            {mint && <CopyButton value={mint} />}
+          </div>
         </div>
       </section>
     </>
