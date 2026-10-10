@@ -1,205 +1,141 @@
 # Tokenva
 
-> **Trustless Cross-Chain Asset Streaming & Payroll Protocol**
+**Trustless Cross-Chain Asset Streaming & Payroll Protocol**
 
-Tokenva is a **Solana-first programmable payroll and payment-streaming protocol**. It combines organization-managed treasury vaults, time-based payment streams, employee claims, stream lifecycle controls, an EVM gateway, Wormhole cross-chain messaging, and Wormhole NTT asset transfer.
+Tokenva is a Solana-first programmable payroll and payment-streaming prototype. It combines organization-managed treasury vaults, time-based payment streams, employee claims, stream lifecycle controls, an EVM gateway, Wormhole cross-chain messaging, and Wormhole Native Token Transfer (NTT).
 
-## Current status
+> **Project status:** Technical milestones M0–M12 are complete. M12 is the final technical milestone; there is no M13. The next phase is product definition and customer discovery (P1).
 
-| Milestone | Status |
-|---|---|
-| M0 — Environment + Solana fundamentals | ✅ Complete |
-| M1 — Protocol configuration | ✅ Complete |
-| M2 — Token vault + deposits | ✅ Complete |
-| M3 — Organization + company treasury | ✅ Complete |
-| M4 — Payment streams + claims | ✅ Complete |
-| M5 — Native lifecycle | ✅ Complete |
-| M6 — Security + comprehensive testing | ✅ Complete |
-| M7 — Frontend | ✅ Complete |
-| M8 — Backend / indexer | ✅ Complete |
-| M9 — EVM gateway | ✅ Complete |
-| M10 — Wormhole cross-chain messaging | ✅ Complete |
-| M11 — Cross-chain assets / NTT | ✅ Complete |
-| M12 — Devnet + documentation + portfolio | ✅ Complete |
+## Contents
 
-**M12 is the final technical milestone. There is no M13.**
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Technology stack](#technology-stack)
+- [Repository layout](#repository-layout)
+- [Development setup](#development-setup)
+- [Deployment references](#deployment-references)
+- [Demonstration evidence](#demonstration-evidence)
+- [Testing and verification](#testing-and-verification)
+- [Security and limitations](#security-and-limitations)
+- [Roadmap status](#roadmap-status)
+- [License](#license)
 
-The latest complete regression recorded in the project context is **41 passed / 0 failed**.
+## Overview
 
-## What Tokenva does
-
-The native Solana payroll flow is:
+Tokenva supports a native Solana payroll flow:
 
 ```text
-Company Wallet
-      ↓
+Company wallet
+     ↓
 Organization
-      ↓
-Tokenva Vault
-      ↓
-Create Stream
-      ↓
-Stream Escrow
-      ↓
+     ↓
+Tokenva vault
+     ↓
+Create payment stream
+     ↓
+Stream escrow
+     ↓
 Time-based earning
-      ↓
-Employee Claim
-      ↓
-Employee Token Account
+     ↓
+Employee claim
+     ↓
+Employee token account
 ```
 
-A stream contains the organization, employee, mint, total amount, start/end times, claimed amount, cancellation state, and related custody accounts. `Stream::earned_amount()` calculates the proportional amount earned over the stream window.
+A stream tracks its organization, employee, token mint, stream ID, total amount, start and end times, claimed amount, cancellation state, and related custody accounts. `Stream::earned_amount()` calculates the amount earned over the stream's configured time window.
 
-## Cross-chain architecture
+The Solana program is the source of truth for on-chain state. The backend indexes and serves queryable data; it does not replace the program.
 
-Tokenva deliberately separates the **control plane** from the **asset plane**.
+## Architecture
 
-### Control plane — cross-chain Tokenva actions
+Tokenva separates cross-chain **control-plane actions** from **asset-plane transfers**.
+
+### Control plane: cross-chain actions
 
 ```text
 Ethereum Sepolia
-      ↓
+     ↓
 Tokenva EVM Gateway
-      ↓
-Wormhole
-      ↓
+     ↓
+Wormhole message
+     ↓
 VAA
-      ↓
+     ↓
 Guardian verification
-      ↓
+     ↓
 Solana VAA verification shim
-      ↓
+     ↓
 Tokenva consume_vaa
-      ↓
+     ↓
 Cross-chain Tokenva action
 ```
 
-The gateway supports cross-chain intents for `CreateStream`, `TopUpStream`, and `CancelStream`. The live demonstrations recorded in the project context exercised CreateStream and TopUpStream.
+The gateway supports cross-chain intents for `CreateStream`, `TopUpStream`, and `CancelStream`. The demonstrations recorded for this project exercised `CreateStream` and `TopUpStream`.
 
-### Asset plane — Wormhole NTT
+### Asset plane: Wormhole NTT
 
 ```text
 EVM Sepolia ERC-20
-      ↓
+     ↓
 Wormhole NTT
-      ↓
+     ↓
 Solana Devnet SPL token
-      ↓
+     ↓
 Destination wallet
-      ↓
-Tokenva Vault deposit
-      ↓
-Stream Escrow
-      ↓
+     ↓
+Manual Tokenva vault deposit
+     ↓
+Stream escrow
+     ↓
 Employee claim
 ```
 
-The M11 demonstration proved a real Sepolia → Solana NTT transfer. The received asset was then manually deposited into the Tokenva vault before being used by the stream.
+The M11 demonstration completed a real Sepolia-to-Solana NTT transfer. The received asset was then deposited into the Tokenva vault manually. The demonstrated workflow does **not** include an automated atomic NTT-receive-to-vault relayer transaction.
 
-> **Important:** M11 does not currently prove an automated atomic `NTT receive → Tokenva Vault` relayer transaction. The demonstrated flow is real NTT transfer followed by a manual Tokenva vault deposit.
-
-### Application / indexing architecture
-
-The frontend uses two data paths:
+### Application and indexing
 
 ```text
-Native protocol path
-
-Connected wallet → Next.js Web App → Solana Devnet RPC → Tokenva Program
-                         ↓
-                  signs transactions
+On-chain transaction path
+Connected wallet → Next.js web app → Solana Devnet RPC → Tokenva program
+                         └─ signs transactions
 
 Indexed read path
-
-Solana Program → RPC → Stream/Activity Indexers → PostgreSQL → Express API
-                                                                  ↓
-                                                           Next.js Web App
+Solana program → RPC → stream/activity indexers → PostgreSQL → Express API
+                                                               ↓
+                                                        Next.js web app
 ```
 
-The backend provides indexed/query access; it does not replace the Solana program as the source of truth.
+## Features
 
-## Core Solana instructions
+- Organization and protocol configuration
+- Token vault initialization and deposits
+- Time-based payment streams and employee claims
+- Stream top-ups and cancellation
+- Indexed stream and activity queries through the backend
+- EVM gateway for cross-chain Tokenva actions
+- Wormhole VAA verification and cross-chain execution path
+- Wormhole NTT asset transfer prototype
+- Security-focused Solana tests and EVM gateway tests
 
-### Native protocol
+Core native Solana instructions include `initialize_protocol`, `create_organization`, `initialize_vault`, `deposit`, `create_stream`, `top_up_stream`, `claim`, and `cancel_stream`.
 
-- `initialize_protocol`
-- `create_organization`
-- `initialize_vault`
-- `deposit`
-- `create_stream`
-- `top_up_stream`
-- `claim`
-- `cancel_stream`
+The cross-chain execution path includes `consume_vaa`, `execute_cross_chain_create_stream`, and `execute_cross_chain_top_up`.
 
-### Cross-chain execution
+## Technology stack
 
-- `consume_vaa`
-- `execute_cross_chain_create_stream`
-- `execute_cross_chain_top_up`
+| Area | Technologies |
+|---|---|
+| Solana program | Rust, Anchor |
+| Solana tooling recorded for this project | Anchor CLI 1.2.0, Solana CLI 4.1.2, Rust 1.98.1 |
+| Web application | Next.js, React, TypeScript, Tailwind CSS |
+| Backend | Node.js, TypeScript, Express |
+| Database | PostgreSQL |
+| EVM gateway | Solidity 0.8.28, Hardhat |
+| Cross-chain messaging and assets | Wormhole messaging, VAA verification, Wormhole NTT |
+| Demonstration networks | Solana Devnet, Ethereum Sepolia |
 
-## Account model
-
-The main on-chain state types are:
-
-- `ProtocolConfig` — global protocol configuration
-- `Organization` — company/authority relationship
-- `Stream` — payment schedule and stream state
-- Cross-chain configuration / consumed-message state used by the Wormhole execution path
-
-A stream tracks:
-
-```text
-organization
-employee
-mint
-vault / escrow accounts
-stream ID
-total amount
-start time
-end time
-claimed amount
-canceled flag / cancel time
-bump
-```
-
-## Security model
-
-The cross-chain execution path validates, among other things:
-
-- VAA body structure and length
-- sequence
-- trusted source chain
-- trusted emitter
-- guardian verification
-- payload length
-- message version
-- action
-- destination chain
-- destination program
-- operation ID
-- stream ID
-- organization
-- employee
-- amount
-- timestamps
-- payload hash
-- canonical numeric encoding
-- non-zero nonce
-- replay / consumed-message state
-
-The native protocol tests also cover unauthorized signers, wrong employee, wrong organization, wrong vault, wrong mint, wrong token program, zero amounts, invalid time ranges, overflow, and invalid lifecycle transitions.
-
-The current project context records:
-
-```text
-cross_chain_security.rs  → 19 tests
-security.rs              → 13 tests
-complete cargo regression → 41 passed / 0 failed
-```
-
-This is a **prototype security model**, not a substitute for an independent production security audit.
-
-## Repository structure
+## Repository layout
 
 ```text
 .
@@ -218,7 +154,6 @@ This is a **prototype security model**, not a substitute for an independent prod
 │   ├── contracts/
 │   ├── scripts/
 │   ├── test/
-│   ├── types/
 │   └── hardhat.config.ts
 ├── idls/
 ├── programs/
@@ -226,95 +161,42 @@ This is a **prototype security model**, not a substitute for an independent prod
 │       ├── Cargo.toml
 │       ├── src/
 │       └── tests/
-├── target/
 └── web/
     └── src/
 ```
 
-NTT deployment support remains in the separate workspace:
+NTT deployment support is maintained separately in `/projects/stream-pay-ntt` for reproducibility. Do not commit `.env` files, private keys, or other secret key material.
 
-```text
-/projects/stream-pay-ntt
-```
-
-NTT deployment support remains in the separate workspace for reproducibility. Private key material from that workspace must never be committed.
-
-## Program details
-
-```text
-Program ID:
-4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS
-
-Anchor:
-1.2.0
-
-Solana CLI:
-4.1.2 (Agave)
-
-Rust:
-1.98.1
-
-Cargo:
-1.98.1
-
-AVM:
-1.2.0
-
-Development / demo cluster:
-Solana Devnet
-
-RPC:
-https://api.devnet.solana.com
-```
-
-## Solana development
+## Development setup
 
 ### Prerequisites
 
-- Rust
-- Solana CLI
-- Anchor CLI
+Install Rust, Cargo, Solana CLI, Anchor CLI, and Node.js/npm versions compatible with the project packages.
 
-### Install / verify Anchor
+Check the Anchor CLI version:
 
 ```bash
 anchor --version
 ```
 
-The project context records Anchor CLI `1.2.0`.
+### Solana program
 
-### Build
+Run these commands from the repository root:
 
 ```bash
 anchor build
-```
-
-### Run tests
-
-```bash
 cargo test
 ```
 
-or, when running the full Anchor test workflow:
+For the full Anchor test workflow, use:
 
 ```bash
 anchor test
 ```
 
-### Local deployment
+For local development, follow the project's configured localnet workflow. Use the documented Devnet deployment when reproducing the cross-chain demonstrations; localnet state is separate from Devnet state.
 
-For local development, use the project's Anchor localnet workflow:
-
-```bash
-anchor localnet
-anchor deploy
-```
-
-For the documented cross-chain prototype evidence, use the configured Solana Devnet deployment rather than assuming localnet state.
-
-## EVM gateway
-
-The EVM gateway is a separate Hardhat project:
+### EVM gateway
 
 ```bash
 cd evm-gateway
@@ -323,97 +205,77 @@ npx hardhat compile
 npx hardhat test
 ```
 
-Solidity version:
+For Sepolia operations, create a local `evm-gateway/.env` containing the required configuration:
 
-```text
-0.8.28
-```
-
-For Sepolia operations, create a local `evm-gateway/.env` with:
-
-```text
+```dotenv
 SEPOLIA_RPC_URL=...
 SEPOLIA_PRIVATE_KEY=...
 ```
 
-Do not commit `.env` or private keys.
+Use your own credentials and never commit this file or disclose private keys.
 
-### Current canonical Sepolia gateway
+### Backend and web application
 
-```text
-0x13a5b0be7F5841Ac2Cb0D07e71bB4209f469F104
-```
+Use each package's existing scripts and lockfiles. From the relevant package directory, install dependencies with `npm ci` where a lockfile is available, then run the package's typecheck, lint, build, or test scripts as defined in its `package.json`.
 
-Older/accidental gateway deployments exist in the project history. The address above is the canonical current gateway reference for documentation.
+Do not assume that local environment variables, database contents, or deployed service configuration match production.
 
-## Wormhole configuration
+## Deployment references
 
-```text
-Wormhole Sepolia Core:
-0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78
+These are project references recorded for the prototype. Confirm network and deployment state before relying on them for a new deployment.
 
-Wormhole Solana Devnet Core:
-3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5
+### Solana Devnet
 
-VAA verification shim:
-EFaNWErqAtVWufdNb7yofSHHfWFos843DFpu4JBw24at
-```
+| Item | Address / value |
+|---|---|
+| Tokenva program ID | `4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS` |
+| RPC endpoint | `https://api.devnet.solana.com` |
+| Vault used in the recorded demonstration | `2bUM6WJy5F7cfPs2eV3Umhp6cnYjU6L4rbwQ7tMnusCF` |
+| Stream #14 | `9jFund1g7mtFfAAxC2uy4FUytMC9QUTqPRhoymASi2MG` |
+| Stream #14 escrow | `928WAuWxyzktSLj7YiG5kbHKpRfDtogsNfTfySb2QJFe` |
 
-The trusted Sepolia emitter represented on Solana is the canonical gateway address encoded for the Wormhole emitter configuration.
+### EVM gateway and Wormhole
 
-## M11 NTT deployment
+| Item | Address |
+|---|---|
+| Canonical Sepolia Tokenva gateway recorded for this project | `0x13a5b0be7F5841Ac2Cb0D07e71bB4209f469F104` |
+| Wormhole Core on Sepolia | `0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78` |
+| Wormhole Core on Solana Devnet | `3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5` |
+| Solana VAA verification shim | `EFaNWErqAtVWufdNb7yofSHHfWFos843DFpu4JBw24at` |
 
-NTT work was performed in:
+### Wormhole NTT deployment
 
-```text
-/projects/stream-pay-ntt
-```
+| Item | Recorded value |
+|---|---|
+| EVM NTT Manager | `0x794513173F19f845e0f65eaa25E1993d155F9617` |
+| EVM Wormhole Transceiver | `0xeD456304d60850A9fE582E34a427005b98eC880f` |
+| Tokenva M11 ERC-20 | `0x7E37db0F3b62a2b77E206509235da94CC195016D` |
+| Solana NTT Manager | `ntt66yTmjfbc459s9m8zhE948bd79vYwvJayV3pXrr5` |
+| Solana token | `6jDvPYSs5qerGyXe3G2FLpFJhFQHHvjbkj9Xi9jYDxhB` |
+| Solana Wormhole Transceiver | `36tGDqAkiAuaRhLMkHhvR63hJvTojekuacPGRkFDshvq` |
+| Token decimals | 6 |
+| EVM mode | Locking |
+| Solana mode | Burning |
 
-NTT CLI used during setup:
+## Demonstration evidence
 
-```text
-1.7.0
-```
+### Native Solana claim
 
-### EVM side
+Recorded claim transaction:
 
-```text
-NTT Manager:
-0x794513173F19f845e0f65eaa25E1993d155F9617
+`CEDLuqHsNURcNZZyKXd5ycmttgXGFaqCnZr8aNFHA4ppcxMqjeSjApeqbMifmFSMf11CTesoKEZgG9Q9112feDN`
 
-Wormhole Transceiver:
-0xeD456304d60850A9fE582E34a427005b98eC880f
+Recorded token-balance reconciliation:
 
-Tokenva M11 ERC-20:
-0x7E37db0F3b62a2b77E206509235da94CC195016D
+| Account | Before | After |
+|---|---:|---:|
+| Employee | 0 | 3.296296 |
+| Escrow | 50 | 46.703704 |
+| **Combined** | **50.000000** | **50.000000** |
 
-Decimals:
-6
-```
+### NTT transfer
 
-The EVM side used locking mode.
-
-### Solana side
-
-```text
-NTT Manager:
-ntt66yTmjfbc459s9m8zhE948bd79vYwvJayV3pXrr5
-
-Solana token:
-6jDvPYSs5qerGyXe3G2FLpFJhFQHHvjbkj9Xi9jYDxhB
-
-Wormhole transceiver:
-36tGDqAkiAuaRhLMkHhvR63hJvTojekuacPGRkFDshvq
-
-Mode:
-burning
-```
-
-The Solana token uses 6 decimals and the legacy SPL Token Program.
-
-### Demonstrated NTT transfer
-
-The recorded transfer command was:
+The recorded NTT command was:
 
 ```bash
 ntt token-transfer \
@@ -427,126 +289,75 @@ ntt token-transfer \
 
 Recorded source transactions:
 
-```text
-0x6c98267887fcdc296ae7f6fd1da091e0dc22df9720dc3e004c7c5ccddaf41b92
-0xbfd21e50369c0b4c7a589cae38ada14bcff146072f06a92fcaa2d9a6ae9e2e50
-```
+- `0x6c98267887fcdc296ae7f6fd1da091e0dc22df9720dc3e004c7c5ccddaf41b92`
+- `0xbfd21e50369c0b4c7a589cae38ada14bcff146072f06a92fcaa2d9a6ae9e2e50`
 
-Recorded Wormhole sequence:
+Recorded Wormhole sequence: `2`.
 
-```text
-2
-```
+[View the recorded WormholeScan transaction](https://wormholescan.io/#/tx/0xbfd21e50369c0b4c7a589cae38ada14bcff146072f06a92fcaa2d9a6ae9e2e50?network=Testnet)
 
-WormholeScan reference:
+The destination wallet received the asset, after which `1 SPT` was manually deposited into the Tokenva vault.
 
-```text
-https://wormholescan.io/#/tx/0xbfd21e50369c0b4c7a589cae38ada14bcff146072f06a92fcaa2d9a6ae9e2e50?network=Testnet
-```
+## Testing and verification
 
-The destination wallet received the transferred asset. Exactly `1 SPT` was then manually deposited into the Tokenva vault.
+The latest complete regression recorded in the project context was:
 
-## Important live Solana evidence
+| Check | Recorded result |
+|---|---|
+| Solana / Rust tests | 41 passed, 0 failed |
+| EVM Hardhat tests | 9 passed |
+| Backend typecheck | Pass |
+| Web lint | Pass |
+| Web production build | Pass |
+| EVM compile | Pass |
+| `git diff --check` | Pass |
+| Git working tree at final packaging | Clean |
 
-### Program
+These are recorded results, not a claim that tests have been rerun against the current checkout.
 
-```text
-4wvijq8n8bUKMsvmyJuhJzmdYq3jDUQYAZ6TXXjZDskS
-```
+The recorded M12 commits are:
 
-### Current vault
+- `61d3755` — `chore: complete M12 technical packaging`
+- `e9d491b` — `chore: ignore generated EVM types`
 
-```text
-2bUM6WJy5F7cfPs2eV3Umhp6cnYjU6L4rbwQ7tMnusCF
-```
+A non-blocking Rust warning was recorded for an unused `authority_mint` variable in `programs/stream-pay-solana/tests/cross_chain_asset.rs`.
 
-### Stream #14
+## Security and limitations
 
-```text
-Stream:
-9jFund1g7mtFfAAxC2uy4FUytMC9QUTqPRhoymASi2MG
+Tokenva is a technical prototype, not a production payroll service. Its test coverage and validation logic are not substitutes for an independent security audit.
 
-Escrow:
-928WAuWxyzktSLj7YiG5kbHKpRfDtogsNfTfySb2QJFe
-```
+The cross-chain execution path validates VAA structure, sequence, trusted source chain and emitter, guardian verification, payload fields, destination, operation and stream identifiers, organization, employee, amount, timestamps, payload hash, numeric encoding, nonce, and replay/consumed-message state. Native tests cover authorization, account relationships, token configuration, amount and time constraints, overflow, and lifecycle transitions.
 
-### Employee claim
+Known gaps include:
 
-Recorded claim transaction:
+- Production-ready company onboarding and employee invitations
+- Enterprise roles and approval policies
+- Production-grade monitoring, retry, and failover operations
+- Commercial billing and support operations
+- Legal and compliance operating structure
+- Independent security audit
+- Validated design-partner demand
+- Automated atomic NTT receipt into the Tokenva vault
 
-```text
-CEDLuqHsNURcNZZyKXd5ycmttgXGFaqCnZr8aNFHA4ppcxMqjeSjApeqbMifmFSMf11CTesoKEZgG9Q9112feDN
-```
+## Roadmap status
 
-Observed reconciliation:
+| Milestone | Scope | Status |
+|---|---|---|
+| M0 | Environment and Solana fundamentals | Complete |
+| M1 | Protocol configuration | Complete |
+| M2 | Token vault and deposits | Complete |
+| M3 | Organization and company treasury | Complete |
+| M4 | Payment streams and claims | Complete |
+| M5 | Native lifecycle | Complete |
+| M6 | Security and comprehensive testing | Complete |
+| M7 | Frontend | Complete |
+| M8 | Backend and indexer | Complete |
+| M9 | EVM gateway | Complete |
+| M10 | Wormhole cross-chain messaging | Complete |
+| M11 | Cross-chain assets / NTT | Complete |
+| M12 | Devnet, documentation, and portfolio packaging | Complete |
 
-```text
-Employee before: 0
-Escrow before:   50
-
-Employee after:  3.296296
-Escrow after:    46.703704
-
-3.296296 + 46.703704 = 50.000000
-```
-
-## M12 — Final technical milestone complete
-
-M12 is the final technical milestone. The complete technical prototype is now packaged with reproducible documentation, architecture descriptions, deployment identifiers, live transaction evidence, security notes, known limitations, and verification commands.
-
-### M12 completion
-
-```text
-M12.1  ✅ Repository documentation
-M12.2  ✅ Architecture documentation
-M12.3  ✅ Reproducible demo
-M12.4  ✅ Final technical evidence
-```
-
-### Final verification
-
-```text
-Solana / Rust tests   41 passed / 0 failed
-EVM Hardhat tests      9 passed / 0 failed
-Backend typecheck      PASS
-Web lint               PASS
-Web production build   PASS
-EVM compile            PASS
-git diff --check       PASS
-git status              CLEAN
-```
-
-A non-blocking Rust warning remains in `programs/stream-pay-solana/tests/cross_chain_asset.rs` for an unused `authority_mint` test variable. It does not affect the passing regression.
-
-The final M12 work was committed and pushed as:
-
-```text
-61d3755  chore: complete M12 technical packaging
-e9d491b  chore: ignore generated EVM types
-```
-
-The EVM TypeChain artifacts are generated files; the tracked generated changes were restored after verification and future generated `types/` output is ignored by `evm-gateway/.gitignore`.
-
-### Next phase
-
-The technical milestone track is finished. The next phase is **P1 — Product Definition + Customer Discovery**. No new M13 technical milestone is planned.
-
-## Honest limitations
-
-Tokenva is a technical prototype, not yet a production payroll company.
-
-The project does not yet represent production-ready:
-
-- company onboarding and employee invitation workflows
-- enterprise roles and approval policies
-- production monitoring / retries / failover
-- commercial billing
-- support operations
-- legal/compliance operating structure
-- independent security audit
-- validated design-partner demand
-
-The M11 NTT integration has one explicit prototype limitation: the asset transfer itself is real, but the demonstrated path is **NTT → destination wallet → manual Tokenva vault deposit**, not an automated atomic NTT-receive-to-vault relayer.
+**M12 is the final technical milestone.** The next phase is **P1 — Product Definition + Customer Discovery**, outside the M0–M12 technical milestone track.
 
 ## License
 
