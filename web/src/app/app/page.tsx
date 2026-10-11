@@ -1126,6 +1126,7 @@ function ProtectedHome({
                     </div>
                     <div className="flex gap-5">
 
+                        <Link href="/how-it-works" className="rounded-xl border border-zinc-800 px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white" > How it works? </Link>
                         <Link href="/" className="rounded-xl border border-zinc-800 px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white" > Home </Link>
                         <div className="dashboard-wallet"><WalletButton /></div>
                     </div>

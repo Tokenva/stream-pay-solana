@@ -1,16 +1,17 @@
 # StreamPay Solana Project Structure
 
-This repository combines the Solana Anchor program, the EVM gateway, a TypeScript backend, and a Next.js frontend. The tree below reflects the current live source layout in this workspace and intentionally omits generated dependency/build output such as `target/`, `node_modules/`, `.next/`, and cache directories.
+This repository combines the Solana Anchor program, the EVM gateway, a TypeScript backend, and a Next.js frontend. The tree below reflects the current live source layout in this workspace and intentionally omits generated dependency/build output such as `target/`, `node_modules/`, `.next/`, `.vercel/`, `artifacts/`, `cache/`, and other transient files.
 
 ```text
 stream-pay-solana/
-├── .anchor/
 ├── .backups/
 ├── .gitignore
 ├── .prettierignore
 ├── Anchor.toml
 ├── Cargo.lock
 ├── Cargo.toml
+├── TokenvaPay_Brand_Assets/
+├── TokenvaPay_Brand_Assets.zip
 ├── app/                                  # wrapper workspace / scaffold
 ├── backend/
 │   ├── .env
@@ -56,8 +57,6 @@ stream-pay-solana/
 │   ├── package-lock.json
 │   ├── remappings.txt
 │   ├── tsconfig.json
-│   ├── artifacts/
-│   ├── cache/
 │   ├── contracts/
 │   │   ├── StreamPayEvmGateway.sol
 │   │   ├── StreamPayM11Token.sol
@@ -66,7 +65,6 @@ stream-pay-solana/
 │   │   └── mocks/
 │   │       └── MockWormhole.sol
 │   ├── ignition/
-│   ├── node_modules/
 │   ├── scripts/
 │   │   ├── check-protocol-config.ts
 │   │   ├── close-vaa-signatures.ts
@@ -163,6 +161,8 @@ stream-pay-solana/
 │       │   │           └── route.ts
 │       │   ├── app/
 │       │   │   └── page.tsx
+│       │   ├── how-it-works/
+│       │   │   └── page.tsx
 │       │   ├── favicon.ico
 │       │   ├── globals.css
 │       │   ├── join/
@@ -225,10 +225,12 @@ stream-pay-solana/
 
 - `programs/stream-pay-solana/`: Solana Anchor program and Rust test suite.
 - `evm-gateway/`: Solidity smart contracts, deployment config, and Hardhat scripts.
-- `backend/`: TypeScript services for indexing, auth, company logic, employee invitation logic, and cross-chain processing.
+- `backend/`: TypeScript services for indexing, auth, company logic, employee invitations, and cross-chain processing.
 - `web/`: Next.js app with pages, API routes, dashboard views, hooks, IDL bindings, join flow, and wallet logic.
 - `docs/`: product, roadmap, threat-model, and project context documentation.
 - `idls/`: Wormhole verification interface definitions used across stacks.
 - `app/`: workspace wrapper and container scaffold.
+- `TokenvaPay_Brand_Assets/`: brand assets and project artwork.
+- `.backups/`: local backup snapshots retained in the workspace.
 
-This structure intentionally excludes generated output such as `target/`, `node_modules/`, `.next/`, build caches, and other transient artifacts while keeping the source-relevant project files visible.
+This structure intentionally excludes generated output such as `target/`, `node_modules/`, `.next/`, `.vercel/`, `cache/`, `artifacts/`, and other transient files while keeping the source-relevant project files visible.
